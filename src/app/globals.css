@@ -1,16 +1,17 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 20% 98%; /* Ultra light gray-blue */
+    --background: 210 20% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 60%; /* Vibrant professional blue */
+    --primary: 217 91% 60%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222 47% 11.2%;
@@ -24,17 +25,12 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 217 91% 60%;
     --radius: 0.75rem;
-    --chart-1: 217 91% 60%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
   }
 
   .dark {
-    --background: 222 47% 4%; /* Deepest black-blue */
+    --background: 222 47% 4%;
     --foreground: 210 40% 98%;
-    --card: 222 47% 6%; /* Slightly lighter than background */
+    --card: 222 47% 6%;
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 6%;
     --popover-foreground: 210 40% 98%;
@@ -59,7 +55,11 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body selection:bg-primary/20;
+    @apply bg-background text-foreground font-body selection:bg-primary/20 antialiased overflow-x-hidden;
+    background-image: 
+      radial-gradient(at 0% 0%, hsla(217, 91%, 60%, 0.03) 0, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(27, 87%, 67%, 0.03) 0, transparent 50%);
+    background-attachment: fixed;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline font-bold tracking-tight;
@@ -68,10 +68,39 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-white/10 dark:border-white/5;
+    @apply bg-card/60 backdrop-blur-xl border border-white/5 dark:border-white/5 shadow-xl;
   }
   
   .sidebar-item-active {
-    @apply bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgba(var(--primary),0.2)] relative after:absolute after:left-0 after:top-1/2 after:-translate-y-1/2 after:h-6 after:w-1 after:bg-primary after:rounded-r-full;
+    @apply bg-primary/10 text-primary relative;
+  }
+
+  .premium-button {
+    @apply transition-all duration-200 active:scale-[0.97] hover:shadow-lg hover:shadow-primary/20;
+  }
+
+  .page-transition {
+    @apply animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out;
+  }
+}
+
+@keyframes slow-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-slow-gradient {
+  background-size: 200% 200%;
+  animation: slow-gradient 15s ease infinite;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

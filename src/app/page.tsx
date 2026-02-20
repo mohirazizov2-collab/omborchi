@@ -1,7 +1,9 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,10 +65,22 @@ export default function DashboardPage() {
   if (!mounted || isUserLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
-          <p className="text-sm font-bold text-muted-foreground animate-pulse tracking-[0.2em] uppercase">omborchi.uz</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-6"
+        >
+          <div className="relative">
+            <Loader2 className="w-12 h-12 animate-spin text-primary" />
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: [0.8, 1.2, 0.8], opacity: [0, 0.5, 0] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="absolute inset-0 bg-primary/20 rounded-full blur-xl"
+            />
+          </div>
+          <p className="text-sm font-black text-muted-foreground animate-pulse tracking-[0.4em] uppercase">omborchi.uz</p>
+        </motion.div>
       </div>
     );
   }
@@ -88,7 +102,7 @@ export default function DashboardPage() {
       trendIcon: Zap,
       trendColor: "text-amber-500",
       icon: WarehouseIcon,
-      color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
+      color: "bg-purple-500/10 text-purple-500"
     },
     { 
       label: t.dashboard.monthlyStockIn, 
@@ -97,7 +111,7 @@ export default function DashboardPage() {
       trendIcon: TrendingUp,
       trendColor: "text-emerald-500",
       icon: ArrowDownRight,
-      color: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+      color: "bg-emerald-500/10 text-emerald-500"
     },
     { 
       label: t.dashboard.monthlyStockOut, 
@@ -106,7 +120,7 @@ export default function DashboardPage() {
       trendIcon: ArrowUpRight,
       trendColor: "text-rose-500",
       icon: ArrowUpRight,
-      color: "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
+      color: "bg-rose-500/10 text-rose-500"
     },
   ];
 
@@ -123,200 +137,264 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <OmniSidebar />
-      <main className="flex-1 p-10 overflow-y-auto scroll-smooth">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+      <motion.main 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="flex-1 p-10 overflow-y-auto"
+      >
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-widest bg-primary/5 text-primary border-primary/20">Operational</Badge>
-              <span className="text-xs text-muted-foreground font-bold">• {new Date().toLocaleDateString('uz-UZ', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-            </div>
-            <h1 className="text-4xl font-black font-headline tracking-tight">{t.dashboard.title}</h1>
-            <p className="text-muted-foreground font-medium">{t.dashboard.description}</p>
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 mb-1"
+            >
+              <Badge variant="outline" className="text-[10px] uppercase font-black tracking-widest bg-primary/5 text-primary border-primary/20 px-3">Operational</Badge>
+              <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-50">• {new Date().toLocaleDateString('uz-UZ', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            </motion.div>
+            <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.dashboard.title}</h1>
+            <p className="text-muted-foreground font-medium text-sm">{t.dashboard.description}</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="rounded-xl font-bold bg-card border-none shadow-sm hover:shadow-md transition-all">
+            <Button variant="outline" className="rounded-xl font-bold bg-card border-white/5 shadow-sm hover:shadow-xl transition-all premium-button">
               <Calendar className="w-4 h-4 mr-2" /> {t.actions.downloadReport}
             </Button>
-            <Button className="rounded-xl font-bold text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all px-6">
+            <Button className="rounded-xl font-black uppercase tracking-widest text-[10px] text-white shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all px-8 h-12 premium-button bg-primary">
               <Zap className="w-4 h-4 mr-2" /> {t.actions.newOperation}
             </Button>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          {stockStats.map((stat, idx) => (
-            <Card key={stat.label} className={cn("border-none shadow-sm bg-card/60 backdrop-blur-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 group", `delay-[${idx * 100}ms]`)}>
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-start mb-6">
-                  <div className={cn("p-3 rounded-2xl transition-transform group-hover:scale-110", stat.color)}>
-                    <stat.icon className="w-6 h-6" />
+        <motion.div 
+          variants={{
+            hidden: { opacity: 0 },
+            show: {
+              opacity: 1,
+              transition: { staggerChildren: 0.05 }
+            }
+          }}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
+        >
+          {stockStats.map((stat) => (
+            <motion.div
+              key={stat.label}
+              variants={{
+                hidden: { opacity: 0, y: 20 },
+                show: { opacity: 1, y: 0 }
+              }}
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            >
+              <Card className="border-none glass-card hover:bg-card group transition-colors">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className={cn("p-3 rounded-2xl transition-transform group-hover:scale-110 duration-300", stat.color)}>
+                      <stat.icon className="w-6 h-6" />
+                    </div>
+                    <div className={cn("flex items-center px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-background border border-white/5 shadow-inner", stat.trendColor)}>
+                      <stat.trendIcon className="w-3 h-3 mr-1" />
+                      {stat.trend}
+                    </div>
                   </div>
-                  <div className={cn("flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-background border", stat.trendColor)}>
-                    <stat.trendIcon className="w-3 h-3 mr-1" />
-                    {stat.trend}
+                  <div className="space-y-1">
+                    <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">{stat.label}</h3>
+                    <p className="text-3xl font-black font-headline tracking-tighter">{stat.value}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-2"
+          >
+            <Card className="border-none glass-card overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-8">
+                <div>
+                  <CardTitle className="font-headline font-black text-xl tracking-tight">{t.dashboard.stockMovements}</CardTitle>
+                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 opacity-50">Real-time flow analytics</p>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary" />
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">In</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Out</span>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</h3>
-                  <p className="text-3xl font-black font-headline tracking-tighter">{stat.value}</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[350px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(var(--foreground), 0.03)" />
+                      <XAxis 
+                        dataKey="month" 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tick={{ fontSize: 9, fontWeight: 900, fill: 'var(--muted-foreground)', letterSpacing: '0.1em' }} 
+                      />
+                      <YAxis 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tick={{ fontSize: 9, fontWeight: 900, fill: 'var(--muted-foreground)' }} 
+                      />
+                      <Tooltip 
+                        cursor={{ fill: 'rgba(var(--primary), 0.03)' }}
+                        contentStyle={{ 
+                          borderRadius: '20px', 
+                          border: 'none', 
+                          backgroundColor: 'rgba(0,0,0,0.8)',
+                          backdropFilter: 'blur(20px)',
+                          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                          padding: '16px',
+                          color: 'white'
+                        }} 
+                      />
+                      <Bar dataKey="stockIn" fill="var(--primary)" radius={[4, 4, 0, 0]} barSize={24} />
+                      <Bar dataKey="stockOut" fill="rgba(var(--foreground), 0.1)" radius={[4, 4, 0, 0]} barSize={24} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
-          ))}
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="border-none glass-card overflow-hidden h-full">
+              <CardHeader className="flex flex-row items-center justify-between pb-6">
+                <div>
+                  <CardTitle className="font-headline font-black text-xl tracking-tight">{t.dashboard.lowStockAlerts}</CardTitle>
+                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 opacity-50">Priority action</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-lg shadow-rose-500/10">
+                  <AlertTriangle className="w-5 h-5 animate-pulse" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <AnimatePresence mode="popLayout">
+                  {lowStockItems.length > 0 ? lowStockItems.map((item: any, idx) => (
+                    <motion.div 
+                      key={item.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className="flex items-center justify-between p-4 rounded-2xl bg-background/40 border border-white/5 hover:border-rose-500/30 transition-all hover:bg-background/80 cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-[10px] font-black group-hover:bg-rose-500/10 group-hover:text-rose-500 transition-colors">
+                          {item.name[0]}
+                        </div>
+                        <div>
+                          <p className="text-sm font-black truncate max-w-[120px] text-foreground">{item.name}</p>
+                          <p className="text-[9px] text-muted-foreground font-black tracking-[0.2em] uppercase opacity-50">{item.sku}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-rose-500">{item.stock}</p>
+                        <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest opacity-50">Units</p>
+                      </div>
+                    </motion.div>
+                  )) : (
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <Box className="w-12 h-12 text-muted/20 mb-4" />
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Healthy Levels</p>
+                    </div>
+                  )}
+                </AnimatePresence>
+                <Button variant="ghost" className="w-full mt-4 text-[9px] font-black uppercase tracking-[0.3em] text-primary hover:bg-primary/5 rounded-xl premium-button">
+                  {t.dashboard.viewAll} <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-          <Card className="lg:col-span-2 border-none shadow-sm bg-card/40 backdrop-blur-md animate-in fade-in slide-in-from-left-4 duration-1000">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="border-none glass-card overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="font-headline font-black text-xl">{t.dashboard.stockMovements}</CardTitle>
-                <p className="text-xs text-muted-foreground font-medium mt-1">Real-time inventory flow analytics</p>
+                <CardTitle className="font-headline font-black text-xl tracking-tight">{t.dashboard.recentMovements}</CardTitle>
+                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1 opacity-50">Verified audit log</p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 mr-4">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Stock In</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-muted" />
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Stock Out</span>
-                </div>
-              </div>
+              <Button variant="outline" size="sm" className="rounded-lg text-[9px] font-black uppercase tracking-widest h-8 px-4 premium-button border-white/5">History</Button>
             </CardHeader>
-            <CardContent>
-              <div className="h-[350px] w-full pt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(var(--foreground), 0.05)" />
-                    <XAxis 
-                      dataKey="month" 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--muted-foreground)' }} 
-                    />
-                    <YAxis 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--muted-foreground)' }} 
-                    />
-                    <Tooltip 
-                      cursor={{ fill: 'rgba(var(--primary), 0.05)' }}
-                      contentStyle={{ 
-                        borderRadius: '16px', 
-                        border: 'none', 
-                        backgroundColor: 'var(--card)',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                        padding: '12px'
-                      }} 
-                    />
-                    <Bar dataKey="stockIn" fill="var(--primary)" radius={[6, 6, 0, 0]} barSize={24} />
-                    <Bar dataKey="stockOut" fill="var(--muted)" radius={[6, 6, 0, 0]} barSize={24} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm bg-card/40 backdrop-blur-md animate-in fade-in slide-in-from-right-4 duration-1000 overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div>
-                <CardTitle className="font-headline font-black text-xl">{t.dashboard.lowStockAlerts}</CardTitle>
-                <p className="text-xs text-muted-foreground font-medium mt-1">Priority reorder list</p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500">
-                <AlertTriangle className="w-5 h-5 animate-pulse" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {lowStockItems.length > 0 ? lowStockItems.map((item: any, idx) => (
-                  <div key={item.id} className={cn("flex items-center justify-between p-4 rounded-2xl bg-background/50 border border-transparent hover:border-rose-500/30 transition-all hover:bg-background cursor-pointer group", `animate-in slide-in-from-right-4 duration-500 delay-[${idx * 150}ms]`)}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xs font-black group-hover:bg-rose-500/10 group-hover:text-rose-500 transition-colors">
-                        {item.name[0]}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold truncate max-w-[120px]">{item.name}</p>
-                        <p className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">{item.sku}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-rose-500">{item.stock}</p>
-                      <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Left</p>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="py-20 flex flex-col items-center justify-center text-center">
-                    <Box className="w-12 h-12 text-muted/20 mb-4" />
-                    <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">All stock levels healthy</p>
-                  </div>
-                )}
-              </div>
-              <Button variant="ghost" className="w-full mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary hover:bg-primary/5 rounded-xl">
-                {t.dashboard.viewAll} <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="border-none shadow-sm bg-card/30 backdrop-blur-lg animate-in fade-in slide-in-from-bottom-8 duration-1000 overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="font-headline font-black text-xl">{t.dashboard.recentMovements}</CardTitle>
-              <p className="text-xs text-muted-foreground font-medium mt-1">Audit log of latest inventory transactions</p>
-            </div>
-            <Button variant="outline" size="sm" className="rounded-lg text-[10px] font-bold uppercase tracking-wider h-8">View History</Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="relative overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.1em]">
-                  <tr>
-                    <th className="px-8 py-4">{t.common.id}</th>
-                    <th className="px-6 py-4">{t.common.type}</th>
-                    <th className="px-6 py-4">{t.common.product}</th>
-                    <th className="px-6 py-4">{t.common.quantity}</th>
-                    <th className="px-6 py-4">{t.common.warehouse}</th>
-                    <th className="px-6 py-4">{t.common.date}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {movements && movements.map((m: any) => (
-                    <tr key={m.id} className="hover:bg-white/5 transition-colors group">
-                      <td className="px-8 py-5 font-code text-xs font-bold text-primary/80 group-hover:text-primary">#{m.id.substring(0,8).toUpperCase()}</td>
-                      <td className="px-6 py-5">
-                        <Badge variant="outline" className={cn(
-                          "rounded-lg font-bold text-[10px] uppercase tracking-wider px-2 py-0.5",
-                          m.movementType === 'StockIn' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                        )}>
-                          {m.movementType}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-5 font-bold text-foreground/90">{m.productId}</td>
-                      <td className="px-6 py-5">
-                        <span className={cn("font-black", m.quantityChange > 0 ? "text-emerald-500" : "text-rose-500")}>
-                          {m.quantityChange > 0 ? `+${m.quantityChange}` : m.quantityChange}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 font-medium text-muted-foreground">{m.warehouseId}</td>
-                      <td className="px-6 py-5 text-muted-foreground font-bold text-xs uppercase tracking-tighter">
-                        {m.movementDate ? new Date(m.movementDate).toLocaleDateString() : 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                  {(!movements || movements.length === 0) && (
+            <CardContent className="p-0">
+              <div className="relative overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-[9px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.2em]">
                     <tr>
-                      <td colSpan={6} className="px-6 py-20 text-center text-muted-foreground italic font-medium">
-                        No activity recorded yet.
-                      </td>
+                      <th className="px-8 py-5">Reference</th>
+                      <th className="px-6 py-5">Activity</th>
+                      <th className="px-6 py-5">Item</th>
+                      <th className="px-6 py-5 text-right">Qty</th>
+                      <th className="px-6 py-5">Node</th>
+                      <th className="px-6 py-5 text-right">Timestamp</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {movements && movements.map((m: any, idx: number) => (
+                      <motion.tr 
+                        key={m.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5 + idx * 0.05 }}
+                        className="hover:bg-primary/[0.02] transition-colors group cursor-pointer"
+                      >
+                        <td className="px-8 py-5 font-code text-[11px] font-black text-primary/70 group-hover:text-primary uppercase tracking-tight">#{m.id.substring(0,8)}</td>
+                        <td className="px-6 py-5">
+                          <Badge variant="outline" className={cn(
+                            "rounded-lg font-black text-[9px] uppercase tracking-widest px-3 py-1 border-none shadow-sm",
+                            m.movementType === 'StockIn' ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                          )}>
+                            {m.movementType}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-5 font-bold text-foreground/90 text-sm">{m.productId}</td>
+                        <td className="px-6 py-5 text-right">
+                          <span className={cn("font-black text-sm", m.quantityChange > 0 ? "text-emerald-500" : "text-rose-500")}>
+                            {m.quantityChange > 0 ? `+${m.quantityChange}` : m.quantityChange}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5 font-bold text-muted-foreground text-xs uppercase tracking-wider opacity-60">{m.warehouseId}</td>
+                        <td className="px-6 py-5 text-right text-[10px] text-muted-foreground font-black uppercase tracking-tighter opacity-40">
+                          {m.movementDate ? new Date(m.movementDate).toLocaleString('uz-UZ', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : 'N/A'}
+                        </td>
+                      </motion.tr>
+                    ))}
+                    {(!movements || movements.length === 0) && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-24 text-center">
+                          <Box className="w-12 h-12 text-muted/10 mx-auto mb-4" />
+                          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em]">No activity detected</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.main>
     </div>
   );
 }
