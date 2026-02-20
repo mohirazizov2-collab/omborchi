@@ -18,8 +18,8 @@ export default function LoginPage() {
   const auth = useAuth();
   const router = useRouter();
   
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("f2472839@gmail.com");
+  const [password, setPassword] = useState("Farrukh0077");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError(t.auth.errorInvalid || "Email yoki parol noto'g'ri.");
       } else {
-        setError("Tizimga kirishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+        setError("Tizimga kirishda xatolik yuz berdi. Iltimos, Firebase Console-da foydalanuvchi yaratilganligiga ishonch hosil qiling.");
       }
     } finally {
       setLoading(false);
@@ -123,14 +123,16 @@ export default function LoginPage() {
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : t.auth.loginButton}
               </Button>
               <div className="text-center space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  {t.auth.noAccount}
-                </p>
-                <div className="p-3 bg-accent/30 rounded-lg border text-[10px] text-muted-foreground leading-relaxed">
-                  <p className="font-bold text-primary mb-1 uppercase">Super Adminni sozlash:</p>
-                  1. Firebase Console-da foydalanuvchi yarating.<br/>
-                  2. UID raqamini nusxalang.<br/>
-                  3. Firestore-da 'rolesAdmin' kolleksiyasiga shu UID nomi bilan hujjat qo'shing.
+                <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 text-[11px] text-muted-foreground leading-relaxed shadow-inner">
+                  <p className="font-bold text-primary mb-2 uppercase tracking-wider flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Super Adminni aktivlashtirish:
+                  </p>
+                  <ol className="text-left space-y-1 ml-2 list-decimal">
+                    <li><b>Firebase Console</b>-da ushbu email/parol bilan user yarating.</li>
+                    <li>O'sha userni <b>UID</b> raqamini nusxalang.</li>
+                    <li>Firestore-da <b>'rolesAdmin'</b> kolleksiyasiga kiring.</li>
+                    <li>Yangi hujjat yarating va ID-siga o'sha <b>UID</b>-ni qo'ying.</li>
+                  </ol>
                 </div>
               </div>
             </CardFooter>
