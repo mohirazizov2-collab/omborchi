@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -82,7 +81,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-headline font-bold text-xl shadow-lg shadow-primary/20">
               O
             </div>
-            <span className="font-headline font-bold text-2xl tracking-tight text-primary">omborchi.uz</span>
+            <span className="font-headline font-bold text-2xl tracking-tight text-foreground">omborchi.uz</span>
           </div>
         </div>
 
