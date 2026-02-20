@@ -38,11 +38,11 @@ Ensure the following are accurately reflected:
 - All tables mentioned in section "6️⃣ Asosiy Jadvalar" (users, roles, warehouses, products, categories, suppliers, goods_receipts, goods_receipt_items, goods_issues, goods_issue_items, transfers, transfer_items, stock_movements, audit_logs).
 - Unique constraints (e.g., SKU for products, delivery_note_number for goods receipts).
 - Referential integrity for all relationships between tables.
-- Soft delete implementation (e.g., `deleted_at` timestamp field) where required for warehouses and products.
-- The `stock_movements` table MUST accurately record ALL stock changes, as per business rules.
+- Soft delete implementation (e.g., 'deleted_at' timestamp field) where required for warehouses and products.
+- The stock_movements table MUST accurately record ALL stock changes, as per business rules.
 - Appropriate data types for each field (e.g., UUID for IDs, timestamp for dates, numeric for prices/quantities).
 - Indexes for frequently queried columns, especially foreign keys and search fields.
-- Default values where appropriate (e.g., `created_at`, `updated_at`).
+- Default values where appropriate (e.g., created_at, updated_at).
 
 The output should be a JSON object with two top-level keys: "postgresqlSchema" and "prismaSchema".
 The value for "postgresqlSchema" should be a single string containing the full PostgreSQL SQL DDL.
