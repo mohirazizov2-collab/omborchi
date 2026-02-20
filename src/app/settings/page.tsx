@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -6,12 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Bell } from "lucide-react";
+import { Bell, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
   const { t } = useLanguage();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      toast({
+        title: "Muvaffaqiyatli",
+        description: "Sozlamalar saqlandi.",
+      });
+    }, 800);
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -31,7 +46,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label>{t.settings.companyName}</Label>
-                  <Input defaultValue="OmniStock Logistics" />
+                  <Input defaultValue="omborchi.uz Logistics" />
                 </div>
                 <div className="space-y-2">
                   <Label>{t.settings.currency}</Label>
@@ -40,7 +55,10 @@ export default function SettingsPage() {
               </div>
             </CardContent>
             <CardFooter className="bg-accent/10 py-3">
-              <Button size="sm">{t.settings.save}</Button>
+              <Button size="sm" onClick={handleSave} disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {t.settings.save}
+              </Button>
             </CardFooter>
           </Card>
 
