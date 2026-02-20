@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, User, Loader2, Minimize2, AlertCircle } from 'lucide-react';
+import { Sparkles, X, Send, Bot, User, Loader2, Minimize2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -49,16 +49,14 @@ export function ChatAssistant() {
       console.error('Chat error:', error);
       
       let errorMessage = "Xatolik yuz berdi.";
+      const errorStr = String(error?.message || "").toLowerCase();
       
-      // Xatolik turini aniqlaymiz
-      const errorMsg = error?.message?.toLowerCase() || "";
-      
-      if (errorMsg.includes('429')) {
-        errorMessage = "AI limiti tugadi. Iltimos, 1-2 daqiqa kuting.";
-      } else if (errorMsg.includes('api key') || errorMsg.includes('key not valid') || errorMsg.includes('unauthorized')) {
-        errorMessage = "AI kaliti (API Key) sozlanmagan yoki xato. Iltimos, loyiha sozlamalarida GEMINI_API_KEY o'rnatilganini tekshiring.";
+      if (errorStr.includes('429')) {
+        errorMessage = "AI limiti tugadi. Iltimos, 1 daqiqa kuting.";
+      } else if (errorStr.includes('key') || errorStr.includes('api') || errorStr.includes('valid')) {
+        errorMessage = "API kaliti (GEMINI_API_KEY) topilmadi yoki xato. Iltimos, Firebase Console-da 'Environment Variables' qismini tekshiring.";
       } else {
-        errorMessage = `Xatolik: ${error.message || 'Server bilan aloqa uzildi'}`;
+        errorMessage = `Tizimda xatolik: ${error.message || 'Server bilan aloqa uzildi'}`;
       }
 
       setMessages(prev => [...prev, { 
@@ -114,9 +112,14 @@ export function ChatAssistant() {
                       </div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setIsOpen(false)}>
-                    <Minimize2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setMessages([{ role: 'model', content: "Suhbat tozalandi. Sizga yana qanday yordam bera olaman?" }])}>
+                      <RefreshCcw className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setIsOpen(false)}>
+                      <Minimize2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               

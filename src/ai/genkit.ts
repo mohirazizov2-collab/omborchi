@@ -1,17 +1,17 @@
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
-// API kalitini barcha standart nomlar bo'yicha qidiramiz
-const apiKey = process.env.GOOGLE_GENAI_API_KEY || 
-               process.env.GEMINI_API_KEY || 
-               process.env.GOOGLE_API_KEY ||
-               process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+/**
+ * @fileOverview Genkit AI konfiguratsiyasi.
+ * 
+ * Bu yerda Google AI plugini va Gemini modeli sozlanadi.
+ * API kaliti avtomatik ravishda GOOGLE_GENAI_API_KEY yoki GOOGLE_API_KEY 
+ * muhit o'zgaruvchilaridan olinadi.
+ */
 
 export const ai = genkit({
   plugins: [
-    googleAI({
-      apiKey: apiKey,
-    }),
+    googleAI(), // Plugini o'zi standart nomlar bo'yicha API kalitini qidiradi
   ],
-  model: 'googleai/gemini-1.5-flash',
+  model: 'googleai/gemini-1.5-flash', // Eng barqaror va tezkor model
 });
