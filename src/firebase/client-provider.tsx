@@ -1,8 +1,10 @@
+
 'use client';
 
 import React, { useMemo, useEffect, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
-import { initializeFirebase, initiateAnonymousSignIn } from '@/firebase';
+import { initializeFirebase } from '@/firebase';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -10,21 +12,29 @@ interface FirebaseClientProviderProps {
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const firebaseServices = useMemo(() => {
-    // Initialize Firebase on the client side, once per component mount.
     return initializeFirebase();
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
+
+  const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
-    // Automatically sign in anonymously if not already signed in
-    // to satisfy security rules that require isSignedIn()
     const { auth } = firebaseServices;
+    
+    // Auth state listener to handle redirects
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        initiateAnonymousSignIn(auth);
+      // If no user and not on login page, redirect to login
+      if (!user && pathname !== '/login') {
+        router.push('/login');
+      }
+      // If user is logged in and on login page, redirect to home
+      if (user && pathname === '/login') {
+        router.push('/');
       }
     });
+
     return () => unsubscribe();
-  }, [firebaseServices]);
+  }, [firebaseServices, pathname, router]);
 
   return (
     <FirebaseProvider

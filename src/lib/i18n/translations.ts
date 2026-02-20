@@ -18,6 +18,17 @@ export const translations = {
       administration: 'Administratsiya',
       profile: 'Profil'
     },
+    auth: {
+      loginTitle: 'Tizimga kirish',
+      loginDescription: 'omborchi.uz boshqaruv paneliga kirish uchun ma\'lumotlaringizni kiriting.',
+      emailLabel: 'Elektron pochta',
+      passwordLabel: 'Parol',
+      loginButton: 'Kirish',
+      forgotPassword: 'Parolni unutdingizmi?',
+      noAccount: 'Hisobingiz yo\'qmi? Super Admin bilan bog\'laning.',
+      errorInvalid: 'Email yoki parol noto\'g\'ri.',
+      loggingIn: 'Kirilmoqda...'
+    },
     dashboard: {
       title: 'Boshqaruv paneli',
       description: 'omborchi.uz inventar va ombor operatsiyalari umumiy ko\'rinishi.',
@@ -35,8 +46,8 @@ export const translations = {
       description: 'Shaxsiy ma\'lumotlar va hisob sozlamalari.',
       personalInfo: 'Shaxsiy ma\'lumotlar',
       accountType: 'Hisob turi',
-      anonymous: 'Anonim foydalanuvchi',
-      authenticated: 'Tasdiqlangan foydalanuvchi',
+      anonymous: 'Mehmon',
+      authenticated: 'Xodim',
       userId: 'Foydalanuvchi ID',
       displayName: 'To\'liq ism',
       email: 'Elektron pochta',
@@ -174,6 +185,17 @@ export const translations = {
       administration: 'Администрирование',
       profile: 'Профиль'
     },
+    auth: {
+      loginTitle: 'Вход в систему',
+      loginDescription: 'Введите свои данные для доступа к панели управления omborchi.uz.',
+      emailLabel: 'Электронная почта',
+      passwordLabel: 'Пароль',
+      loginButton: 'Войти',
+      forgotPassword: 'Забыли пароль?',
+      noAccount: 'Нет аккаунта? Свяжитесь с Супер Админом.',
+      errorInvalid: 'Неверный email или пароль.',
+      loggingIn: 'Вход...'
+    },
     dashboard: {
       title: 'Панель управления',
       description: 'Обзор инвентаря и складских операций omborchi.uz.',
@@ -191,8 +213,8 @@ export const translations = {
       description: 'Личная информация и настройки аккаунта.',
       personalInfo: 'Личная информация',
       accountType: 'Тип аккаунта',
-      anonymous: 'Анонимный пользователь',
-      authenticated: 'Авторизованный пользователь',
+      anonymous: 'Гость',
+      authenticated: 'Сотрудник',
       userId: 'ID пользователя',
       displayName: 'Полное имя',
       email: 'Эл. почта',
@@ -330,6 +352,17 @@ export const translations = {
       administration: 'Administration',
       profile: 'Profile'
     },
+    auth: {
+      loginTitle: 'Sign In',
+      loginDescription: 'Enter your credentials to access omborchi.uz dashboard.',
+      emailLabel: 'Email Address',
+      passwordLabel: 'Password',
+      loginButton: 'Sign In',
+      forgotPassword: 'Forgot Password?',
+      noAccount: 'No account? Contact Super Admin.',
+      errorInvalid: 'Invalid email or password.',
+      loggingIn: 'Signing in...'
+    },
     dashboard: {
       title: 'Dashboard',
       description: 'Overview of omborchi.uz inventory and warehouse operations.',
@@ -347,8 +380,8 @@ export const translations = {
       description: 'Personal information and account settings.',
       personalInfo: 'Personal Information',
       accountType: 'Account Type',
-      anonymous: 'Anonymous User',
-      authenticated: 'Authenticated User',
+      anonymous: 'Guest',
+      authenticated: 'Staff',
       userId: 'User ID',
       displayName: 'Full Name',
       email: 'Email',

@@ -1,12 +1,13 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- Yordamchi funksiyalar ---
     
-    // Foydalanuvchi tizimga kirganligini tekshirish
+    // Foydalanuvchi tizimga kirganligini va anonim EMASLIGINI tekshirish
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
     // Foydalanuvchi o'ziga tegishli ma'lumot ekanligini tekshirish
@@ -23,25 +24,32 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(userId);
+      // Faqat admin yangi foydalanuvchi yarata oladi
+      allow create: if isAdmin();
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if false; // Foydalanuvchi o'zini o'zi o'chira olmaydi
+      allow delete: if isAdmin();
+    }
+
+    // Admin rollarini faqat mavjud adminlar boshqara oladi
+    match /rolesAdmin/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // --- Omborxonalar (Warehouses) ---
     match /warehouses/{warehouseId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn(); // Tizimga kirgan har kim ombor ochishi mumkin
+      allow create: if isAdmin(); // Faqat admin yangi ombor ochishi mumkin
       allow update: if isAdmin() || (isSignedIn() && resource.data.responsibleUserId == request.auth.uid);
-      allow delete: if isAdmin(); // Faqat admin o'chira oladi
+      allow delete: if isAdmin(); 
     }
 
     // --- Mahsulotlar (Products) ---
     match /products/{productId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn(); // Mahsulot miqdorini o'zgartirish uchun
-      allow delete: if isAdmin(); // Faqat admin katalogdan o'chira oladi
+      allow update: if isSignedIn(); 
+      allow delete: if isAdmin(); 
     }
 
     // --- Zaxira harakatlari (Stock Movements - Audit Trail) ---
@@ -53,7 +61,6 @@ service cloud.firestore {
     }
 
     // --- Qolgan barcha ma'lumotlar ---
-    // Odatiy holatda hamma narsa yopiq
     match /{path=**} {
       allow read, write: if isAdmin();
     }
