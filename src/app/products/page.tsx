@@ -2,23 +2,21 @@
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, Search, Plus, Filter, MoreHorizontal } from "lucide-react";
+import { Package, Search, Plus, Filter, MoreHorizontal, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
-
-const products = [
-  { id: 1, name: "Intel Core i9-13900K", sku: "CPU-I9-139", category: "Processors", stock: 12, price: "$589.00", status: "Low Stock" },
-  { id: 2, name: "NVIDIA RTX 4090 FE", sku: "GPU-4090-FE", category: "Graphics Cards", stock: 4, price: "$1,599.00", status: "Critical" },
-  { id: 3, name: "Samsung 980 Pro 2TB", sku: "SSD-SAM-980", category: "Storage", stock: 45, price: "$189.99", status: "In Stock" },
-  { id: 4, name: "Corsair Vengeance 32GB", sku: "RAM-COR-32", category: "Memory", stock: 8, price: "$125.50", status: "Low Stock" },
-  { id: 5, name: "ASUS ROG Maximus Z790", sku: "MB-ASU-Z790", category: "Motherboards", stock: 22, price: "$649.00", status: "In Stock" },
-];
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 export default function ProductsPage() {
   const { t } = useLanguage();
+  const db = useFirestore();
+
+  const productsQuery = useMemoFirebase(() => collection(db, "products"), [db]);
+  const { data: products, isLoading } = useCollection(productsQuery);
 
   return (
     <div className="flex min-h-screen">
@@ -46,7 +44,11 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 gap-4">
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
           <Card className="border-none shadow-sm">
             <div className="relative overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -62,7 +64,7 @@ export default function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {products.map((p) => (
+                  {products && products.map((p: any) => (
                     <tr key={p.id} className="hover:bg-accent/10 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -72,13 +74,13 @@ export default function ProductsPage() {
                           <span className="font-medium">{p.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-muted-foreground">{p.category}</td>
+                      <td className="px-6 py-4 text-muted-foreground">{p.categoryId}</td>
                       <td className="px-6 py-4 font-code text-xs">{p.sku}</td>
-                      <td className="px-6 py-4 font-bold">{p.stock}</td>
-                      <td className="px-6 py-4">{p.price}</td>
+                      <td className="px-6 py-4 font-bold">{p.stock || 0}</td>
+                      <td className="px-6 py-4">${p.salePrice}</td>
                       <td className="px-6 py-4">
-                        <Badge variant={p.status === "In Stock" ? "default" : p.status === "Low Stock" ? "secondary" : "destructive"}>
-                          {p.status}
+                        <Badge variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}>
+                          {(p.stock || 0) > (p.lowStockThreshold || 10) ? "In Stock" : "Low Stock"}
                         </Badge>
                       </td>
                       <td className="px-6 py-4">
@@ -88,11 +90,18 @@ export default function ProductsPage() {
                       </td>
                     </tr>
                   ))}
+                  {(!products || products.length === 0) && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                        Katalog bo'sh. Mahsulotlar qo'shing.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </Card>
-        </div>
+        )}
       </main>
     </div>
   );

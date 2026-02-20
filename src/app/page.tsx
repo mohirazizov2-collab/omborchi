@@ -4,23 +4,24 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, limit, orderBy } from "firebase/firestore";
 import { 
   TrendingUp, 
-  TrendingDown, 
   Box, 
   Warehouse as WarehouseIcon, 
   ArrowUpRight, 
   ArrowDownRight, 
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from "lucide-react";
 
-// Dynamically import Recharts to avoid SSR errors
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
@@ -32,16 +33,30 @@ const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: fa
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
+  const db = useFirestore();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Fetch data from Firebase
+  const warehousesQuery = useMemoFirebase(() => collection(db, "warehouses"), [db]);
+  const { data: warehouses, isLoading: warehousesLoading } = useCollection(warehousesQuery);
+
+  const productsQuery = useMemoFirebase(() => collection(db, "products"), [db]);
+  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
+
+  const recentMovementsQuery = useMemoFirebase(() => 
+    query(collection(db, "stockMovements"), orderBy("movementDate", "desc"), limit(5)), 
+    [db]
+  );
+  const { data: movements } = useCollection(recentMovementsQuery);
+
   const stockStats = [
     { 
       label: t.dashboard.totalStockValue, 
-      value: "$4,239,000", 
-      trend: "+12.5%", 
+      value: productsLoading ? "..." : `$${products?.reduce((acc, p) => acc + (p.salePrice * 100), 0).toLocaleString() || 0}`, 
+      trend: "+0%", 
       trendIcon: TrendingUp,
       trendColor: "text-green-500",
       icon: Box,
@@ -49,8 +64,8 @@ export default function DashboardPage() {
     },
     { 
       label: t.dashboard.activeWarehouses, 
-      value: "14", 
-      trend: "+2", 
+      value: warehousesLoading ? "..." : (warehouses?.length || 0).toString(), 
+      trend: "+0", 
       trendIcon: ArrowUpRight,
       trendColor: "text-blue-500",
       icon: WarehouseIcon,
@@ -58,8 +73,8 @@ export default function DashboardPage() {
     },
     { 
       label: t.dashboard.monthlyStockIn, 
-      value: "12,450", 
-      trend: "+18%", 
+      value: "0", 
+      trend: "0%", 
       trendIcon: TrendingUp,
       trendColor: "text-green-500",
       icon: ArrowDownRight,
@@ -67,9 +82,9 @@ export default function DashboardPage() {
     },
     { 
       label: t.dashboard.monthlyStockOut, 
-      value: "10,230", 
-      trend: "+5%", 
-      trendIcon: TrendingDown,
+      value: "0", 
+      trend: "0%", 
+      trendIcon: ArrowUpRight,
       trendColor: "text-red-500",
       icon: ArrowUpRight,
       color: "bg-orange-100 text-orange-600"
@@ -77,29 +92,17 @@ export default function DashboardPage() {
   ];
 
   const chartData = [
-    { month: "Jan", stockIn: 450, stockOut: 300 },
-    { month: "Feb", stockIn: 520, stockOut: 380 },
-    { month: "Mar", stockIn: 480, stockOut: 420 },
-    { month: "Apr", stockIn: 610, stockOut: 450 },
-    { month: "May", stockIn: 590, stockOut: 480 },
-    { month: "Jun", stockIn: 720, stockOut: 510 },
+    { month: "Jan", stockIn: 0, stockOut: 0 },
+    { month: "Feb", stockIn: 0, stockOut: 0 },
+    { month: "Mar", stockIn: 0, stockOut: 0 },
   ];
 
-  const lowStockItems = [
-    { name: "Intel Core i9-13900K", sku: "CPU-I9-139", stock: 12, threshold: 20 },
-    { name: "NVIDIA RTX 4090", sku: "GPU-4090-FE", stock: 4, threshold: 10 },
-    { name: "Samsung 980 Pro 2TB", sku: "SSD-SAM-980", stock: 15, threshold: 30 },
-    { name: "Corsair Vengeance 32GB", sku: "RAM-COR-32", stock: 8, threshold: 15 },
-  ];
+  const lowStockItems = products?.filter(p => p.stock < (p.lowStockThreshold || 10)).slice(0, 4) || [];
 
-  const recentMovements = [
-    { id: "M-1029", type: "Stock In", product: "MacBook Pro M2", quantity: 50, warehouse: "Main Hub", date: "2 hours ago" },
-    { id: "M-1028", type: "Transfer", product: "iPhone 15 Pro", quantity: 20, warehouse: "East Branch", date: "5 hours ago" },
-    { id: "M-1027", type: "Stock Out", product: "iPad Air", quantity: 15, warehouse: "North Outlet", date: "1 day ago" },
-  ];
+  if (!mounted) return null;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       <OmniSidebar />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
@@ -113,10 +116,9 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stockStats.map((stat) => (
-            <Card key={stat.label} className="border-none shadow-sm bg-card/50 backdrop-blur-sm">
+            <Card key={stat.label} className="border-none shadow-sm bg-card">
               <CardContent className="pt-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className={cn("p-2 rounded-lg", stat.color)}>
@@ -137,32 +139,26 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Main Chart */}
           <Card className="lg:col-span-2 border-none shadow-sm">
             <CardHeader>
               <CardTitle className="font-headline font-bold text-lg">{t.dashboard.stockMovements}</CardTitle>
             </CardHeader>
             <CardContent>
-              {mounted ? (
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                      <YAxis tickLine={false} axisLine={false} />
-                      <Tooltip />
-                      <Bar dataKey="stockIn" fill="#2E68B8" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="stockOut" fill="#669995" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-[300px] w-full bg-accent/20 animate-pulse rounded-lg" />
-              )}
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis tickLine={false} axisLine={false} />
+                    <Tooltip />
+                    <Bar dataKey="stockIn" fill="#2E68B8" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="stockOut" fill="#669995" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Low Stock Alerts */}
           <Card className="border-none shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -172,8 +168,8 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {lowStockItems.map((item) => (
-                  <div key={item.sku} className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border">
+                {lowStockItems.length > 0 ? lowStockItems.map((item: any) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border">
                     <div>
                       <p className="text-sm font-semibold truncate max-w-[140px]">{item.name}</p>
                       <p className="text-xs text-muted-foreground font-code">{item.sku}</p>
@@ -182,7 +178,9 @@ export default function DashboardPage() {
                       <p className="text-sm font-bold text-destructive">{item.stock} left</p>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Barcha mahsulotlar yetarli.</p>
+                )}
               </div>
               <Button variant="link" className="w-full mt-4 text-xs">
                 {t.dashboard.viewAll} <ChevronRight className="w-3 h-3 ml-1" />
@@ -191,7 +189,6 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Recent Transactions Table */}
         <Card className="border-none shadow-sm">
           <CardHeader>
             <CardTitle className="font-headline font-bold text-lg">{t.dashboard.recentMovements}</CardTitle>
@@ -210,20 +207,27 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {recentMovements.map((m) => (
+                  {movements && movements.map((m: any) => (
                     <tr key={m.id} className="hover:bg-accent/20 transition-colors">
-                      <td className="px-6 py-4 font-code text-primary">{m.id}</td>
+                      <td className="px-6 py-4 font-code text-primary">{m.id.substring(0,6)}</td>
                       <td className="px-6 py-4">
-                        <Badge variant={m.type === "Stock In" ? "default" : m.type === "Transfer" ? "secondary" : "outline"}>
-                          {m.type}
+                        <Badge variant="default">
+                          {m.movementType}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 font-medium">{m.product}</td>
-                      <td className="px-6 py-4 font-bold">{m.quantity}</td>
-                      <td className="px-6 py-4">{m.warehouse}</td>
-                      <td className="px-6 py-4 text-muted-foreground">{m.date}</td>
+                      <td className="px-6 py-4 font-medium">{m.productId}</td>
+                      <td className="px-6 py-4 font-bold">{m.quantityChange}</td>
+                      <td className="px-6 py-4">{m.warehouseId}</td>
+                      <td className="px-6 py-4 text-muted-foreground">{new Date(m.movementDate).toLocaleDateString()}</td>
                     </tr>
                   ))}
+                  {(!movements || movements.length === 0) && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                        Hozircha harakatlar mavjud emas.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

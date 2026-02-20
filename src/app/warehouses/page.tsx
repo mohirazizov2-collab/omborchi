@@ -2,23 +2,22 @@
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus } from "lucide-react";
+import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 export default function WarehousesPage() {
   const { t } = useLanguage();
+  const db = useFirestore();
 
-  const warehouses = [
-    { id: 1, name: "Main Hub - Tashkent", address: "Bunyodkor St. 12, Tashkent", manager: "Azamat Sharipov", phone: "+998 90 123 45 67", capacity: "92%" },
-    { id: 2, name: "Fergana Regional", address: "Mustaqillik Blvd 45, Fergana", manager: "Nodira Rahimova", phone: "+998 93 456 78 90", capacity: "45%" },
-    { id: 3, name: "Samarkand Hub", address: "Registan St. 88, Samarkand", manager: "Sardor Alimov", phone: "+998 97 789 01 23", capacity: "78%" },
-    { id: 4, name: "Bukhara Distribution", address: "Old City 12, Bukhara", manager: "Umida Karimova", phone: "+998 99 234 56 78", capacity: "12%" },
-  ];
+  const warehousesQuery = useMemoFirebase(() => collection(db, "warehouses"), [db]);
+  const { data: warehouses, isLoading } = useCollection(warehousesQuery);
 
   return (
     <div className="flex min-h-screen">
@@ -39,54 +38,62 @@ export default function WarehousesPage() {
           <Button variant="outline">{t.actions.filter}</Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {warehouses.map((w) => (
-            <Card key={w.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-start justify-between pb-2">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg font-headline font-bold">{w.name}</CardTitle>
-                  <div className="flex items-center text-xs text-muted-foreground gap-1">
-                    <MapPin className="w-3 h-3" /> {w.address}
-                  </div>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <User className="w-4 h-4" /> <span>{t.warehouses.manager}:</span>
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {warehouses && warehouses.map((w: any) => (
+              <Card key={w.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg font-headline font-bold">{w.name}</CardTitle>
+                    <div className="flex items-center text-xs text-muted-foreground gap-1">
+                      <MapPin className="w-3 h-3" /> {w.address}
                     </div>
-                    <span className="font-medium">{w.manager}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="w-4 h-4" /> <span>{t.warehouses.contact}:</span>
-                    </div>
-                    <span className="font-medium">{w.phone}</span>
-                  </div>
-                  <div className="pt-4 border-t mt-4 flex justify-between items-center">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">{t.warehouses.utilization}</p>
-                      <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className={cn(
-                            "h-full rounded-full",
-                            parseInt(w.capacity) > 80 ? "bg-red-500" : parseInt(w.capacity) > 50 ? "bg-orange-500" : "bg-green-500"
-                          )} 
-                          style={{ width: w.capacity }} 
-                        />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User className="w-4 h-4" /> <span>{t.warehouses.manager}:</span>
                       </div>
+                      <span className="font-medium">{w.responsibleUserId}</span>
                     </div>
-                    <Badge variant="secondary" className="font-bold">{w.capacity}</Badge>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="w-4 h-4" /> <span>{t.warehouses.contact}:</span>
+                      </div>
+                      <span className="font-medium">{w.phoneNumber}</span>
+                    </div>
+                    <div className="pt-4 border-t mt-4 flex justify-between items-center">
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">{t.warehouses.utilization}</p>
+                        <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: "0%" }} 
+                          />
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="font-bold">0%</Badge>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+            {(!warehouses || warehouses.length === 0) && (
+              <div className="col-span-full py-20 text-center border-2 border-dashed rounded-xl border-muted">
+                <p className="text-muted-foreground">Hozircha omborlar yo'q. Birinchi omborni qo'shing!</p>
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
