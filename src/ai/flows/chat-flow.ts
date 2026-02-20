@@ -5,7 +5,7 @@
  * - chatWithAI - Foydalanuvchi bilan muloqot qiluvchi asosiy funksiya.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, model } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const ChatInputSchema = z.object({
@@ -30,6 +30,7 @@ export async function chatWithAI(input: ChatInput): Promise<ChatOutput> {
 
 const chatPrompt = ai.definePrompt({
   name: 'chatPrompt',
+  model: model,
   input: { schema: ChatInputSchema },
   output: { schema: ChatOutputSchema },
   prompt: `Siz "omborchi.uz" tizimining aqlli yordamchisisiz. Sizning ismingiz - Omborchi AI.

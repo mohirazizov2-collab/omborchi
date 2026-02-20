@@ -5,7 +5,7 @@
  * - analyzeReports - Hisobot ma'lumotlarini tahlil qiluvchi asosiy funksiya.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, model } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AnalyzeReportsInputSchema = z.object({
@@ -38,6 +38,7 @@ export async function analyzeReports(input: AnalyzeReportsInput): Promise<Analyz
 
 const analyzePrompt = ai.definePrompt({
   name: 'analyzeReportsPrompt',
+  model: model,
   input: { schema: AnalyzeReportsInputSchema },
   output: { schema: AnalyzeReportsOutputSchema },
   prompt: `Siz professional ombor boshqaruvi va logistika bo'yicha AI konsultantisiz.
