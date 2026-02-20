@@ -2,17 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * OMNISTOCK SECURITY RULES
-     * 
-     * CORE PHILOSOPHY:
-     * This ruleset implements a robust Role-Based Access Control (RBAC) and attribute-based access 
-     * control model. It prioritizes "Authorization Independence" by leveraging denormalized data 
-     * (like responsibleUserId and warehouseId) directly on documents to ensure atomic and 
-     * performant security decisions without recursive database lookups.
-     */
-
-    // --- Helper Functions ---
+    // --- Yordamchi funksiyalar ---
 
     function isSignedIn() {
       return request.auth != null;
@@ -26,140 +16,41 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid));
     }
 
-    function isWarehouseManager() {
-      return isSignedIn() && exists(/databases/$(database)/documents/rolesWarehouseManager/$(request.auth.uid));
-    }
-
-    function isOperator() {
-      return isSignedIn() && exists(/databases/$(database)/documents/rolesOperator/$(request.auth.uid));
-    }
-
-    // --- User & Role Management ---
+    // --- Foydalanuvchilar ---
 
     match /users/{userId} {
-      allow get, list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if (isOwner(userId) || isAdmin()) && resource != null && request.resource.data.id == resource.data.id;
-      allow delete: if isAdmin() && resource != null;
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
     }
 
-    match /roles/{roleId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /rolesAdmin/{userId} {
-      allow read, write: if isAdmin();
-    }
-    match /rolesWarehouseManager/{userId} {
-      allow read, write: if isAdmin();
-    }
-    match /rolesOperator/{userId} {
-      allow read, write: if isAdmin();
-    }
-
-    // --- Global Entities (Catalog & Contacts) ---
-
-    match /categories/{categoryId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin() || isWarehouseManager();
-    }
-
-    match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin() || isWarehouseManager();
-    }
-
-    match /suppliers/{supplierId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin() || isWarehouseManager();
-    }
-
-    // --- Warehouse Operations ---
+    // --- Omborxonalar ---
 
     match /warehouses/{warehouseId} {
-      allow get, list: if isSignedIn();
-      allow create, delete: if isAdmin();
-      allow update: if resource != null && (isAdmin() || isOwner(resource.data.responsibleUserId));
-    }
-
-    match /warehouses/{warehouseId}/productStock/{productId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin() || isWarehouseManager() || isOperator();
-    }
-
-    match /warehouses/{warehouseId}/goodsReceipts/{receiptId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
-      allow update: if resource != null && (isAdmin() || isOwner(resource.data.responsibleUserId)) && request.resource.data.responsibleUserId == resource.data.responsibleUserId;
-      allow delete: if isAdmin() && resource != null;
-
-      match /items/{itemId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn() && request.resource.data.goodsReceiptResponsibleUserId == request.auth.uid;
-        allow update: if resource != null && (isAdmin() || isOwner(resource.data.goodsReceiptResponsibleUserId));
-        allow delete: if isAdmin() && resource != null;
-      }
-    }
-
-    match /warehouses/{warehouseId}/goodsIssues/{issueId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
-      allow update: if resource != null && (isAdmin() || isOwner(resource.data.responsibleUserId)) && request.resource.data.responsibleUserId == resource.data.responsibleUserId;
-      allow delete: if isAdmin() && resource != null;
-
-      match /items/{itemId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn() && request.resource.data.goodsIssueResponsibleUserId == request.auth.uid;
-        allow update: if resource != null && (isAdmin() || isOwner(resource.data.goodsIssueResponsibleUserId));
-        allow delete: if isAdmin() && resource != null;
-      }
-    }
-
-    match /transfers/{transferId} {
-      function canAccessTransfer(data) {
-        return isAdmin() || 
-               isOwner(data.responsibleUserId) || 
-               isOwner(data.sourceWarehouseResponsibleUserId) || 
-               isOwner(data.destinationWarehouseResponsibleUserId);
-      }
-
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
-      allow update: if resource != null && canAccessTransfer(resource.data);
-      allow delete: if isAdmin() && resource != null;
-
-      match /items/{itemId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn() && request.resource.data.transferResponsibleUserId == request.auth.uid;
-        allow update: if resource != null && (isAdmin() || isOwner(resource.data.transferResponsibleUserId));
-        allow delete: if isAdmin() && resource != null;
-      }
-    }
-
-    /**
-     * @description Stock movement audit trail (Root level access for dashboard).
-     */
-    match /stockMovements/{movementId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
-    }
-
-    /**
-     * @description Stock movement audit trail (Nested level).
-     */
-    match /warehouses/{warehouseId}/stockMovements/{movementId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
-      allow update, delete: if false; // Audit logs are immutable
-    }
-
-    // --- System Audit ---
-
-    match /auditLogs/{auditLogId} {
-      allow get, list: if isAdmin();
+      allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if false; // Immutable
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.responsibleUserId == request.auth.uid);
+    }
+
+    // --- Mahsulotlar ---
+
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // --- Zaxira harakatlari (Audit Trail) ---
+
+    match /stockMovements/{movementId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
+      allow update, delete: if false; // Harakatlar tarixi o'zgartirilmasligi shart
+    }
+
+    // --- Qolgan barcha narsalar ---
+    match /{path=**} {
+      allow read, write: if isAdmin();
     }
   }
 }
