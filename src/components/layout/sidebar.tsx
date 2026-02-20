@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/firebase";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function OmniSidebar() {
   const pathname = usePathname();
@@ -72,29 +73,31 @@ export function OmniSidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
-        <div className="px-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full justify-between gap-2 bg-accent/20 border-none h-9">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs font-medium uppercase">{language}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">Change</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {languages.map((l) => (
-                <DropdownMenuItem 
-                  key={l.code} 
-                  onClick={() => setLanguage(l.code as any)}
-                  className={cn(language === l.code && "bg-primary/10 text-primary")}
-                >
-                  <span className="mr-2">{l.flag}</span> {l.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex gap-2 px-2">
+          <div className="flex-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full justify-between gap-2 bg-accent/20 border-none h-9">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs font-medium uppercase">{language}</span>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                {languages.map((l) => (
+                  <DropdownMenuItem 
+                    key={l.code} 
+                    onClick={() => setLanguage(l.code as any)}
+                    className={cn(language === l.code && "bg-primary/10 text-primary")}
+                  >
+                    <span className="mr-2">{l.flag}</span> {l.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <ThemeToggle />
         </div>
 
         <div>
