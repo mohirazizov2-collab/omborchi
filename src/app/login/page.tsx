@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Mail, Globe, AlertCircle } from "lucide-react";
+import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function LoginPage() {
@@ -30,11 +30,12 @@ export default function LoginPage() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // Login muvaffaqiyatli bo'lsa, FirebaseClientProvider avtomatik ravishda Dashboardga o'tkazadi
       router.push("/");
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError(t.auth.errorInvalid);
+        setError(t.auth.errorInvalid || "Email yoki parol noto'g'ri.");
       } else {
         setError("Tizimga kirishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
       }
@@ -72,7 +73,9 @@ export default function LoginPage() {
 
         <Card className="border-none shadow-xl">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold font-headline text-center">{t.auth.loginTitle}</CardTitle>
+            <CardTitle className="text-2xl font-bold font-headline text-center flex items-center justify-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-primary" /> {t.auth.loginTitle}
+            </CardTitle>
             <CardDescription className="text-center">{t.auth.loginDescription}</CardDescription>
           </CardHeader>
           <form onSubmit={handleLogin}>
@@ -123,8 +126,11 @@ export default function LoginPage() {
                 <p className="text-xs text-muted-foreground">
                   {t.auth.noAccount}
                 </p>
-                <div className="p-2 bg-accent/30 rounded border text-[10px] text-muted-foreground leading-tight">
-                  Eslatma: Birinchi Super Admin hisobi Firebase Console orqali yaratilishi va UID 'rolesAdmin' kolleksiyasiga qo'shilishi kerak.
+                <div className="p-3 bg-accent/30 rounded-lg border text-[10px] text-muted-foreground leading-relaxed">
+                  <p className="font-bold text-primary mb-1 uppercase">Super Adminni sozlash:</p>
+                  1. Firebase Console-da foydalanuvchi yarating.<br/>
+                  2. UID raqamini nusxalang.<br/>
+                  3. Firestore-da 'rolesAdmin' kolleksiyasiga shu UID nomi bilan hujjat qo'shing.
                 </div>
               </div>
             </CardFooter>

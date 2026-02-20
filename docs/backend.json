@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Warehouse": {
@@ -43,11 +44,20 @@
         "responsibleUserId": { "type": "string" }
       },
       "required": ["id", "productId", "warehouseId", "quantityChange", "movementType"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Super Admin huquqiga ega foydalanuvchilar UID ro'yxati.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "assignedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
-    "providers": ["anonymous", "password"],
-    "securityPolicy": "Strict: Authenticated users only. Audit trail immutable."
+    "providers": ["password"],
+    "securityPolicy": "Strict: Email/Password login required. Super Admin roles checked via rolesAdmin collection."
   },
   "firestore": {
     "/warehouses/{warehouseId}": {
@@ -65,6 +75,10 @@
     "/users/{userId}": {
       "schema": { "type": "object" },
       "description": "Foydalanuvchi profillari."
+    },
+    "/rolesAdmin/{userId}": {
+      "schema": "#/entities/AdminRole",
+      "description": "Super Admin huquqini tasdiqlovchi UID ro'yxati."
     }
   }
 }
