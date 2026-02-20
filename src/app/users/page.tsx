@@ -148,8 +148,10 @@ export default function UsersPage() {
                       <SelectValue placeholder="Rolni tanlang" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="Super Admin">Super Admin</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
                       <SelectItem value="Warehouse Manager">Menejer</SelectItem>
+                      <SelectItem value="Warehouse Worker">Omborchi</SelectItem>
                       <SelectItem value="Operator">Operator</SelectItem>
                     </SelectContent>
                   </Select>
