@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -86,14 +85,14 @@ export default function ReportsPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.reports.title}</h1>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">{t.reports.title}</h1>
             <p className="text-muted-foreground mt-1">{t.reports.description}</p>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" className="gap-2">
               <Download className="w-4 h-4" /> {t.reports.export}
             </Button>
-            <Button className="gap-2">
+            <Button className="gap-2 text-white">
               <Filter className="w-4 h-4" /> {t.actions.filter}
             </Button>
           </div>

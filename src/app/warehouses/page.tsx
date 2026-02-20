@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -19,7 +18,7 @@ import {
 import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
@@ -82,7 +81,7 @@ export default function WarehousesPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.warehouses.title}</h1>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">{t.warehouses.title}</h1>
             <p className="text-muted-foreground mt-1">{t.warehouses.description}</p>
           </div>
           

@@ -125,7 +125,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex gap-3">
             <Button variant="outline">{t.actions.downloadReport}</Button>
-            <Button>{t.actions.newOperation}</Button>
+            <Button className="text-white">{t.actions.newOperation}</Button>
           </div>
         </header>
 
