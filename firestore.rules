@@ -5,45 +5,34 @@ service cloud.firestore {
 
     // --- Yordamchi funksiyalar ---
     
-    // Foydalanuvchi tizimga kirganligini tekshirish
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Foydalanuvchi o'ziga tegishli ma'lumot ekanligini tekshirish
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Admin ekanligini tekshirish (rolesAdmin kolleksiyasi orqali)
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid));
     }
 
-    // --- Foydalanuvchilar (Users) ---
+    // --- Foydalanuvchilar ---
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isAdmin();
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
     }
 
-    // Admin rollarini faqat mavjud adminlar boshqara oladi
     match /rolesAdmin/{userId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // --- Omborxonalar (Warehouses) ---
+    // --- Omborxonalar ---
     match /warehouses/{warehouseId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn(); 
-      allow update: if isAdmin() || (isSignedIn() && resource.data.responsibleUserId == request.auth.uid);
+      allow update: if isSignedIn(); // Foydalanish oson bo'lishi uchun isSignedIn qilib turamiz
       allow delete: if isAdmin(); 
     }
 
-    // --- Mahsulotlar (Products) ---
+    // --- Mahsulotlar ---
     match /products/{productId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -51,16 +40,17 @@ service cloud.firestore {
       allow delete: if isAdmin(); 
     }
 
-    // --- Zaxira harakatlari (Stock Movements - Audit Trail) ---
+    // --- Zaxira harakatlari (Audit Trail) ---
     match /stockMovements/{movementId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if false; 
+      allow update, delete: if false; // Hech qachon o'chirib va o'zgartirib bo'lmaydi
     }
 
-    // --- Qolgan barcha ma'lumotlar ---
+    // --- Default qoidalar ---
     match /{path=**} {
-      allow read, write: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }
