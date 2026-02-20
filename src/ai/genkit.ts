@@ -4,10 +4,10 @@ import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * @fileOverview AI konfiguratsiyasi.
- * Farruxbek taqdim etgan API kalitdan foydalaniladi.
+ * Foydalanuvchi taqdim etgan yangi API kalitdan foydalaniladi.
  */
 
-const API_KEY = process.env.GOOGLE_GENAI_API_KEY || 'AIzaSyDmQYr26NuWXot50VdN4Dk1wHrRDcW2kkk';
+const API_KEY = process.env.GOOGLE_GENAI_API_KEY || 'AIzaSyASDjVEDtI1g3esWeu87wDoOAjUr2fM1GI';
 
 export const ai = genkit({
   plugins: [
