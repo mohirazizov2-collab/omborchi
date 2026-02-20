@@ -1,26 +1,80 @@
+
 "use client";
 
+import { useState } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
 import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function WarehousesPage() {
   const { t } = useLanguage();
   const db = useFirestore();
   const { user, isUserLoading: authLoading } = useUser();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    address: "",
+    phoneNumber: ""
+  });
 
   const warehousesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return collection(db, "warehouses");
   }, [db, user]);
   const { data: warehouses, isLoading } = useCollection(warehousesQuery);
+
+  const handleSave = () => {
+    if (!db || !user || !formData.name) return;
+    
+    setIsSaving(true);
+    const warehouseId = doc(collection(db, "warehouses")).id;
+    const warehouseRef = doc(db, "warehouses", warehouseId);
+    
+    const newWarehouse = {
+      id: warehouseId,
+      name: formData.name,
+      address: formData.address,
+      phoneNumber: formData.phoneNumber,
+      responsibleUserId: user.uid,
+      isDeleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setDoc(warehouseRef, newWarehouse)
+      .then(() => {
+        setIsDialogOpen(false);
+        setFormData({ name: "", address: "", phoneNumber: "" });
+      })
+      .catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: warehouseRef.path,
+          operation: 'create',
+          requestResourceData: newWarehouse
+        }));
+      })
+      .finally(() => setIsSaving(false));
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -31,9 +85,51 @@ export default function WarehousesPage() {
             <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.warehouses.title}</h1>
             <p className="text-muted-foreground mt-1">{t.warehouses.description}</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" /> {t.warehouses.addNew}
-          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" /> {t.warehouses.addNew}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t.warehouses.addNew}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>{t.common.id} (Nomi)</Label>
+                  <Input 
+                    value={formData.name} 
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    placeholder="Masalan: Asosiy Ombor Toshkent" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Manzil</Label>
+                  <Input 
+                    value={formData.address} 
+                    onChange={(e) => setFormData({...formData, address: e.target.value})}
+                    placeholder="Ko'cha nomi, shahar" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telefon</Label>
+                  <Input 
+                    value={formData.phoneNumber} 
+                    onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                    placeholder="+998 90 123 45 67" 
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t.actions.save}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </header>
 
         <div className="mb-6 flex gap-4">
@@ -66,7 +162,7 @@ export default function WarehousesPage() {
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <User className="w-4 h-4" /> <span>{t.warehouses.manager}:</span>
                       </div>
-                      <span className="font-medium">{w.responsibleUserId}</span>
+                      <span className="font-medium truncate max-w-[150px]">{w.responsibleUserId}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">

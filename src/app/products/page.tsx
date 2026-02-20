@@ -1,25 +1,84 @@
+
 "use client";
 
+import { useState } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
 import { Package, Search, Plus, Filter, MoreHorizontal, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, doc, setDoc } from "firebase/firestore";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function ProductsPage() {
   const { t } = useLanguage();
   const db = useFirestore();
   const { user, isUserLoading: authLoading } = useUser();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    sku: "",
+    price: "0",
+    stock: "0"
+  });
 
   const productsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return collection(db, "products");
   }, [db, user]);
   const { data: products, isLoading } = useCollection(productsQuery);
+
+  const handleSave = () => {
+    if (!db || !user || !formData.name || !formData.sku) return;
+    
+    setIsSaving(true);
+    const productId = doc(collection(db, "products")).id;
+    const productRef = doc(db, "products", productId);
+    
+    const newProduct = {
+      id: productId,
+      name: formData.name,
+      sku: formData.sku,
+      salePrice: parseFloat(formData.price),
+      stock: parseInt(formData.stock),
+      categoryId: "general",
+      unitOfMeasure: "pcs",
+      lowStockThreshold: 10,
+      isDeleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setDoc(productRef, newProduct)
+      .then(() => {
+        setIsDialogOpen(false);
+        setFormData({ name: "", sku: "", price: "0", stock: "0" });
+      })
+      .catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: productRef.path,
+          operation: 'create',
+          requestResourceData: newProduct
+        }));
+      })
+      .finally(() => setIsSaving(false));
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -30,9 +89,61 @@ export default function ProductsPage() {
             <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.products.title}</h1>
             <p className="text-muted-foreground mt-1">{t.products.description}</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" /> {t.products.addNew}
-          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" /> {t.products.addNew}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t.products.addNew}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Mahsulot nomi</Label>
+                  <Input 
+                    value={formData.name} 
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    placeholder="Masalan: Intel Core i9" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>SKU</Label>
+                  <Input 
+                    value={formData.sku} 
+                    onChange={(e) => setFormData({...formData, sku: e.target.value})}
+                    placeholder="PRD-12345" 
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Narxi ($)</Label>
+                    <Input 
+                      type="number"
+                      value={formData.price} 
+                      onChange={(e) => setFormData({...formData, price: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Zaxira miqdori</Label>
+                    <Input 
+                      type="number"
+                      value={formData.stock} 
+                      onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t.actions.save}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </header>
 
         <Card className="border-none shadow-sm mb-8">
