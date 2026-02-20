@@ -1,0 +1,1146 @@
+{
+  "entities": {
+    "Role": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Role",
+      "type": "object",
+      "description": "Defines user roles within the application, controlling access to different functionalities.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Role entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the role (e.g., 'Admin', 'Warehouse Manager', 'Operator')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the role's permissions and responsibilities."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the role was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the role was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "name",
+        "description",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents application users, linking to roles and specific warehouses. Authentication details are managed externally.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity. This ID is distinct from any external authentication system ID."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's chosen username or display name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "roleId": {
+          "type": "string",
+          "description": "Reference to the Role assigned to this user. (Relationship: Role 1:N User)"
+        },
+        "warehouseId": {
+          "type": "string",
+          "description": "Reference to the Warehouse this user is primarily associated with, if applicable. (Relationship: Warehouse 1:N User)"
+        },
+        "deletedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user was soft-deleted, if applicable.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "username",
+        "email",
+        "roleId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Warehouse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Warehouse",
+      "type": "object",
+      "description": "Represents a physical or logical location for storing products.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Warehouse entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the warehouse."
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the warehouse."
+        },
+        "responsiblePersonId": {
+          "type": "string",
+          "description": "Reference to the User who is responsible for this warehouse. (Relationship: User 1:N Warehouse)"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number for the warehouse."
+        },
+        "deletedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the warehouse was soft-deleted, if applicable.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the warehouse was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the warehouse was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "name",
+        "address",
+        "responsiblePersonId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Organizes products into logical groups.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product category."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the product category."
+        },
+        "deletedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the category was soft-deleted, if applicable.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the category was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the category was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Supplier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supplier",
+      "type": "object",
+      "description": "Represents a vendor or supplier from whom products are sourced.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Supplier entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the supplier."
+        },
+        "contactPerson": {
+          "type": "string",
+          "description": "The name of the primary contact person at the supplier."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number for the supplier."
+        },
+        "email": {
+          "type": "string",
+          "description": "Contact email address for the supplier.",
+          "format": "email"
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the supplier."
+        },
+        "deletedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the supplier was soft-deleted, if applicable.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the supplier was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the supplier was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Defines individual products managed in the inventory system.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Product entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "sku": {
+          "type": "string",
+          "description": "Stock Keeping Unit, a unique identifier for the product."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to the Category the product belongs to. (Relationship: Category 1:N Product)"
+        },
+        "unitOfMeasure": {
+          "type": "string",
+          "description": "The unit in which the product is measured (e.g., 'pcs', 'kg', 'liter')."
+        },
+        "costPrice": {
+          "type": "number",
+          "description": "The cost price of the product (tannarx)."
+        },
+        "salePrice": {
+          "type": "number",
+          "description": "The selling price of the product (sotuv narxi)."
+        },
+        "barcode": {
+          "type": "string",
+          "description": "Optional barcode for the product."
+        },
+        "lowStockThreshold": {
+          "type": "number",
+          "description": "The minimum quantity threshold for this product, triggering low-stock alerts."
+        },
+        "deletedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the product was soft-deleted, if applicable.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the product was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the product was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "name",
+        "sku",
+        "categoryId",
+        "unitOfMeasure",
+        "costPrice",
+        "salePrice",
+        "lowStockThreshold",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GoodsReceipt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GoodsReceipt",
+      "type": "object",
+      "description": "Records the process of receiving goods into a warehouse (Stock In).",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the GoodsReceipt entity."
+        },
+        "deliveryNoteNumber": {
+          "type": "string",
+          "description": "Unique delivery note number (nakladnoy) for this receipt."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date when the goods were received.",
+          "format": "date-time"
+        },
+        "supplierId": {
+          "type": "string",
+          "description": "Reference to the Supplier from whom the goods were received. (Relationship: Supplier 1:N GoodsReceipt)"
+        },
+        "warehouseId": {
+          "type": "string",
+          "description": "Reference to the Warehouse where the goods were received. (Relationship: Warehouse 1:N GoodsReceipt)"
+        },
+        "responsibleUserId": {
+          "type": "string",
+          "description": "Reference to the User responsible for recording this goods receipt. (Relationship: User 1:N GoodsReceipt)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional notes or description for the goods receipt."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the goods receipt record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the goods receipt record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "deliveryNoteNumber",
+        "date",
+        "supplierId",
+        "warehouseId",
+        "responsibleUserId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GoodsReceiptItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GoodsReceiptItem",
+      "type": "object",
+      "description": "Details individual products and quantities received within a GoodsReceipt.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the GoodsReceiptItem entity."
+        },
+        "goodsReceiptId": {
+          "type": "string",
+          "description": "Reference to the parent GoodsReceipt. (Relationship: GoodsReceipt 1:N GoodsReceiptItem)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to the Product being received. (Relationship: Product 1:N GoodsReceiptItem)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the product received."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "The unit price of the product at the time of receipt."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the goods receipt item record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the goods receipt item record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "goodsReceiptId",
+        "productId",
+        "quantity",
+        "unitPrice",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GoodsIssue": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GoodsIssue",
+      "type": "object",
+      "description": "Records the process of issuing goods from a warehouse (Stock Out).",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the GoodsIssue entity."
+        },
+        "warehouseId": {
+          "type": "string",
+          "description": "Reference to the Warehouse from which the goods were issued. (Relationship: Warehouse 1:N GoodsIssue)"
+        },
+        "destination": {
+          "type": "string",
+          "description": "The destination of the issued goods (e.g., client name, department)."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date when the goods were issued.",
+          "format": "date-time"
+        },
+        "responsibleUserId": {
+          "type": "string",
+          "description": "Reference to the User responsible for recording this goods issue. (Relationship: User 1:N GoodsIssue)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional notes or description for the goods issue."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the goods issue record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the goods issue record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "warehouseId",
+        "destination",
+        "date",
+        "responsibleUserId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GoodsIssueItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GoodsIssueItem",
+      "type": "object",
+      "description": "Details individual products and quantities issued within a GoodsIssue.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the GoodsIssueItem entity."
+        },
+        "goodsIssueId": {
+          "type": "string",
+          "description": "Reference to the parent GoodsIssue. (Relationship: GoodsIssue 1:N GoodsIssueItem)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to the Product being issued. (Relationship: Product 1:N GoodsIssueItem)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the product issued."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "The unit price of the product at the time of issue."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the goods issue item record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the goods issue item record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "goodsIssueId",
+        "productId",
+        "quantity",
+        "unitPrice",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Transfer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Transfer",
+      "type": "object",
+      "description": "Records the movement of goods between two warehouses.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Transfer entity."
+        },
+        "sourceWarehouseId": {
+          "type": "string",
+          "description": "Reference to the Warehouse from which products are transferred. (Relationship: Warehouse 1:N Transfer - as source)"
+        },
+        "destinationWarehouseId": {
+          "type": "string",
+          "description": "Reference to the Warehouse to which products are transferred. (Relationship: Warehouse 1:N Transfer - as destination)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date when the transfer was initiated or completed.",
+          "format": "date-time"
+        },
+        "responsibleUserId": {
+          "type": "string",
+          "description": "Reference to the User responsible for initiating this transfer. (Relationship: User 1:N Transfer)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional notes or description for the transfer."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the transfer (e.g., 'pending', 'completed', 'cancelled')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the transfer record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the transfer record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "sourceWarehouseId",
+        "destinationWarehouseId",
+        "date",
+        "responsibleUserId",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TransferItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TransferItem",
+      "type": "object",
+      "description": "Details individual products and quantities involved in a Transfer.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the TransferItem entity."
+        },
+        "transferId": {
+          "type": "string",
+          "description": "Reference to the parent Transfer. (Relationship: Transfer 1:N TransferItem)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to the Product being transferred. (Relationship: Product 1:N TransferItem)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the product being transferred."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the transfer item record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the transfer item record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "transferId",
+        "productId",
+        "quantity",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StockMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StockMovement",
+      "type": "object",
+      "description": "Logs every change in product stock for a specific warehouse.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the StockMovement entity."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to the Product involved in the movement. (Relationship: Product 1:N StockMovement)"
+        },
+        "warehouseId": {
+          "type": "string",
+          "description": "Reference to the Warehouse where the stock movement occurred. (Relationship: Warehouse 1:N StockMovement)"
+        },
+        "movementType": {
+          "type": "string",
+          "description": "The type of stock movement (e.g., 'IN', 'OUT', 'TRANSFER_IN', 'TRANSFER_OUT')."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the product moved. Positive for incoming, negative for outgoing movements."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "The unit price of the product at the time of movement."
+        },
+        "referenceId": {
+          "type": "string",
+          "description": "Reference to the originating transaction (GoodsReceipt, GoodsIssue, or Transfer)."
+        },
+        "referenceType": {
+          "type": "string",
+          "description": "The type of the originating transaction (e.g., 'GoodsReceipt', 'GoodsIssue', 'Transfer')."
+        },
+        "currentStockLevel": {
+          "type": "number",
+          "description": "The stock level of the product in the warehouse immediately after this movement."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp when the stock movement occurred.",
+          "format": "date-time"
+        },
+        "responsibleUserId": {
+          "type": "string",
+          "description": "Reference to the User who was responsible for the action causing this movement. (Relationship: User 1:N StockMovement)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the stock movement record was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "productId",
+        "warehouseId",
+        "movementType",
+        "quantity",
+        "unitPrice",
+        "referenceId",
+        "referenceType",
+        "currentStockLevel",
+        "timestamp",
+        "responsibleUserId",
+        "createdAt"
+      ]
+    },
+    "Stock": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Stock",
+      "type": "object",
+      "description": "Represents the current stock balance of a product in a specific warehouse, typically a materialized view or real-time aggregated data.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Stock entity (combination of productId and warehouseId can form a natural key)."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to the Product. (Relationship: Product 1:N Stock)"
+        },
+        "warehouseId": {
+          "type": "string",
+          "description": "Reference to the Warehouse. (Relationship: Warehouse 1:N Stock)"
+        },
+        "currentQuantity": {
+          "type": "number",
+          "description": "The current quantity of the product in this warehouse."
+        },
+        "lastMovementTimestamp": {
+          "type": "string",
+          "description": "Timestamp of the most recent stock movement that affected this balance.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this stock record was initially created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when this stock record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "productId",
+        "warehouseId",
+        "currentQuantity",
+        "lastMovementTimestamp",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AuditLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AuditLog",
+      "type": "object",
+      "description": "Records all significant user activities and system changes for auditing purposes.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema draft version.",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AuditLog entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who performed the action. (Relationship: User 1:N AuditLog)"
+        },
+        "action": {
+          "type": "string",
+          "description": "The type of action performed (e.g., 'create', 'update', 'delete', 'stock_in', 'transfer_completed')."
+        },
+        "entityType": {
+          "type": "string",
+          "description": "The type of entity that was affected by the action (e.g., 'Warehouse', 'Product', 'GoodsReceipt')."
+        },
+        "entityId": {
+          "type": "string",
+          "description": "The ID of the entity that was affected."
+        },
+        "oldValue": {
+          "type": "string",
+          "description": "A description or JSON string representing the state of the entity before the action."
+        },
+        "newValue": {
+          "type": "string",
+          "description": "A description or JSON string representing the state of the entity after the action."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp when the action occurred.",
+          "format": "date-time"
+        },
+        "ipAddress": {
+          "type": "string",
+          "description": "The IP address from which the action was initiated."
+        },
+        "userAgent": {
+          "type": "string",
+          "description": "The user agent string of the client that initiated the action."
+        }
+      },
+      "required": [
+        "$schema",
+        "id",
+        "userId",
+        "action",
+        "entityType",
+        "entityId",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/roles/{roleId}",
+        "definition": {
+          "entityName": "Role",
+          "schema": {
+            "$ref": "#/backend/entities/Role"
+          },
+          "description": "Defines application roles such as Admin, Warehouse Manager, and Operator. Access to manage roles is restricted to Admins. Users' assigned roles are queried from their User document for authorization checks.",
+          "params": [
+            {
+              "name": "roleId",
+              "description": "Unique identifier for the role."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles, including their assigned `roleId` and `warehouseId`. This crucial denormalization enables efficient role-based access control and warehouse-specific authorization checks directly from `request.auth.uid`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user (typically Firebase Auth UID)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/warehouses/{warehouseId}",
+        "definition": {
+          "entityName": "Warehouse",
+          "schema": {
+            "$ref": "#/backend/entities/Warehouse"
+          },
+          "description": "Top-level collection for managing physical or logical warehouses. Documents include `responsiblePersonId` for initial ownership, and access for other roles (e.g., Warehouse Managers) is linked via their `warehouseId` in the `/users/{uid}` document.",
+          "params": [
+            {
+              "name": "warehouseId",
+              "description": "Unique identifier for the warehouse."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/warehouses/{warehouseId}/stock/{productId}",
+        "definition": {
+          "entityName": "Stock",
+          "schema": {
+            "$ref": "#/backend/entities/Stock"
+          },
+          "description": "Represents the current stock balance of a `Product` within a specific `Warehouse`. The `warehouseId` is implicit from the path, and `productId` serves as the document ID. This structure ensures clear, path-based access control for warehouse-specific stock. Includes `currentQuantity` and `lastMovementTimestamp`.",
+          "params": [
+            {
+              "name": "warehouseId",
+              "description": "Unique identifier for the parent warehouse."
+            },
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product whose stock is being recorded."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Global collection for organizing products into logical categories. Access to manage categories is typically controlled by user roles.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "Unique identifier for the product category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/suppliers/{supplierId}",
+        "definition": {
+          "entityName": "Supplier",
+          "schema": {
+            "$ref": "#/backend/entities/Supplier"
+          },
+          "description": "Global collection for managing vendor or supplier information. Access controlled by user roles.",
+          "params": [
+            {
+              "name": "supplierId",
+              "description": "Unique identifier for the supplier."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Global collection for defining individual products managed in the inventory. Access controlled by user roles (e.g., Admins, Warehouse Managers can manage; Operators can read).",
+          "params": [
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/goodsReceipts/{goodsReceiptId}",
+        "definition": {
+          "entityName": "GoodsReceipt",
+          "schema": {
+            "$ref": "#/backend/entities/GoodsReceipt"
+          },
+          "description": "Records the process of receiving goods into a warehouse (Stock In). Includes denormalized `warehouseId` and `responsibleUserId` for authorization independence and efficient querying.",
+          "params": [
+            {
+              "name": "goodsReceiptId",
+              "description": "Unique identifier for the goods receipt transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/goodsReceipts/{goodsReceiptId}/items/{goodsReceiptItemId}",
+        "definition": {
+          "entityName": "GoodsReceiptItem",
+          "schema": {
+            "$ref": "#/backend/entities/GoodsReceiptItem"
+          },
+          "description": "Details individual products and quantities received within a GoodsReceipt. Includes denormalized `warehouseId` and `responsibleUserId` from the parent `GoodsReceipt` for authorization independence, allowing direct rule evaluation without parent lookups.",
+          "params": [
+            {
+              "name": "goodsReceiptId",
+              "description": "Unique identifier of the parent goods receipt."
+            },
+            {
+              "name": "goodsReceiptItemId",
+              "description": "Unique identifier for the goods receipt item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/goodsIssues/{goodsIssueId}",
+        "definition": {
+          "entityName": "GoodsIssue",
+          "schema": {
+            "$ref": "#/backend/entities/GoodsIssue"
+          },
+          "description": "Records the process of issuing goods from a warehouse (Stock Out). Includes denormalized `warehouseId` and `responsibleUserId` for authorization independence and efficient querying.",
+          "params": [
+            {
+              "name": "goodsIssueId",
+              "description": "Unique identifier for the goods issue transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/goodsIssues/{goodsIssueId}/items/{goodsIssueItemId}",
+        "definition": {
+          "entityName": "GoodsIssueItem",
+          "schema": {
+            "$ref": "#/backend/entities/GoodsIssueItem"
+          },
+          "description": "Details individual products and quantities issued within a GoodsIssue. Includes denormalized `warehouseId` and `responsibleUserId` from the parent `GoodsIssue` for authorization independence, allowing direct rule evaluation without parent lookups.",
+          "params": [
+            {
+              "name": "goodsIssueId",
+              "description": "Unique identifier of the parent goods issue."
+            },
+            {
+              "name": "goodsIssueItemId",
+              "description": "Unique identifier for the goods issue item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/transfers/{transferId}",
+        "definition": {
+          "entityName": "Transfer",
+          "schema": {
+            "$ref": "#/backend/entities/Transfer"
+          },
+          "description": "Records the movement of goods between two warehouses. Includes denormalized `sourceWarehouseId`, `destinationWarehouseId`, and `responsibleUserId` for authorization independence and efficient querying.",
+          "params": [
+            {
+              "name": "transferId",
+              "description": "Unique identifier for the transfer transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/transfers/{transferId}/items/{transferItemId}",
+        "definition": {
+          "entityName": "TransferItem",
+          "schema": {
+            "$ref": "#/backend/entities/TransferItem"
+          },
+          "description": "Details individual products and quantities involved in a Transfer. Includes denormalized `sourceWarehouseId`, `destinationWarehouseId`, and `responsibleUserId` from the parent `Transfer` for authorization independence, allowing direct rule evaluation without parent lookups.",
+          "params": [
+            {
+              "name": "transferId",
+              "description": "Unique identifier of the parent transfer."
+            },
+            {
+              "name": "transferItemId",
+              "description": "Unique identifier for the transfer item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/stockMovements/{stockMovementId}",
+        "definition": {
+          "entityName": "StockMovement",
+          "schema": {
+            "$ref": "#/backend/entities/StockMovement"
+          },
+          "description": "Logs every change in product stock for auditing and reporting. Includes denormalized `warehouseId` and `responsibleUserId` for authorization independence. Primarily read-only for most users, with writes handled by backend functions.",
+          "params": [
+            {
+              "name": "stockMovementId",
+              "description": "Unique identifier for the stock movement log entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/auditLogs/{auditLogId}",
+        "definition": {
+          "entityName": "AuditLog",
+          "schema": {
+            "$ref": "#/backend/entities/AuditLog"
+          },
+          "description": "Records all significant user activities and system changes. Includes `userId`, `entityType`, and `entityId` for direct access control. Highly restricted (read-only for Admins), with writes exclusively via backend functions.",
+          "params": [
+            {
+              "name": "auditLogId",
+              "description": "Unique identifier for the audit log entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore data structure for OmniStock prioritizes Authorization Independence and Query as a Privilege (QAP) by employing strategic denormalization and structural segregation. \n\n**Authorization Independence:**\n1.  **User Roles and Warehouse Assignments:** The `users` collection stores each user's `roleId` and their primary `warehouseId` directly in their document (`/users/{userId}`). This is critical for security rules, allowing a single `get(/users/$(request.auth.uid))` operation to retrieve a user's fundamental permissions without complex hierarchical lookups. This single `get()` is performed once per request, ensuring efficiency.\n2.  **Denormalization in Subcollections:** For subcollections such as `goodsReceipts/{goodsReceiptId}/items`, `goodsIssues/{goodsIssueId}/items`, and `transfers/{transferId}/items`, key authorization context (e.g., `warehouseId`, `responsibleUserId`, `sourceWarehouseId`, `destinationWarehouseId`) from the parent document is **denormalized** into each individual item document. This eliminates the need for expensive and rule-breaking `get()` calls to parent documents when evaluating access for subcollection items. Security rules can directly check the denormalized fields on the `resource.data` of the item document, ensuring atomic authorization checks and robust security.\n3.  **Top-level Transactions:** All top-level transactional documents (`goodsReceipts`, `goodsIssues`, `transfers`, `stockMovements`) explicitly contain the `warehouseId`(s) and `responsibleUserId` fields. This means any security rule evaluating access to these documents can directly use their own data (`resource.data`) for authorization, preventing chained `get()` operations.\n\n**Query as a Privilege (QAPs):**\n1.  **Structural Segregation for Homogeneous Security:** Collections like `roles`, `categories`, `suppliers`, and `products` are at the root level, implying a global security posture where access is primarily role-based (e.g., only Admins can create/update, others can read). This simplifies security rules as all documents within these collections share the same access requirements, avoiding complex document-level filters that Firestore rules cannot enforce for `list` operations.\n2.  **Path-Based Ownership for Warehouse Data:** The `warehouses/{warehouseId}/stock/{productId}` structure ensures that stock balances are directly nested under their respective warehouses. This naturally supports QAPs, as a Warehouse Manager assigned to `warehouseA` can only query (`list`) documents under `warehouses/warehouseA/stock`. The `warehouseId` is intrinsically part of the path, making rule evaluation straightforward (`allow read: if request.auth.uid == get(/users/$(request.auth.uid)).data.warehouseId;`).\n3.  **Denormalized Fields for Transactional QAPs:** For collections like `goodsReceipts`, `goodsIssues`, `transfers`, and `stockMovements`, the `warehouseId` (or source/destination warehouse IDs) is a field within each document. This enables secure `list` queries where a Warehouse Manager can filter for records pertaining to their assigned warehouse (e.g., `collection('goodsReceipts').where('warehouseId', '==', userWarehouseId)`). The security rules then confirm that `userWarehouseId` matches the `warehouseId` in the `resource.data` of the documents being queried, ensuring that only authorized data is returned, without the rules themselves acting as filters."
+  }
+}
