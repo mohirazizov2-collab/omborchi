@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, User, Loader2, MessageSquare, Minimize2, AlertCircle } from 'lucide-react';
+import { Sparkles, X, Send, Bot, User, Loader2, Minimize2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -46,11 +46,17 @@ export function ChatAssistant() {
       });
       setMessages(prev => [...prev, { role: 'model', content: response.response }]);
     } catch (error: any) {
-      console.error('Chat error:', error);
-      let errorMessage = "Uzr, texnik xatolik yuz berdi.";
+      console.error('Chat error details:', error);
+      
+      // Xatolik xabarini foydalanuvchiga tushunarliroq ko'rsatamiz
+      let errorMessage = "Kutilmagan xatolik yuz berdi.";
       
       if (error?.message?.includes('429')) {
-        errorMessage = "AI limiti tugadi. Iltimos, 1-2 daqiqa kutib turing.";
+        errorMessage = "AI limiti vaqtincha tugadi. 1-2 daqiqa kutib qayta urinib ko'ring.";
+      } else if (error?.message?.includes('API key')) {
+        errorMessage = "AI kaliti (API Key) noto'g'ri yoki sozlanmagan. Iltimos, sozlamalarni tekshiring.";
+      } else if (error?.message) {
+        errorMessage = `Xatolik: ${error.message}`;
       }
 
       setMessages(prev => [...prev, { 
@@ -65,7 +71,6 @@ export function ChatAssistant() {
 
   return (
     <>
-      {/* Floating Toggle Button */}
       <motion.div
         className="fixed bottom-6 right-6 z-[100]"
         initial={{ scale: 0, opacity: 0 }}
@@ -84,7 +89,6 @@ export function ChatAssistant() {
         </Button>
       </motion.div>
 
-      {/* Chat Window */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -139,8 +143,8 @@ export function ChatAssistant() {
                             ? "bg-primary text-white rounded-tr-none" 
                             : cn("bg-card border border-white/5 text-foreground rounded-tl-none", m.isError && "border-destructive/30 bg-destructive/5 text-destructive")
                         )}>
-                          {m.isError && <AlertCircle className="w-4 h-4 mb-2" />}
-                          <p className="leading-relaxed font-medium">{m.content}</p>
+                          {m.isError && <AlertCircle className="w-4 h-4 mb-2 inline-block mr-2" />}
+                          <p className="leading-relaxed font-medium inline">{m.content}</p>
                         </div>
                       </motion.div>
                     ))}
