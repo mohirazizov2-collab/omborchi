@@ -65,8 +65,8 @@ export function OmniSidebar() {
     <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0">
       <div className="flex items-center justify-between px-6 h-16 border-b">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-headline font-bold">
-            O
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+            <Warehouse className="w-5 h-5" />
           </div>
           <span className="font-headline font-bold text-xl tracking-tight text-foreground">omborchi.uz</span>
         </div>
