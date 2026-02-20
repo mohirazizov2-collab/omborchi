@@ -4,6 +4,7 @@ import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * @fileOverview Google Gemini orqali Genkit konfiguratsiyasi.
+ * Siz taqdim etgan API kalitidan foydalaniladi.
  */
 
 export const ai = genkit({
