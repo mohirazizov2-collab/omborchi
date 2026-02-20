@@ -1,7 +1,7 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,15 +30,23 @@ export default function UsersPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, isUserLoading: authLoading } = useUser();
+  const { user, role, isUserLoading: authLoading } = useUser();
+  const router = useRouter();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
   const [formData, setFormData] = useState({
     displayName: "",
     email: "",
-    role: "Warehouse Worker"
+    role: "Omborchi"
   });
+
+  // Role Guard
+  useEffect(() => {
+    if (!authLoading && role && role !== "Super Admin" && role !== "Admin") {
+      router.push("/");
+    }
+  }, [role, authLoading, router]);
 
   const usersQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -75,7 +83,7 @@ export default function UsersPage() {
           description: "Foydalanuvchi profili yaratildi.",
         });
         setIsDialogOpen(false);
-        setFormData({ displayName: "", email: "", role: "Warehouse Worker" });
+        setFormData({ displayName: "", email: "", role: "Omborchi" });
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -86,6 +94,14 @@ export default function UsersPage() {
       })
       .finally(() => setIsSaving(false));
   };
+
+  if (authLoading || (role && role !== "Super Admin" && role !== "Admin")) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -163,7 +179,7 @@ export default function UsersPage() {
           </Dialog>
         </header>
 
-        {(isLoading || authLoading) ? (
+        {isLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
