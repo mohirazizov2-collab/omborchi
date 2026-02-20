@@ -4,6 +4,7 @@ import { LanguageProvider } from '@/lib/i18n/context';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
+import { ChatAssistant } from '@/components/ai/chat-assistant';
 
 export const metadata: Metadata = {
   title: 'omborchi.uz - Advanced Inventory Management',
@@ -27,6 +28,7 @@ export default function RootLayout({
           <FirebaseClientProvider>
             <LanguageProvider>
               {children}
+              <ChatAssistant />
               <Toaster />
             </LanguageProvider>
           </FirebaseClientProvider>
