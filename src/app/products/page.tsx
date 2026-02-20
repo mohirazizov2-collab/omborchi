@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -8,14 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Package, Search, Plus, Filter, MoreHorizontal, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection } from "firebase/firestore";
 
 export default function ProductsPage() {
   const { t } = useLanguage();
   const db = useFirestore();
+  const { user, isUserLoading: authLoading } = useUser();
 
-  const productsQuery = useMemoFirebase(() => collection(db, "products"), [db]);
+  const productsQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "products");
+  }, [db, user]);
   const { data: products, isLoading } = useCollection(productsQuery);
 
   return (
@@ -44,7 +47,7 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
 
-        {isLoading ? (
+        {(isLoading || authLoading) ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>

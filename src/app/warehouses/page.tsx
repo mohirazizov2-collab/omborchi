@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -9,14 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection } from "firebase/firestore";
 
 export default function WarehousesPage() {
   const { t } = useLanguage();
   const db = useFirestore();
+  const { user, isUserLoading: authLoading } = useUser();
 
-  const warehousesQuery = useMemoFirebase(() => collection(db, "warehouses"), [db]);
+  const warehousesQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "warehouses");
+  }, [db, user]);
   const { data: warehouses, isLoading } = useCollection(warehousesQuery);
 
   return (
@@ -38,7 +41,7 @@ export default function WarehousesPage() {
           <Button variant="outline">{t.actions.filter}</Button>
         </div>
 
-        {isLoading ? (
+        {(isLoading || authLoading) ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
