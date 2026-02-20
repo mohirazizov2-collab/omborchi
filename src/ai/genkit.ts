@@ -1,18 +1,19 @@
 
 import { genkit } from 'genkit';
-import { openAI } from 'genkitx-openai';
+import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview OpenAI platformasi orqali Genkit konfiguratsiyasi.
+ * @fileOverview Google Gemini orqali Genkit konfiguratsiyasi.
+ * OpenAI kvotasi tugagani sababli barqaror modelga o'tkazildi.
  */
 
 export const ai = genkit({
   plugins: [
-    openAI({
-      apiKey: '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',
+    googleAI({
+      apiKey: 'AIzaSyDmQYr26NuWXot50VdN4Dk1wHrRDcW2kkk',
     }),
   ],
 });
 
-// OpenAI gpt-4o modeli
-export const model = 'openai/gpt-4o';
+// Barqaror Gemini 1.5 Flash modeli
+export const model = 'googleai/gemini-1.5-flash';

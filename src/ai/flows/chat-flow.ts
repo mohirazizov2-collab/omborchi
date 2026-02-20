@@ -1,8 +1,7 @@
+
 'use server';
 /**
  * @fileOverview Omborchi AI Assistant uchun Genkit flow.
- * 
- * - chatWithAI - Foydalanuvchi bilan muloqot qiluvchi asosiy funksiya.
  */
 
 import { ai, model } from '@/ai/genkit';

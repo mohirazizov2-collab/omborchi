@@ -1,8 +1,7 @@
+
 'use server';
 /**
  * @fileOverview Hisobotlarni tahlil qilish uchun Genkit flow.
- * 
- * - analyzeReports - Hisobot ma'lumotlarini tahlil qiluvchi asosiy funksiya.
  */
 
 import { ai, model } from '@/ai/genkit';
