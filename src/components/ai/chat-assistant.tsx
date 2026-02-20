@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, User, Loader2, MessageSquare, Minimize2 } from 'lucide-react';
+import { Sparkles, X, Send, Bot, User, Loader2, MessageSquare, Minimize2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 interface Message {
   role: 'user' | 'model';
   content: string;
+  isError?: boolean;
 }
 
 export function ChatAssistant() {
@@ -41,12 +42,22 @@ export function ChatAssistant() {
     try {
       const response = await chatWithAI({
         message: userMessage,
-        history: messages
+        history: messages.filter(m => !m.isError).map(m => ({ role: m.role, content: m.content }))
       });
       setMessages(prev => [...prev, { role: 'model', content: response.response }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, { role: 'model', content: "Uzr, texnik xatolik yuz berdi. Iltimos, keyinroq qayta urunib ko'ring." }]);
+      let errorMessage = "Uzr, texnik xatolik yuz berdi.";
+      
+      if (error?.message?.includes('429')) {
+        errorMessage = "AI limiti tugadi. Iltimos, 1-2 daqiqa kutib turing.";
+      }
+
+      setMessages(prev => [...prev, { 
+        role: 'model', 
+        content: errorMessage,
+        isError: true
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -126,8 +137,9 @@ export function ChatAssistant() {
                           "p-4 rounded-2xl text-sm max-w-[80%] shadow-sm",
                           m.role === 'user' 
                             ? "bg-primary text-white rounded-tr-none" 
-                            : "bg-card border border-white/5 text-foreground rounded-tl-none"
+                            : cn("bg-card border border-white/5 text-foreground rounded-tl-none", m.isError && "border-destructive/30 bg-destructive/5 text-destructive")
                         )}>
+                          {m.isError && <AlertCircle className="w-4 h-4 mb-2" />}
                           <p className="leading-relaxed font-medium">{m.content}</p>
                         </div>
                       </motion.div>
