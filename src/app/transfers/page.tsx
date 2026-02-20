@@ -11,9 +11,9 @@ import { ArrowRightLeft, Plus, Trash2, Calendar, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export default function TransfersPage() {
   const { t } = useLanguage();
@@ -25,10 +25,16 @@ export default function TransfersPage() {
   const [fromWarehouse, setFromWarehouse] = useState("");
   const [toWarehouse, setToWarehouse] = useState("");
 
-  const productsQuery = useMemoFirebase(() => collection(db, "products"), [db]);
+  const productsQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "products");
+  }, [db]);
   const { data: products } = useCollection(productsQuery);
 
-  const warehousesQuery = useMemoFirebase(() => collection(db, "warehouses"), [db]);
+  const warehousesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "warehouses");
+  }, [db]);
   const { data: warehouses } = useCollection(warehousesQuery);
 
   const addItem = () => {
@@ -67,16 +73,20 @@ export default function TransfersPage() {
     setLoading(true);
     try {
       items.forEach(item => {
+        // Record the transfer movement
         const movementData = {
           productId: item.productId,
           fromWarehouseId: fromWarehouse,
           toWarehouseId: toWarehouse,
-          quantity: item.quantity,
+          quantityChange: item.quantity,
           movementType: "Transfer",
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
+
+        // In a real app, you'd also update per-warehouse stock levels here.
+        // For MVP, we are tracking global stock in products and movements history.
       });
 
       toast({

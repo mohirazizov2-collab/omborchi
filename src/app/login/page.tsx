@@ -10,38 +10,55 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck } from "lucide-react";
+import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck, Copy, CheckCircle2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const { t, language, setLanguage } = useLanguage();
   const auth = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   
   const [email, setEmail] = useState("f2472839@gmail.com");
   const [password, setPassword] = useState("Farrukh0077");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [userUid, setUserUid] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setUserUid("");
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // Login muvaffaqiyatli bo'lsa, FirebaseClientProvider avtomatik ravishda Dashboardga o'tkazadi
-      router.push("/");
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      setUserUid(result.user.uid);
+      toast({
+        title: "Tizimga kirildi",
+        description: "Endi quyidagi UID orqali Super Adminni faollashtiring.",
+      });
+      // Muvaffaqiyatli bo'lsa, FirebaseClientProvider avtomatik ravishda Dashboardga o'tkazadi
+      // Agar rolesAdmin-da bo'lmasa, quyida ko'rsatma chiqadi.
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError(t.auth.errorInvalid || "Email yoki parol noto'g'ri.");
+        setError("Email yoki parol noto'g'ri. Firebase Console-da user yaratganingizga ishonch hosil qiling.");
       } else {
-        setError("Tizimga kirishda xatolik yuz berdi. Iltimos, Firebase Console-da foydalanuvchi yaratilganligiga ishonch hosil qiling.");
+        setError("Xatolik: " + err.message);
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const copyUid = () => {
+    navigator.clipboard.writeText(userUid);
+    toast({
+      title: "Nusxalandi",
+      description: "UID buferga olindi.",
+    });
   };
 
   return (
@@ -78,65 +95,92 @@ export default function LoginPage() {
             </CardTitle>
             <CardDescription className="text-center">{t.auth.loginDescription}</CardDescription>
           </CardHeader>
-          <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4">
-              {error && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {error}
+          
+          {!userUid ? (
+            <form onSubmit={handleLogin}>
+              <CardContent className="space-y-4">
+                {error && (
+                  <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {error}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email">{t.auth.emailLabel}</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="admin@omborchi.uz" 
+                      className="pl-10"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">{t.auth.emailLabel}</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="admin@omborchi.uz" 
-                    className="pl-10"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="password">{t.auth.passwordLabel}</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      className="pl-10"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" className="w-full h-11 text-lg font-semibold" disabled={loading}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : t.auth.loginButton}
+                </Button>
+              </CardFooter>
+            </form>
+          ) : (
+            <CardContent className="space-y-6 pt-2">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-3">
+                <div className="flex items-center gap-2 text-green-700 font-bold">
+                  <CheckCircle2 className="w-5 h-5" /> Autentifikatsiya muvaffaqiyatli!
+                </div>
+                <p className="text-sm text-green-600">
+                  Lekin siz hali <b>rolesAdmin</b> ro'yxatida yo'qsiz. Quyidagi UID-ni nusxalab, Firestore-da sozlang:
+                </p>
+                <div className="flex items-center gap-2 bg-white p-2 rounded border border-green-200 font-code text-xs">
+                  <span className="flex-1 truncate">{userUid}</span>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={copyUid}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password">{t.auth.passwordLabel}</Label>
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    className="pl-10"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
+
+              <div className="space-y-3 text-sm">
+                <p className="font-bold text-primary flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[10px]">1</div>
+                  Firestore-ga kiring
+                </p>
+                <p className="ml-7 text-muted-foreground">
+                  <b>rolesAdmin</b> nomli kolleksiya oching.
+                </p>
+
+                <p className="font-bold text-primary flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[10px]">2</div>
+                  Hujjat (Document) yarating
+                </p>
+                <p className="ml-7 text-muted-foreground">
+                  <b>Document ID</b> degan joyiga yuqoridagi <b>UID</b>-ni qo'ying.
+                </p>
+                
+                <Button variant="outline" className="w-full mt-4" onClick={() => window.location.reload()}>
+                  Sozlab bo'ldim, qayta yuklash
+                </Button>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <Button type="submit" className="w-full h-11 text-lg font-semibold" disabled={loading}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : t.auth.loginButton}
-              </Button>
-              <div className="text-center space-y-2">
-                <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 text-[11px] text-muted-foreground leading-relaxed shadow-inner">
-                  <p className="font-bold text-primary mb-2 uppercase tracking-wider flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Super Adminni aktivlashtirish:
-                  </p>
-                  <ol className="text-left space-y-1 ml-2 list-decimal">
-                    <li><b>Firebase Console</b>-da ushbu email/parol bilan user yarating.</li>
-                    <li>O'sha userni <b>UID</b> raqamini nusxalang.</li>
-                    <li>Firestore-da <b>'rolesAdmin'</b> kolleksiyasiga kiring.</li>
-                    <li>Yangi hujjat yarating va ID-siga o'sha <b>UID</b>-ni qo'ying.</li>
-                  </ol>
-                </div>
-              </div>
-            </CardFooter>
-          </form>
+          )}
         </Card>
       </div>
     </div>
