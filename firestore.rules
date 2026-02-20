@@ -10,22 +10,6 @@ service cloud.firestore {
      * control model. It prioritizes "Authorization Independence" by leveraging denormalized data 
      * (like responsibleUserId and warehouseId) directly on documents to ensure atomic and 
      * performant security decisions without recursive database lookups.
-     * 
-     * DATA STRUCTURE:
-     * - User profiles are stored at /users/{userId}.
-     * - Authorization roles are managed via existence checks in specific role collections:
-     *   /rolesAdmin, /rolesWarehouseManager, and /rolesOperator.
-     * - Operational data is logically grouped under /warehouses/{warehouseId} or /transfers.
-     * 
-     * KEY SECURITY DECISIONS:
-     * - DBAC (Document-Based Access Control): We use the existence of a document in role-specific 
-     *   collections to verify Admin, Manager, or Operator status.
-     * - Path-Based Ownership: User-specific data and warehouse-specific transactions are secured 
-     *   using wildcards from the URI and internal identity fields.
-     * - Immutability: Critical relational fields (like responsibleUserId) are enforced as 
-     *   immutable on updates to prevent authorization bypass.
-     * - Prototyping Flexibility: While authorization is strictly enforced, data types and 
-     *   general schemas are not validated to allow for rapid schema iteration.
      */
 
     // --- Helper Functions ---
@@ -37,9 +21,6 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
-    // The function isExistingOwner was unused and its internal use of 'resource' as a global
-    // variable in a top-level function was incorrect. Removed as part of rule validation fix.
 
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid));
@@ -55,13 +36,6 @@ service cloud.firestore {
 
     // --- User & Role Management ---
 
-    /**
-     * @description Rules for user profiles. Users can manage their own profile; Admins have full access.
-     * @path /users/{userId}
-     * @allow (get) request.auth.uid == userId
-     * @deny (update) request.auth.uid != userId && !isAdmin
-     * @principle Enforces document ownership for user profiles.
-     */
     match /users/{userId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && request.resource.data.id == userId;
@@ -69,22 +43,11 @@ service cloud.firestore {
       allow delete: if isAdmin() && resource != null;
     }
 
-    /**
-     * @description Global role metadata. Read-only for all authenticated staff; Admin only writes.
-     * @path /roles/{roleId}
-     * @allow (get) Any signed-in user.
-     * @deny (create) Non-admin users.
-     * @principle Restricts system configuration to Admin roles.
-     */
     match /roles/{roleId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
 
-    /**
-     * @description DBAC role assignment collections. Only Admins can view or modify role assignments.
-     * @path /rolesAdmin/{userId}, /rolesWarehouseManager/{userId}, /rolesOperator/{userId}
-     */
     match /rolesAdmin/{userId} {
       allow read, write: if isAdmin();
     }
@@ -97,13 +60,6 @@ service cloud.firestore {
 
     // --- Global Entities (Catalog & Contacts) ---
 
-    /**
-     * @description Catalog data (Categories, Products, Suppliers). Visible to all staff. Managed by Admins and Managers.
-     * @path /categories/{categoryId}, /products/{productId}, /suppliers/{supplierId}
-     * @allow (get) Any signed-in user.
-     * @deny (update) Operator role.
-     * @principle Public read within the organization with privileged write access.
-     */
     match /categories/{categoryId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isAdmin() || isWarehouseManager();
@@ -121,34 +77,17 @@ service cloud.firestore {
 
     // --- Warehouse Operations ---
 
-    /**
-     * @description Warehouse metadata. Admins manage; staff can view.
-     * @path /warehouses/{warehouseId}
-     * @allow (update) Admin or the specific Responsible User.
-     * @principle Uses denormalized responsibleUserId for fine-grained management.
-     */
     match /warehouses/{warehouseId} {
       allow get, list: if isSignedIn();
       allow create, delete: if isAdmin();
       allow update: if resource != null && (isAdmin() || isOwner(resource.data.responsibleUserId));
     }
 
-    /**
-     * @description Stock balance within a warehouse. Read by staff; modified by system operators/managers.
-     * @path /warehouses/{warehouseId}/productStock/{productId}
-     * @principle Warehouse-scoped security checks.
-     */
     match /warehouses/{warehouseId}/productStock/{productId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isAdmin() || isWarehouseManager() || isOperator();
     }
 
-    /**
-     * @description Goods Receipt transactions. Authorized for Admins, Managers, and the Operator who processed it.
-     * @path /warehouses/{warehouseId}/goodsReceipts/{receiptId}
-     * @allow (create) Signed-in user setting themselves as responsibleUserId.
-     * @principle Ensures transaction ownership and prevents unauthorized modification of audit trails.
-     */
     match /warehouses/{warehouseId}/goodsReceipts/{receiptId} {
       allow get, list: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
@@ -163,10 +102,6 @@ service cloud.firestore {
       }
     }
 
-    /**
-     * @description Goods Issue transactions. Similar logic to Receipts, enforcing ownership via responsibleUserId.
-     * @path /warehouses/{warehouseId}/goodsIssues/{issueId}
-     */
     match /warehouses/{warehouseId}/goodsIssues/{issueId} {
       allow get, list: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
@@ -181,12 +116,6 @@ service cloud.firestore {
       }
     }
 
-    /**
-     * @description Warehouse Transfers. Cross-warehouse visibility managed by denormalized responsible user IDs.
-     * @path /transfers/{transferId}
-     * @allow (get) If user is initiator, source manager, or destination manager.
-     * @principle Supports multi-party authorization through data denormalization.
-     */
     match /transfers/{transferId} {
       function canAccessTransfer(data) {
         return isAdmin() || 
@@ -209,8 +138,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Stock movement audit trail. Create-only for operators/managers; immutable once written.
-     * @path /warehouses/{warehouseId}/stockMovements/{movementId}
+     * @description Stock movement audit trail (Root level access for dashboard).
+     */
+    match /stockMovements/{movementId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
+    }
+
+    /**
+     * @description Stock movement audit trail (Nested level).
      */
     match /warehouses/{warehouseId}/stockMovements/{movementId} {
       allow get, list: if isSignedIn();
@@ -220,13 +156,6 @@ service cloud.firestore {
 
     // --- System Audit ---
 
-    /**
-     * @description System-wide Audit Logs. Restricted to Admins for compliance and security monitoring.
-     * @path /auditLogs/{auditLogId}
-     * @allow (create) Any signed-in user (to allow app-level logging).
-     * @deny (list) Non-admin users.
-     * @principle Restricts sensitive activity logs to high-privilege accounts.
-     */
     match /auditLogs/{auditLogId} {
       allow get, list: if isAdmin();
       allow create: if isSignedIn();
