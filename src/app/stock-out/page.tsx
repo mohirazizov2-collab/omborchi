@@ -8,8 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Plus, Calendar, Truck, User } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n/context";
+import { Badge } from "@/components/ui/badge";
 
 export default function StockOutPage() {
+  const { t } = useLanguage();
   const [items, setItems] = useState([{ id: 1, product: "", quantity: 0 }]);
 
   const addItem = () => {
@@ -27,37 +30,36 @@ export default function StockOutPage() {
       <OmniSidebar />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">Stock Out (Goods Issue)</h1>
-          <p className="text-muted-foreground mt-1">Record items leaving the warehouse for customers or projects.</p>
+          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.stockOut.title}</h1>
+          <p className="text-muted-foreground mt-1">{t.stockOut.description}</p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle className="font-headline">Issue Details</CardTitle>
-                <CardDescription>Specify where the items are being sent.</CardDescription>
+                <CardTitle className="font-headline">{t.stockOut.issueDetails}</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="order_number">Order / Reference #</Label>
+                  <Label htmlFor="order_number">{t.stockOut.refNumber}</Label>
                   <div className="relative">
                     <Truck className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                     <Input id="order_number" placeholder="ORD-998877" className="pl-10" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="date">Date of Issue</Label>
+                  <Label htmlFor="date">{t.stockOut.issueDate}</Label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                     <Input id="date" type="date" className="pl-10" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="source_warehouse">Source Warehouse</Label>
+                  <Label htmlFor="source_warehouse">{t.stockOut.sourceWarehouse}</Label>
                   <Select>
                     <SelectTrigger id="source_warehouse">
-                      <SelectValue placeholder="Select warehouse" />
+                      <SelectValue placeholder={t.stockOut.sourceWarehouse} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="main">Main Hub - Tashkent</SelectItem>
@@ -66,10 +68,10 @@ export default function StockOutPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="customer">Client / Recipient</Label>
+                  <Label htmlFor="customer">{t.stockOut.recipient}</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    <Input id="customer" placeholder="Acme Corp / Tech Solutions" className="pl-10" />
+                    <Input id="customer" placeholder="Acme Corp" className="pl-10" />
                   </div>
                 </div>
               </CardContent>
@@ -78,30 +80,29 @@ export default function StockOutPage() {
             <Card className="border-none shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="font-headline">Items to Issue</CardTitle>
-                  <CardDescription>Select products and quantities to remove from stock.</CardDescription>
+                  <CardTitle className="font-headline">{t.stockOut.title}</CardTitle>
                 </div>
                 <Button variant="outline" size="sm" onClick={addItem} className="gap-2">
-                  <Plus className="w-4 h-4" /> Add Item
+                  <Plus className="w-4 h-4" /> {t.actions.addItem}
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 {items.map((item) => (
                   <div key={item.id} className="flex gap-4 items-end p-4 rounded-lg bg-accent/20 border">
                     <div className="flex-1 space-y-2">
-                      <Label className="text-xs">Product</Label>
+                      <Label className="text-xs">{t.common.product}</Label>
                       <Select>
                         <SelectTrigger>
-                          <SelectValue placeholder="Search product..." />
+                          <SelectValue placeholder={t.common.product} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="i9">Intel Core i9-13900K (12 avail.)</SelectItem>
-                          <SelectItem value="rtx4090">NVIDIA RTX 4090 FE (4 avail.)</SelectItem>
+                          <SelectItem value="i9">Intel Core i9-13900K</SelectItem>
+                          <SelectItem value="rtx4090">NVIDIA RTX 4090 FE</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="w-32 space-y-2">
-                      <Label className="text-xs">Quantity</Label>
+                      <Label className="text-xs">{t.common.quantity}</Label>
                       <Input type="number" placeholder="0" />
                     </div>
                     <Button 
@@ -121,25 +122,17 @@ export default function StockOutPage() {
           <div className="space-y-6">
             <Card className="border-none shadow-sm h-fit sticky top-8">
               <CardHeader>
-                <CardTitle className="font-headline">Finalization</CardTitle>
-                <CardDescription>Review stock levels before processing.</CardDescription>
+                <CardTitle className="font-headline">{t.common.summary}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Unique SKUs</span>
+                  <span className="text-muted-foreground">{t.common.totalItems}</span>
                   <span className="font-semibold">{items.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Status</span>
-                  <Badge variant="outline">Verification Required</Badge>
-                </div>
-                <div className="pt-4 border-t">
-                  <p className="text-xs text-muted-foreground italic">Note: Processing this will immediately decrease the inventory levels in the selected warehouse.</p>
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-3">
-                <Button className="w-full h-11 text-lg bg-orange-600 hover:bg-orange-700">Dispatch Order</Button>
-                <Button variant="outline" className="w-full">Print Picking List</Button>
+                <Button className="w-full h-11 text-lg bg-orange-600 hover:bg-orange-700">{t.stockOut.dispatch}</Button>
+                <Button variant="outline" className="w-full">{t.stockOut.pickingList}</Button>
               </CardFooter>
             </Card>
           </div>

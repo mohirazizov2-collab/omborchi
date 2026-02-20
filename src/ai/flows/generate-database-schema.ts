@@ -39,7 +39,7 @@ Ensure the following are accurately reflected:
 - Unique constraints (e.g., SKU for products, delivery_note_number for goods receipts).
 - Referential integrity for all relationships between tables.
 - Soft delete implementation (e.g., 'deleted_at' timestamp field) where required for warehouses and products.
-- The stock_movements table MUST accurately record ALL stock changes, as per business rules.
+- The 'stock_movements' table MUST accurately record ALL stock changes, as per business rules.
 - Appropriate data types for each field (e.g., UUID for IDs, timestamp for dates, numeric for prices/quantities).
 - Indexes for frequently queried columns, especially foreign keys and search fields.
 - Default values where appropriate (e.g., created_at, updated_at).

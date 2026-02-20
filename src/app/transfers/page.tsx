@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRightLeft, Plus, Trash2, Calendar, MapPin } from "lucide-react";
+import { ArrowRightLeft, Plus, Trash2, Calendar } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n/context";
 
 export default function TransfersPage() {
+  const { t } = useLanguage();
   const [items, setItems] = useState([{ id: 1, product: "", quantity: 0 }]);
 
   const addItem = () => {
@@ -27,23 +29,22 @@ export default function TransfersPage() {
       <OmniSidebar />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">Inter-Warehouse Transfers</h1>
-          <p className="text-muted-foreground mt-1">Move stock between your distribution centers and hubs.</p>
+          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.transfers.title}</h1>
+          <p className="text-muted-foreground mt-1">{t.transfers.description}</p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-none shadow-sm">
               <CardHeader>
-                <CardTitle className="font-headline">Route Details</CardTitle>
-                <CardDescription>Select source and destination warehouses.</CardDescription>
+                <CardTitle className="font-headline">{t.transfers.routeDetails}</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="source">Source Warehouse</Label>
+                  <Label htmlFor="source">{t.transfers.fromWarehouse}</Label>
                   <Select>
                     <SelectTrigger id="source">
-                      <SelectValue placeholder="From..." />
+                      <SelectValue placeholder={t.transfers.fromWarehouse} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="main">Main Hub - Tashkent</SelectItem>
@@ -52,10 +53,10 @@ export default function TransfersPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="destination">Destination Warehouse</Label>
+                  <Label htmlFor="destination">{t.transfers.toWarehouse}</Label>
                   <Select>
                     <SelectTrigger id="destination">
-                      <SelectValue placeholder="To..." />
+                      <SelectValue placeholder={t.transfers.toWarehouse} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="samarkand">Samarkand Hub</SelectItem>
@@ -64,15 +65,11 @@ export default function TransfersPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="transfer_date">Scheduled Date</Label>
+                  <Label htmlFor="transfer_date">{t.transfers.scheduleDate}</Label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                     <Input id="transfer_date" type="date" className="pl-10" />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ref">Reference #</Label>
-                  <Input id="ref" placeholder="TRF-001122" />
                 </div>
               </CardContent>
             </Card>
@@ -80,21 +77,20 @@ export default function TransfersPage() {
             <Card className="border-none shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="font-headline">Items to Transfer</CardTitle>
-                  <CardDescription>Specify products and quantities.</CardDescription>
+                  <CardTitle className="font-headline">{t.transfers.title}</CardTitle>
                 </div>
                 <Button variant="outline" size="sm" onClick={addItem} className="gap-2">
-                  <Plus className="w-4 h-4" /> Add Item
+                  <Plus className="w-4 h-4" /> {t.actions.addItem}
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 {items.map((item) => (
                   <div key={item.id} className="flex gap-4 items-end p-4 rounded-lg bg-accent/20 border">
                     <div className="flex-1 space-y-2">
-                      <Label className="text-xs">Product</Label>
+                      <Label className="text-xs">{t.common.product}</Label>
                       <Select>
                         <SelectTrigger>
-                          <SelectValue placeholder="Search product..." />
+                          <SelectValue placeholder={t.common.product} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="i9">Intel Core i9-13900K</SelectItem>
@@ -103,7 +99,7 @@ export default function TransfersPage() {
                       </Select>
                     </div>
                     <div className="w-32 space-y-2">
-                      <Label className="text-xs">Quantity</Label>
+                      <Label className="text-xs">{t.common.quantity}</Label>
                       <Input type="number" placeholder="0" />
                     </div>
                     <Button 
@@ -123,27 +119,18 @@ export default function TransfersPage() {
           <div className="space-y-6">
             <Card className="border-none shadow-sm h-fit sticky top-8">
               <CardHeader>
-                <CardTitle className="font-headline">Transfer Summary</CardTitle>
-                <CardDescription>Confirm logistics requirements.</CardDescription>
+                <CardTitle className="font-headline">{t.common.summary}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total SKUs</span>
+                  <span className="text-muted-foreground">{t.common.totalItems}</span>
                   <span className="font-semibold">{items.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Distance (Est.)</span>
-                  <span className="font-semibold">320 km</span>
-                </div>
-                <div className="pt-4 border-t">
-                  <p className="text-xs text-muted-foreground italic">Note: Inventory will be marked as "In Transit" until received at the destination warehouse.</p>
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-3">
                 <Button className="w-full h-11 text-lg gap-2">
-                  <ArrowRightLeft className="w-5 h-5" /> Initiate Transfer
+                  <ArrowRightLeft className="w-5 h-5" /> {t.transfers.initiate}
                 </Button>
-                <Button variant="outline" className="w-full">Save as Draft</Button>
               </CardFooter>
             </Card>
           </div>

@@ -1,4 +1,3 @@
-
 export type Language = 'uz' | 'ru' | 'en';
 
 export const translations = {
@@ -7,8 +6,8 @@ export const translations = {
       dashboard: 'Dashboard',
       warehouses: 'Omborlar',
       products: 'Mahsulotlar',
-      stockIn: 'Kirib kelish',
-      stockOut: 'Chiqib ketish',
+      stockIn: 'Kirish',
+      stockOut: 'Chiqish',
       transfers: 'Transferlar',
       reports: 'Hisobotlar',
       systemGen: 'Tizim Gen',
@@ -50,6 +49,74 @@ export const translations = {
       price: 'Narx',
       status: 'Holat'
     },
+    stockIn: {
+      title: 'Tovarlar kirimi (Goods Receipt)',
+      description: 'Yetkazib beruvchilardan kelgan tovarlarni qayd etish.',
+      dnDetails: 'Yuk xati tafsilotlari',
+      dnNumber: 'Yuk xati raqami (DN)',
+      receiptDate: 'Kabul qilingan sana',
+      supplier: 'Yetkazib beruvchi',
+      targetWarehouse: 'Maqsadli ombor',
+      productItems: 'Mahsulotlar ro\'yxati',
+      process: 'Qabul qilishni yakunlash',
+      saveDraft: 'Qoralama sifatida saqlash'
+    },
+    stockOut: {
+      title: 'Tovarlar chiqimi (Goods Issue)',
+      description: 'Ombordan tovarlarni chiqarish (mijozlarga yoki loyihalarga).',
+      issueDetails: 'Chiqim tafsilotlari',
+      refNumber: 'Buyurtma / Referans raqami',
+      issueDate: 'Chiqarilgan sana',
+      sourceWarehouse: 'Chiqaruvchi ombor',
+      recipient: 'Mijoz / Qabul qiluvchi',
+      dispatch: 'Tovarni jo\'natish',
+      pickingList: 'Terish varaqasini chop etish'
+    },
+    transfers: {
+      title: 'Omborlararo transferlar',
+      description: 'Zaxiralarni bir ombordan ikkinchisiga o\'tkazish.',
+      routeDetails: 'Yo\'nalish tafsilotlari',
+      fromWarehouse: 'Qaysi ombordan',
+      toWarehouse: 'Qaysi omborga',
+      scheduleDate: 'Rejalashtirilgan sana',
+      initiate: 'Transferni boshlash'
+    },
+    reports: {
+      title: 'Analitika va Hisobotlar',
+      description: 'Inventar ko\'rsatkichlari va logistika metrikalarini tahlil qiling.',
+      export: 'PDF-ga eksport qilish',
+      stockValueTrend: 'Zaxira qiymati tendensiyasi',
+      categoryDist: 'Kategoriyalar bo\'yicha taqsimot',
+      accuracy: 'Inventarizatsiya aniqligi'
+    },
+    users: {
+      title: 'Foydalanuvchilarni boshqarish',
+      description: 'Tizimga kirish darajalarini va jamoa a\'zolarini boshqaring.',
+      invite: 'Foydalanuvchini taklif qilish',
+      role: 'Rol',
+      assignedHub: 'Biriktirilgan markaz',
+      status: 'Holat'
+    },
+    settings: {
+      title: 'Tizim sozlamalari',
+      description: 'OmniStock global parametrlarini va xavfsizlikni sozlash.',
+      general: 'Umumiy konfiguratsiya',
+      companyName: 'Kompaniya nomi',
+      currency: 'Valyuta',
+      notifications: 'Bildirishnomalar',
+      lowStockAlerts: 'Kam zaxira haqida ogohlantirish',
+      save: 'O\'zgarishlarni saqlash'
+    },
+    systemGen: {
+      title: 'Tizim generatsiya vositasi',
+      description: 'AI yordamida arxitektura artefaktlarini yaratish.',
+      inputReqs: 'Talablarni kiritish',
+      generate: 'Arxitekturani yaratish',
+      database: 'Ma\'lumotlar bazasi',
+      structure: 'Tuzilma',
+      apiBoilerplate: 'API Boilerplate',
+      endpoints: 'Endpointlar'
+    },
     actions: {
       downloadReport: 'Hisobotni yuklash',
       newOperation: 'Yangi operatsiya',
@@ -58,7 +125,9 @@ export const translations = {
       save: 'Saqlash',
       cancel: 'Bekor qilish',
       edit: 'Tahrirlash',
-      delete: 'O\'chirish'
+      delete: 'O\'chirish',
+      viewAll: 'Hammasini ko\'rish',
+      addItem: 'Buyum qo\'shish'
     },
     common: {
       quantity: 'Miqdor',
@@ -66,7 +135,11 @@ export const translations = {
       date: 'Sana',
       product: 'Mahsulot',
       type: 'Turi',
-      id: 'ID'
+      id: 'ID',
+      summary: 'Xulosa',
+      totalItems: 'Jami buyumlar',
+      totalValue: 'Jami qiymat',
+      price: 'Narx'
     }
   },
   ru: {
@@ -117,6 +190,74 @@ export const translations = {
       price: 'Цена',
       status: 'Статус'
     },
+    stockIn: {
+      title: 'Приход товара (Goods Receipt)',
+      description: 'Регистрация входящих товаров по накладным.',
+      dnDetails: 'Детали накладной',
+      dnNumber: 'Номер накладной (DN)',
+      receiptDate: 'Дата получения',
+      supplier: 'Поставщик',
+      targetWarehouse: 'Целевой склад',
+      productItems: 'Список товаров',
+      process: 'Завершить прием',
+      saveDraft: 'Сохранить черновик'
+    },
+    stockOut: {
+      title: 'Расход товара (Goods Issue)',
+      description: 'Выдача товаров со склада (клиентам или на проекты).',
+      issueDetails: 'Детали выдачи',
+      refNumber: 'Номер заказа / Референс',
+      issueDate: 'Дата выдачи',
+      sourceWarehouse: 'Склад отгрузки',
+      recipient: 'Клиент / Получатель',
+      dispatch: 'Отправить товар',
+      pickingList: 'Печать листа сборки'
+    },
+    transfers: {
+      title: 'Межскладские переводы',
+      description: 'Перемещение запасов между вашими складами.',
+      routeDetails: 'Детали маршрута',
+      fromWarehouse: 'Со склада',
+      toWarehouse: 'На склад',
+      scheduleDate: 'Плановая дата',
+      initiate: 'Начать перевод'
+    },
+    reports: {
+      title: 'Аналитика и Отчеты',
+      description: 'Анализируйте показатели инвентаря и логистические метрики.',
+      export: 'Экспорт в PDF',
+      stockValueTrend: 'Тренды стоимости запасов',
+      categoryDist: 'Распределение по категориям',
+      accuracy: 'Точность инвентаризации'
+    },
+    users: {
+      title: 'Управление пользователями',
+      description: 'Управляйте уровнями доступа и членами команды.',
+      invite: 'Пригласить пользователя',
+      role: 'Роль',
+      assignedHub: 'Привязанный центр',
+      status: 'Статус'
+    },
+    settings: {
+      title: 'Системные настройки',
+      description: 'Настройка глобальных параметров OmniStock и безопасности.',
+      general: 'Общая конфигурация',
+      companyName: 'Название компании',
+      currency: 'Валюта',
+      notifications: 'Уведомления',
+      lowStockAlerts: 'Предупреждения о низком запасе',
+      save: 'Сохранить изменения'
+    },
+    systemGen: {
+      title: 'Инструмент генерации системы',
+      description: 'Создание архитектурных артефактов с помощью ИИ.',
+      inputReqs: 'Ввод требований',
+      generate: 'Генерировать архитектуру',
+      database: 'База данных',
+      structure: 'Структура',
+      apiBoilerplate: 'API Boilerplate',
+      endpoints: 'Эндпоинты'
+    },
     actions: {
       downloadReport: 'Скачать отчет',
       newOperation: 'Новая операция',
@@ -125,7 +266,9 @@ export const translations = {
       save: 'Сохранить',
       cancel: 'Отмена',
       edit: 'Изменить',
-      delete: 'Удалить'
+      delete: 'Удалить',
+      viewAll: 'Посмотреть все',
+      addItem: 'Добавить позицию'
     },
     common: {
       quantity: 'Кол-во',
@@ -133,7 +276,11 @@ export const translations = {
       date: 'Дата',
       product: 'Продукт',
       type: 'Тип',
-      id: 'ID'
+      id: 'ID',
+      summary: 'Итог',
+      totalItems: 'Всего позиций',
+      totalValue: 'Общая стоимость',
+      price: 'Цена'
     }
   },
   en: {
@@ -184,6 +331,74 @@ export const translations = {
       price: 'Price',
       status: 'Status'
     },
+    stockIn: {
+      title: 'Stock In (Goods Receipt)',
+      description: 'Record incoming inventory via delivery notes from suppliers.',
+      dnDetails: 'Delivery Note Details',
+      dnNumber: 'Delivery Note #',
+      receiptDate: 'Date of Receipt',
+      supplier: 'Supplier',
+      targetWarehouse: 'Target Warehouse',
+      productItems: 'Product Items',
+      process: 'Process Receipt',
+      saveDraft: 'Save Draft'
+    },
+    stockOut: {
+      title: 'Stock Out (Goods Issue)',
+      description: 'Record items leaving the warehouse for customers or projects.',
+      issueDetails: 'Issue Details',
+      refNumber: 'Order / Reference #',
+      issueDate: 'Date of Issue',
+      sourceWarehouse: 'Source Warehouse',
+      recipient: 'Client / Recipient',
+      dispatch: 'Dispatch Order',
+      pickingList: 'Print Picking List'
+    },
+    transfers: {
+      title: 'Inter-Warehouse Transfers',
+      description: 'Move stock between your distribution centers and hubs.',
+      routeDetails: 'Route Details',
+      fromWarehouse: 'Source Warehouse',
+      toWarehouse: 'Destination Warehouse',
+      scheduleDate: 'Scheduled Date',
+      initiate: 'Initiate Transfer'
+    },
+    reports: {
+      title: 'Analytics & Reports',
+      description: 'Deep dive into your inventory performance and logistics metrics.',
+      export: 'Export PDF',
+      stockValueTrend: 'Stock Value Trend',
+      categoryDist: 'Category Distribution',
+      accuracy: 'Inventory Accuracy'
+    },
+    users: {
+      title: 'User Management',
+      description: 'Control access levels and manage team members.',
+      invite: 'Invite User',
+      role: 'Role',
+      assignedHub: 'Assigned Hub',
+      status: 'Status'
+    },
+    settings: {
+      title: 'System Settings',
+      description: 'Configure OmniStock global parameters and security.',
+      general: 'General Configuration',
+      companyName: 'Company Name',
+      currency: 'Currency',
+      notifications: 'Notifications',
+      lowStockAlerts: 'Low stock alerts',
+      save: 'Save Changes'
+    },
+    systemGen: {
+      title: 'System Generation Tool',
+      description: 'AI-powered architectural artifacts generator.',
+      inputReqs: 'Input Requirements',
+      generate: 'Generate Architecture',
+      database: 'Database',
+      structure: 'Structure',
+      apiBoilerplate: 'API Boilerplate',
+      endpoints: 'Endpoints'
+    },
     actions: {
       downloadReport: 'Download Report',
       newOperation: 'New Operation',
@@ -192,7 +407,9 @@ export const translations = {
       save: 'Save Changes',
       cancel: 'Cancel',
       edit: 'Edit',
-      delete: 'Delete'
+      delete: 'Delete',
+      viewAll: 'View All',
+      addItem: 'Add Item'
     },
     common: {
       quantity: 'Quantity',
@@ -200,7 +417,11 @@ export const translations = {
       date: 'Date',
       product: 'Product',
       type: 'Type',
-      id: 'ID'
+      id: 'ID',
+      summary: 'Summary',
+      totalItems: 'Total Items',
+      totalValue: 'Total Value',
+      price: 'Price'
     }
   }
 };

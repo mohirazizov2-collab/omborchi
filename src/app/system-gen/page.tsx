@@ -10,17 +10,18 @@ import { Loader2, Database, Code, FileText, Layout, Wand2 } from "lucide-react";
 import { generateDatabaseSchema } from "@/ai/flows/generate-database-schema";
 import { generateBackendProjectStructure } from "@/ai/flows/generate-backend-project-structure";
 import { generateBackendApiBoilerplate } from "@/ai/flows/generate-backend-api-boilerplate";
+import { useLanguage } from "@/lib/i18n/context";
 
 export default function SystemGenPage() {
   const [loading, setLoading] = useState(false);
   const [requirements, setRequirements] = useState("");
   const [results, setResults] = useState<any>(null);
+  const { t } = useLanguage();
 
   const handleGenerate = async () => {
     if (!requirements) return;
     setLoading(true);
     try {
-      // For demo, we run them in parallel
       const [dbSchema, structure, api] = await Promise.all([
         generateDatabaseSchema({ requirements }),
         generateBackendProjectStructure({ projectName: "OmniStock" }),
@@ -44,18 +45,17 @@ export default function SystemGenPage() {
       <OmniSidebar />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">System Generation Tool</h1>
-          <p className="text-muted-foreground mt-1">AI-powered architectural artifacts generator for OmniStock.</p>
+          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.systemGen.title}</h1>
+          <p className="text-muted-foreground mt-1">{t.systemGen.description}</p>
         </header>
 
         <Card className="mb-8 border-none shadow-sm bg-primary/5">
           <CardHeader>
-            <CardTitle className="font-headline">Input Requirements</CardTitle>
-            <CardDescription>Paste your system functional and non-functional requirements below.</CardDescription>
+            <CardTitle className="font-headline">{t.systemGen.inputReqs}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea 
-              placeholder="e.g., The system needs to manage warehouses, products, and stock-related operations..."
+              placeholder="..."
               className="min-h-[150px] bg-card font-body"
               value={requirements}
               onChange={(e) => setRequirements(e.target.value)}
@@ -66,7 +66,7 @@ export default function SystemGenPage() {
               disabled={loading || !requirements}
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
-              Generate System Architecture
+              {t.systemGen.generate}
             </Button>
           </CardContent>
         </Card>
@@ -75,10 +75,10 @@ export default function SystemGenPage() {
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Tabs defaultValue="db" className="w-full">
               <TabsList className="grid grid-cols-4 mb-6">
-                <TabsTrigger value="db" className="gap-2"><Database className="w-4 h-4" /> Database</TabsTrigger>
-                <TabsTrigger value="structure" className="gap-2"><Layout className="w-4 h-4" /> Structure</TabsTrigger>
-                <TabsTrigger value="api" className="gap-2"><Code className="w-4 h-4" /> API Boilerplate</TabsTrigger>
-                <TabsTrigger value="endpoints" className="gap-2"><FileText className="w-4 h-4" /> Endpoints</TabsTrigger>
+                <TabsTrigger value="db" className="gap-2"><Database className="w-4 h-4" /> {t.systemGen.database}</TabsTrigger>
+                <TabsTrigger value="structure" className="gap-2"><Layout className="w-4 h-4" /> {t.systemGen.structure}</TabsTrigger>
+                <TabsTrigger value="api" className="gap-2"><Code className="w-4 h-4" /> {t.systemGen.apiBoilerplate}</TabsTrigger>
+                <TabsTrigger value="endpoints" className="gap-2"><FileText className="w-4 h-4" /> {t.systemGen.endpoints}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="db">
@@ -104,7 +104,7 @@ export default function SystemGenPage() {
 
               <TabsContent value="structure">
                 <Card className="border-none shadow-sm">
-                  <CardHeader><CardTitle className="font-headline">Recommended NestJS Folder Structure</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="font-headline">{t.systemGen.structure}</CardTitle></CardHeader>
                   <CardContent>
                     <pre className="bg-muted p-6 rounded-lg text-sm font-code overflow-x-auto">
                       {results.structure.folderStructure}
@@ -116,18 +116,10 @@ export default function SystemGenPage() {
               <TabsContent value="api">
                 <div className="space-y-6">
                   <Card className="border-none shadow-sm">
-                    <CardHeader><CardTitle className="font-headline">Stock Movement Service (Transactional)</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="font-headline">{t.systemGen.apiBoilerplate}</CardTitle></CardHeader>
                     <CardContent>
                       <pre className="bg-muted p-6 rounded-lg text-xs font-code overflow-x-auto">
                         {results.api.stockMovementServiceExample}
-                      </pre>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-none shadow-sm">
-                    <CardHeader><CardTitle className="font-headline">Warehouse Controller</CardTitle></CardHeader>
-                    <CardContent>
-                      <pre className="bg-muted p-6 rounded-lg text-xs font-code overflow-x-auto">
-                        {results.api.warehouseControllerExample}
                       </pre>
                     </CardContent>
                   </Card>
@@ -136,7 +128,7 @@ export default function SystemGenPage() {
 
               <TabsContent value="endpoints">
                 <Card className="border-none shadow-sm">
-                  <CardHeader><CardTitle className="font-headline">API Endpoint Definitions</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="font-headline">{t.systemGen.endpoints}</CardTitle></CardHeader>
                   <CardContent className="prose prose-sm max-w-none">
                     <pre className="bg-muted p-6 rounded-lg text-xs font-code overflow-x-auto whitespace-pre-wrap">
                       {results.api.apiEndpoints}

@@ -4,21 +4,23 @@ import { useEffect, useState } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line,
-  PieChart,
-  Pie,
-  Cell
-} from "recharts";
-import { Download, Filter, Calendar, FileText } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Download, Filter } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
+
+// Dynamically import Recharts to avoid SSR errors
+const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
+const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
+const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
+const XAxis = dynamic(() => import("recharts").then(m => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
+const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
+const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
+const Line = dynamic(() => import("recharts").then(m => m.Line), { ssr: false });
+const PieChart = dynamic(() => import("recharts").then(m => m.PieChart), { ssr: false });
+const Pie = dynamic(() => import("recharts").then(m => m.Pie), { ssr: false });
+const Cell = dynamic(() => import("recharts").then(m => m.Cell), { ssr: false });
 
 const COLORS = ['#2E68B8', '#669995', '#193D3E', '#B88B2E', '#B8452E'];
 
@@ -41,6 +43,7 @@ const categoryData = [
 
 export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     setMounted(true);
@@ -52,15 +55,15 @@ export default function ReportsPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">Analytics & Reports</h1>
-            <p className="text-muted-foreground mt-1">Deep dive into your inventory performance and logistics metrics.</p>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.reports.title}</h1>
+            <p className="text-muted-foreground mt-1">{t.reports.description}</p>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" className="gap-2">
-              <Download className="w-4 h-4" /> Export PDF
+              <Download className="w-4 h-4" /> {t.reports.export}
             </Button>
             <Button className="gap-2">
-              <Filter className="w-4 h-4" /> Filter Data
+              <Filter className="w-4 h-4" /> {t.actions.filter}
             </Button>
           </div>
         </header>
@@ -74,7 +77,7 @@ export default function ReportsPage() {
           </Card>
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-2">
-              <CardDescription>Inventory Accuracy</CardDescription>
+              <CardDescription>{t.reports.accuracy}</CardDescription>
               <CardTitle className="text-2xl font-bold font-headline">99.8%</CardTitle>
             </CardHeader>
           </Card>
@@ -89,8 +92,7 @@ export default function ReportsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="border-none shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg font-headline font-bold">Stock Value Trend</CardTitle>
-              <CardDescription>Daily inventory valuation across all hubs.</CardDescription>
+              <CardTitle className="text-lg font-headline font-bold">{t.reports.stockValueTrend}</CardTitle>
             </CardHeader>
             <CardContent className="h-[300px]">
               {mounted ? (
@@ -111,8 +113,7 @@ export default function ReportsPage() {
 
           <Card className="border-none shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg font-headline font-bold">Category Distribution</CardTitle>
-              <CardDescription>Stock allocation by product category.</CardDescription>
+              <CardTitle className="text-lg font-headline font-bold">{t.reports.categoryDist}</CardTitle>
             </CardHeader>
             <CardContent className="h-[300px]">
               {mounted ? (

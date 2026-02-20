@@ -3,9 +3,10 @@
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, MoreHorizontal, ShieldCheck, Mail } from "lucide-react";
+import { UserPlus, MoreHorizontal, ShieldCheck } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
 
 const users = [
   { id: 1, name: "Azamat Sharipov", role: "Warehouse Manager", email: "azamat@omnistock.uz", status: "Active", hub: "Main Hub" },
@@ -15,17 +16,19 @@ const users = [
 ];
 
 export default function UsersPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex min-h-screen">
       <OmniSidebar />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">User Management</h1>
-            <p className="text-muted-foreground mt-1">Control access levels and manage team members.</p>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.users.title}</h1>
+            <p className="text-muted-foreground mt-1">{t.users.description}</p>
           </div>
           <Button className="gap-2">
-            <UserPlus className="w-4 h-4" /> Invite User
+            <UserPlus className="w-4 h-4" /> {t.users.invite}
           </Button>
         </header>
 
@@ -36,9 +39,9 @@ export default function UsersPage() {
                 <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
                   <tr>
                     <th className="px-6 py-4 font-semibold">User</th>
-                    <th className="px-6 py-4 font-semibold">Role</th>
-                    <th className="px-6 py-4 font-semibold">Assigned Hub</th>
-                    <th className="px-6 py-4 font-semibold">Status</th>
+                    <th className="px-6 py-4 font-semibold">{t.users.role}</th>
+                    <th className="px-6 py-4 font-semibold">{t.users.assignedHub}</th>
+                    <th className="px-6 py-4 font-semibold">{t.users.status}</th>
                     <th className="px-6 py-4 font-semibold"></th>
                   </tr>
                 </thead>
