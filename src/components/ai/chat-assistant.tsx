@@ -46,17 +46,19 @@ export function ChatAssistant() {
       });
       setMessages(prev => [...prev, { role: 'model', content: response.response }]);
     } catch (error: any) {
-      console.error('Chat error details:', error);
+      console.error('Chat error:', error);
       
-      // Xatolik xabarini foydalanuvchiga tushunarliroq ko'rsatamiz
-      let errorMessage = "Kutilmagan xatolik yuz berdi.";
+      let errorMessage = "Xatolik yuz berdi.";
       
-      if (error?.message?.includes('429')) {
-        errorMessage = "AI limiti vaqtincha tugadi. 1-2 daqiqa kutib qayta urinib ko'ring.";
-      } else if (error?.message?.includes('API key')) {
-        errorMessage = "AI kaliti (API Key) noto'g'ri yoki sozlanmagan. Iltimos, sozlamalarni tekshiring.";
-      } else if (error?.message) {
-        errorMessage = `Xatolik: ${error.message}`;
+      // Xatolik turini aniqlaymiz
+      const errorMsg = error?.message?.toLowerCase() || "";
+      
+      if (errorMsg.includes('429')) {
+        errorMessage = "AI limiti tugadi. Iltimos, 1-2 daqiqa kuting.";
+      } else if (errorMsg.includes('api key') || errorMsg.includes('key not valid') || errorMsg.includes('unauthorized')) {
+        errorMessage = "AI kaliti (API Key) sozlanmagan yoki xato. Iltimos, loyiha sozlamalarida GEMINI_API_KEY o'rnatilganini tekshiring.";
+      } else {
+        errorMessage = `Xatolik: ${error.message || 'Server bilan aloqa uzildi'}`;
       }
 
       setMessages(prev => [...prev, { 
