@@ -114,7 +114,8 @@ export const translations = {
       export: 'PDF-ga eksport qilish',
       stockValueTrend: 'Zaxira qiymati tendensiyasi',
       categoryDist: 'Kategoriyalar bo\'yicha taqsimot',
-      accuracy: 'Inventarizatsiya aniqligi'
+      accuracy: 'Inventarizatsiya aniqligi',
+      aiAnalyze: 'AI Tahlil'
     },
     users: {
       title: 'Foydalanuvchilarni boshqarish',
@@ -281,7 +282,8 @@ export const translations = {
       export: 'Экспорт в PDF',
       stockValueTrend: 'Тренды стоимости запасов',
       categoryDist: 'Распределение по категориям',
-      accuracy: 'Точность инвентаризации'
+      accuracy: 'Точность инвентаризации',
+      aiAnalyze: 'AI Анализ'
     },
     users: {
       title: 'Управление пользователями',
@@ -448,7 +450,8 @@ export const translations = {
       export: 'Export PDF',
       stockValueTrend: 'Stock Value Trend',
       categoryDist: 'Category Distribution',
-      accuracy: 'Inventory Accuracy'
+      accuracy: 'Inventory Accuracy',
+      aiAnalyze: 'AI Analyze'
     },
     users: {
       title: 'User Management',
