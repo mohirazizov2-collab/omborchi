@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow for generating a recommended NestJS backend project structure.
@@ -7,7 +8,7 @@
  * - GenerateBackendProjectStructureOutput - The return type for the generateBackendProjectStructure function.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai, model} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateBackendProjectStructureInputSchema = z.object({
@@ -35,6 +36,7 @@ export async function generateBackendProjectStructure(
 
 const prompt = ai.definePrompt({
   name: 'generateBackendProjectStructurePrompt',
+  model: model,
   input: {schema: GenerateBackendProjectStructureInputSchema},
   output: {schema: GenerateBackendProjectStructureOutputSchema},
   prompt: `You are an expert backend architect. Your task is to design a robust and maintainable NestJS backend project structure, strictly following Clean Architecture principles and emphasizing modularity.

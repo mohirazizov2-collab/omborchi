@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow for generating backend API boilerplate code, including API endpoint lists and NestJS controller/service examples for OmniStock.
@@ -7,7 +8,7 @@
  * - GenerateBackendAPIBoilerplateOutput - The return type for the generateBackendApiBoilerplate function, containing API endpoints and boilerplate code.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai, model} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateBackendAPIBoilerplateInputSchema = z
@@ -60,6 +61,7 @@ export type GenerateBackendAPIBoilerplateOutput = z.infer<
 
 const generateBackendApiBoilerplatePrompt = ai.definePrompt({
   name: 'generateBackendApiBoilerplatePrompt',
+  model: model,
   input: {schema: GenerateBackendAPIBoilerplateInputSchema},
   output: {schema: GenerateBackendAPIBoilerplateOutputSchema},
   prompt: `You are an expert Senior Backend Developer specializing in NestJS, TypeScript, and Prisma.

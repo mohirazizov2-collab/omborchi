@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -8,7 +9,7 @@
  * - GenerateDatabaseSchemaOutput - The return type for the generateDatabaseSchema function.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, model } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const GenerateDatabaseSchemaInputSchema = z.object({
@@ -28,6 +29,7 @@ export async function generateDatabaseSchema(input: GenerateDatabaseSchemaInput)
 
 const generateDatabaseSchemaPrompt = ai.definePrompt({
   name: 'generateDatabaseSchemaPrompt',
+  model: model,
   input: { schema: GenerateDatabaseSchemaInputSchema },
   output: { schema: GenerateDatabaseSchemaOutputSchema },
   prompt: `You are an expert database architect specialized in PostgreSQL and Prisma.
