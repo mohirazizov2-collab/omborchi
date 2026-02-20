@@ -78,7 +78,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
               <Warehouse className="w-6 h-6" />
             </div>
             <span className="font-headline font-bold text-2xl tracking-tight text-foreground">omborchi.uz</span>
