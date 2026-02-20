@@ -4,53 +4,53 @@
 
 @layer base {
   :root {
-    --background: 210 20% 96%; /* #F0F2F4 - Light Blue-Gray */
+    --background: 210 20% 98%; /* Ultra light gray-blue */
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 215 60% 45%; /* #2E68B8 - Professional Blue */
+    --primary: 217 91% 60%; /* Vibrant professional blue */
     --primary-foreground: 210 40% 98%;
-    --secondary: 176 22% 50%; /* #669995 - Muted Blue-Green */
-    --secondary-foreground: 210 40% 98%;
-    --muted: 210 20% 90%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 176 22% 95%;
-    --accent-foreground: 215 60% 45%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 215 60% 45%;
+    --ring: 217 91% 60%;
     --radius: 0.75rem;
-    --chart-1: 215 60% 45%;
-    --chart-2: 176 22% 50%;
+    --chart-1: 217 91% 60%;
+    --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
   }
 
   .dark {
-    --background: 222 47% 7%; /* To'q navy-qora */
-    --foreground: 213 31% 91%;
-    --card: 222 47% 10%; /* Cardlar fondan biroz yorqinroq */
-    --card-foreground: 213 31% 91%;
-    --popover: 222 47% 10%;
-    --popover-foreground: 213 31% 91%;
-    --primary: 217 91% 60%; /* Tungi rejimda ko'k rang biroz yorqinroq */
-    --primary-foreground: 222 47% 7%;
-    --secondary: 222 47% 15%;
+    --background: 222 47% 4%; /* Deepest black-blue */
+    --foreground: 210 40% 98%;
+    --card: 222 47% 6%; /* Slightly lighter than background */
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 6%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 4%;
+    --secondary: 217.2 32.6% 12%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 223 47% 15%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 216 34% 17%;
+    --muted: 217.2 32.6% 12%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 12%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 217.2 32.6% 12%;
+    --input: 217.2 32.6% 12%;
+    --ring: 217 91% 60%;
   }
 }
 
@@ -59,9 +59,19 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body transition-colors duration-300;
+    @apply bg-background text-foreground font-body selection:bg-primary/20;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-headline;
+    @apply font-headline font-bold tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-md border border-white/10 dark:border-white/5;
+  }
+  
+  .sidebar-item-active {
+    @apply bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgba(var(--primary),0.2)] relative after:absolute after:left-0 after:top-1/2 after:-translate-y-1/2 after:h-6 after:w-1 after:bg-primary after:rounded-r-full;
   }
 }

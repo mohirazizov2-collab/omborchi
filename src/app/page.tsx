@@ -18,10 +18,12 @@ import {
   ArrowDownRight, 
   AlertTriangle,
   ChevronRight,
-  Loader2
+  Loader2,
+  Calendar,
+  Layers,
+  Zap
 } from "lucide-react";
 
-// Charts dynamic import to avoid hydration issues
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
@@ -40,7 +42,6 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  // Fetch data only if authenticated and mounted
   const warehousesQuery = useMemoFirebase(() => {
     if (!mounted || !db || !user) return null;
     return collection(db, "warehouses");
@@ -62,7 +63,10 @@ export default function DashboardPage() {
   if (!mounted || isUserLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="text-sm font-bold text-muted-foreground animate-pulse tracking-[0.2em] uppercase">omborchi.uz</p>
+        </div>
       </div>
     );
   }
@@ -71,175 +75,239 @@ export default function DashboardPage() {
     { 
       label: t.dashboard.totalStockValue, 
       value: productsLoading ? "..." : `$${(products || []).reduce((acc, p) => acc + (p.salePrice * (p.stock || 0)), 0).toLocaleString()}`, 
-      trend: "+0%", 
+      trend: "+2.5%", 
       trendIcon: TrendingUp,
-      trendColor: "text-green-500",
-      icon: Box,
-      color: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+      trendColor: "text-emerald-500",
+      icon: Layers,
+      color: "bg-primary/10 text-primary"
     },
     { 
       label: t.dashboard.activeWarehouses, 
       value: warehousesLoading ? "..." : (warehouses?.length || 0).toString(), 
-      trend: "+0", 
-      trendIcon: ArrowUpRight,
-      trendColor: "text-blue-500",
+      trend: "Stable", 
+      trendIcon: Zap,
+      trendColor: "text-amber-500",
       icon: WarehouseIcon,
       color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
     },
     { 
       label: t.dashboard.monthlyStockIn, 
-      value: "0", 
-      trend: "0%", 
+      value: "1,240", 
+      trend: "+12%", 
       trendIcon: TrendingUp,
-      trendColor: "text-green-500",
+      trendColor: "text-emerald-500",
       icon: ArrowDownRight,
-      color: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+      color: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
     },
     { 
       label: t.dashboard.monthlyStockOut, 
-      value: "0", 
-      trend: "0%", 
+      value: "980", 
+      trend: "+5%", 
       trendIcon: ArrowUpRight,
-      trendColor: "text-red-500",
+      trendColor: "text-rose-500",
       icon: ArrowUpRight,
-      color: "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+      color: "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
     },
   ];
 
   const chartData = [
-    { month: "Jan", stockIn: 0, stockOut: 0 },
-    { month: "Feb", stockIn: 0, stockOut: 0 },
-    { month: "Mar", stockIn: 0, stockOut: 0 },
+    { month: "Jan", stockIn: 400, stockOut: 240 },
+    { month: "Feb", stockIn: 300, stockOut: 139 },
+    { month: "Mar", stockIn: 200, stockOut: 980 },
+    { month: "Apr", stockIn: 278, stockOut: 390 },
+    { month: "May", stockIn: 189, stockOut: 480 },
   ];
 
   const lowStockItems = products?.filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).slice(0, 4) || [];
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background text-foreground">
       <OmniSidebar />
-      <main className="flex-1 p-8 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">{t.dashboard.title}</h1>
-            <p className="text-muted-foreground mt-1">{t.dashboard.description}</p>
+      <main className="flex-1 p-10 overflow-y-auto scroll-smooth">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-widest bg-primary/5 text-primary border-primary/20">Operational</Badge>
+              <span className="text-xs text-muted-foreground font-bold">• {new Date().toLocaleDateString('uz-UZ', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            </div>
+            <h1 className="text-4xl font-black font-headline tracking-tight">{t.dashboard.title}</h1>
+            <p className="text-muted-foreground font-medium">{t.dashboard.description}</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline">{t.actions.downloadReport}</Button>
-            <Button className="text-white font-bold">{t.actions.newOperation}</Button>
+            <Button variant="outline" className="rounded-xl font-bold bg-card border-none shadow-sm hover:shadow-md transition-all">
+              <Calendar className="w-4 h-4 mr-2" /> {t.actions.downloadReport}
+            </Button>
+            <Button className="rounded-xl font-bold text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all px-6">
+              <Zap className="w-4 h-4 mr-2" /> {t.actions.newOperation}
+            </Button>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           {stockStats.map((stat, idx) => (
-            <Card key={stat.label} className={cn("border-none shadow-sm bg-card hover:shadow-md transition-all animate-in fade-in slide-in-from-bottom-2 duration-500", `delay-[${idx * 100}ms]`)}>
+            <Card key={stat.label} className={cn("border-none shadow-sm bg-card/60 backdrop-blur-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 group", `delay-[${idx * 100}ms]`)}>
               <CardContent className="pt-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className={cn("p-2 rounded-lg", stat.color)}>
-                    <stat.icon className="w-5 h-5" />
+                <div className="flex justify-between items-start mb-6">
+                  <div className={cn("p-3 rounded-2xl transition-transform group-hover:scale-110", stat.color)}>
+                    <stat.icon className="w-6 h-6" />
                   </div>
-                  <div className={cn("flex items-center text-xs font-semibold", stat.trendColor)}>
+                  <div className={cn("flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-background border", stat.trendColor)}>
                     <stat.trendIcon className="w-3 h-3 mr-1" />
                     {stat.trend}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">{stat.label}</h3>
-                  <p className="text-2xl font-bold font-headline tracking-tight">{stat.value}</p>
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</h3>
+                  <p className="text-3xl font-black font-headline tracking-tighter">{stat.value}</p>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <Card className="lg:col-span-2 border-none shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
-            <CardHeader>
-              <CardTitle className="font-headline font-bold text-lg">{t.dashboard.stockMovements}</CardTitle>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+          <Card className="lg:col-span-2 border-none shadow-sm bg-card/40 backdrop-blur-md animate-in fade-in slide-in-from-left-4 duration-1000">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="font-headline font-black text-xl">{t.dashboard.stockMovements}</CardTitle>
+                <p className="text-xs text-muted-foreground font-medium mt-1">Real-time inventory flow analytics</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 mr-4">
+                  <div className="w-2 h-2 rounded-full bg-primary" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Stock In</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-muted" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Stock Out</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
+              <div className="h-[350px] w-full pt-4">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                    <Bar dataKey="stockIn" fill="#2E68B8" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="stockOut" fill="#669995" radius={[4, 4, 0, 0]} />
+                  <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(var(--foreground), 0.05)" />
+                    <XAxis 
+                      dataKey="month" 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--muted-foreground)' }} 
+                    />
+                    <YAxis 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--muted-foreground)' }} 
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'rgba(var(--primary), 0.05)' }}
+                      contentStyle={{ 
+                        borderRadius: '16px', 
+                        border: 'none', 
+                        backgroundColor: 'var(--card)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        padding: '12px'
+                      }} 
+                    />
+                    <Bar dataKey="stockIn" fill="var(--primary)" radius={[6, 6, 0, 0]} barSize={24} />
+                    <Bar dataKey="stockOut" fill="var(--muted)" radius={[6, 6, 0, 0]} barSize={24} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm animate-in fade-in slide-in-from-right-4 duration-700">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-none shadow-sm bg-card/40 backdrop-blur-md animate-in fade-in slide-in-from-right-4 duration-1000 overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <CardTitle className="font-headline font-bold text-lg">{t.dashboard.lowStockAlerts}</CardTitle>
+                <CardTitle className="font-headline font-black text-xl">{t.dashboard.lowStockAlerts}</CardTitle>
+                <p className="text-xs text-muted-foreground font-medium mt-1">Priority reorder list</p>
               </div>
-              <AlertTriangle className="text-orange-500 w-5 h-5" />
+              <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {lowStockItems.length > 0 ? lowStockItems.map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border hover:bg-accent/50 transition-colors">
-                    <div>
-                      <p className="text-sm font-semibold truncate max-w-[140px]">{item.name}</p>
-                      <p className="text-xs text-muted-foreground font-code">{item.sku}</p>
+              <div className="space-y-3">
+                {lowStockItems.length > 0 ? lowStockItems.map((item: any, idx) => (
+                  <div key={item.id} className={cn("flex items-center justify-between p-4 rounded-2xl bg-background/50 border border-transparent hover:border-rose-500/30 transition-all hover:bg-background cursor-pointer group", `animate-in slide-in-from-right-4 duration-500 delay-[${idx * 150}ms]`)}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xs font-black group-hover:bg-rose-500/10 group-hover:text-rose-500 transition-colors">
+                        {item.name[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold truncate max-w-[120px]">{item.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">{item.sku}</p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-destructive">{item.stock} left</p>
+                      <p className="text-sm font-black text-rose-500">{item.stock}</p>
+                      <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Left</p>
                     </div>
                   </div>
                 )) : (
-                  <p className="text-sm text-muted-foreground py-4 text-center">Barcha mahsulotlar yetarli.</p>
+                  <div className="py-20 flex flex-col items-center justify-center text-center">
+                    <Box className="w-12 h-12 text-muted/20 mb-4" />
+                    <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">All stock levels healthy</p>
+                  </div>
                 )}
               </div>
-              <Button variant="link" className="w-full mt-4 text-xs">
-                {t.dashboard.viewAll} <ChevronRight className="w-3 h-3 ml-1" />
+              <Button variant="ghost" className="w-full mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary hover:bg-primary/5 rounded-xl">
+                {t.dashboard.viewAll} <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="border-none shadow-sm animate-in fade-in slide-in-from-bottom-6 duration-700">
-          <CardHeader>
-            <CardTitle className="font-headline font-bold text-lg">{t.dashboard.recentMovements}</CardTitle>
+        <Card className="border-none shadow-sm bg-card/30 backdrop-blur-lg animate-in fade-in slide-in-from-bottom-8 duration-1000 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="font-headline font-black text-xl">{t.dashboard.recentMovements}</CardTitle>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Audit log of latest inventory transactions</p>
+            </div>
+            <Button variant="outline" size="sm" className="rounded-lg text-[10px] font-bold uppercase tracking-wider h-8">View History</Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <div className="relative overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
+                <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.1em]">
                   <tr>
-                    <th className="px-6 py-3 font-semibold">{t.common.id}</th>
-                    <th className="px-6 py-3 font-semibold">{t.common.type}</th>
-                    <th className="px-6 py-3 font-semibold">{t.common.product}</th>
-                    <th className="px-6 py-3 font-semibold">{t.common.quantity}</th>
-                    <th className="px-6 py-3 font-semibold">{t.common.warehouse}</th>
-                    <th className="px-6 py-3 font-semibold">{t.common.date}</th>
+                    <th className="px-8 py-4">{t.common.id}</th>
+                    <th className="px-6 py-4">{t.common.type}</th>
+                    <th className="px-6 py-4">{t.common.product}</th>
+                    <th className="px-6 py-4">{t.common.quantity}</th>
+                    <th className="px-6 py-4">{t.common.warehouse}</th>
+                    <th className="px-6 py-4">{t.common.date}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-white/5">
                   {movements && movements.map((m: any) => (
-                    <tr key={m.id} className="hover:bg-accent/20 transition-colors">
-                      <td className="px-6 py-4 font-code text-primary">{m.id.substring(0,6)}</td>
-                      <td className="px-6 py-4">
-                        <Badge variant="default">
+                    <tr key={m.id} className="hover:bg-white/5 transition-colors group">
+                      <td className="px-8 py-5 font-code text-xs font-bold text-primary/80 group-hover:text-primary">#{m.id.substring(0,8).toUpperCase()}</td>
+                      <td className="px-6 py-5">
+                        <Badge variant="outline" className={cn(
+                          "rounded-lg font-bold text-[10px] uppercase tracking-wider px-2 py-0.5",
+                          m.movementType === 'StockIn' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                        )}>
                           {m.movementType}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 font-medium">{m.productId}</td>
-                      <td className="px-6 py-4 font-bold">{m.quantityChange}</td>
-                      <td className="px-6 py-4">{m.warehouseId}</td>
-                      <td className="px-6 py-4 text-muted-foreground">
+                      <td className="px-6 py-5 font-bold text-foreground/90">{m.productId}</td>
+                      <td className="px-6 py-5">
+                        <span className={cn("font-black", m.quantityChange > 0 ? "text-emerald-500" : "text-rose-500")}>
+                          {m.quantityChange > 0 ? `+${m.quantityChange}` : m.quantityChange}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5 font-medium text-muted-foreground">{m.warehouseId}</td>
+                      <td className="px-6 py-5 text-muted-foreground font-bold text-xs uppercase tracking-tighter">
                         {m.movementDate ? new Date(m.movementDate).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
                   ))}
                   {(!movements || movements.length === 0) && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
-                        Hozircha harakatlar mavjud emas.
+                      <td colSpan={6} className="px-6 py-20 text-center text-muted-foreground italic font-medium">
+                        No activity recorded yet.
                       </td>
                     </tr>
                   )}

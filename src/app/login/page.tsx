@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck, Copy, CheckCircle2, Database, Key, Warehouse } from "lucide-react";
+import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck, Copy, CheckCircle2, Database, Key, Warehouse, ArrowRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
@@ -59,57 +59,60 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background text-foreground">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#02040a] relative overflow-hidden font-body">
+      {/* Dynamic Background Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] animate-pulse delay-700" />
+      
+      <div className="absolute top-6 right-6 z-20">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2 uppercase font-bold text-xs">
-              <Globe className="w-4 h-4" /> {language}
+            <Button variant="ghost" size="sm" className="gap-2 uppercase font-black text-[10px] tracking-widest text-white/70 hover:text-white hover:bg-white/10 transition-all rounded-xl border border-white/10">
+              <Globe className="w-3 h-3" /> {language}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setLanguage('uz')}>🇺🇿 O'zbek</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('ru')}>🇷🇺 Русский</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('en')}>🇺🇸 English</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="rounded-xl border-white/10 bg-black/80 backdrop-blur-xl text-white">
+            <DropdownMenuItem onClick={() => setLanguage('uz')} className="cursor-pointer py-2">🇺🇿 O'zbek</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('ru')} className="cursor-pointer py-2">🇷🇺 Русский</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('en')} className="cursor-pointer py-2">🇺🇸 English</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex justify-center mb-8">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
-              <Warehouse className="w-6 h-6" />
-            </div>
-            <span className="font-headline font-bold text-2xl tracking-tight text-foreground">omborchi.uz</span>
+      <div className="w-full max-w-md p-6 z-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        <div className="flex flex-col items-center mb-10">
+          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-white shadow-2xl shadow-primary/30 mb-6 transition-transform hover:scale-110 active:scale-95 duration-300">
+            <Warehouse className="w-9 h-9" />
           </div>
+          <h1 className="font-headline font-black text-4xl tracking-tighter text-white">omborchi.uz</h1>
+          <p className="text-white/40 text-xs font-bold uppercase tracking-[0.3em] mt-2">Enterprise Edition</p>
         </div>
 
-        <Card className="border-none shadow-xl bg-card">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold font-headline text-center flex items-center justify-center gap-2">
-              <ShieldCheck className="w-6 h-6 text-primary" /> {t.auth.loginTitle}
+        <Card className="border-white/5 shadow-2xl bg-white/[0.03] backdrop-blur-2xl rounded-[2rem] overflow-hidden">
+          <CardHeader className="space-y-1 pb-2">
+            <CardTitle className="text-2xl font-black font-headline text-center text-white">
+              {t.auth.loginTitle}
             </CardTitle>
-            <CardDescription className="text-center">{t.auth.loginDescription}</CardDescription>
+            <CardDescription className="text-center text-white/50 font-medium">{t.auth.loginDescription}</CardDescription>
           </CardHeader>
           
           {!userUid ? (
             <form onSubmit={handleLogin}>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5 pt-4">
                 {error && (
-                  <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2">
+                  <div className="p-4 rounded-2xl bg-destructive/10 text-destructive text-xs font-bold border border-destructive/20 flex items-center gap-3 animate-in zoom-in-95 duration-300">
                     <AlertCircle className="w-4 h-4" />
                     {error}
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="email">{t.auth.emailLabel}</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="email" className="text-white/70 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.emailLabel}</Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 group-focus-within:text-primary transition-colors" />
                     <Input 
                       id="email" 
                       type="email" 
-                      className="pl-10"
+                      className="h-12 pl-11 rounded-2xl bg-white/[0.05] border-white/10 text-white placeholder:text-white/20 focus:ring-primary/50 transition-all"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -117,13 +120,13 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">{t.auth.passwordLabel}</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="password" className="text-white/70 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.passwordLabel}</Label>
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 group-focus-within:text-primary transition-colors" />
                     <Input 
                       id="password" 
                       type="password" 
-                      className="pl-10"
+                      className="h-12 pl-11 rounded-2xl bg-white/[0.05] border-white/10 text-white placeholder:text-white/20 focus:ring-primary/50 transition-all"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -131,61 +134,65 @@ export default function LoginPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full h-11 text-lg font-semibold text-white" disabled={loading}>
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : t.auth.loginButton}
+              <CardFooter className="pt-2 pb-8 px-6">
+                <Button type="submit" className="w-full h-12 rounded-2xl text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-95 transition-all duration-300" disabled={loading}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <>{t.auth.loginButton} <ArrowRight className="w-4 h-4 ml-2" /></>}
                 </Button>
               </CardFooter>
             </form>
           ) : (
-            <CardContent className="space-y-6 pt-2">
-              <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl space-y-3">
-                <div className="flex items-center gap-2 text-green-600 font-bold">
+            <CardContent className="space-y-6 pt-6 pb-10">
+              <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-[1.5rem] space-y-4">
+                <div className="flex items-center gap-3 text-emerald-400 font-black text-sm uppercase tracking-wider">
                   <CheckCircle2 className="w-5 h-5" /> Autentifikatsiya muvaffaqiyatli!
                 </div>
-                <p className="text-sm text-green-700/80">
-                  Lekin siz hali <b>rolesAdmin</b> ro'yxatida yo'qsiz. Quyidagi UID-ni nusxalab, Firestore-da sozlang:
+                <p className="text-xs text-white/60 font-medium leading-relaxed">
+                  Hisobingiz tayyor, lekin siz hali <b>rolesAdmin</b> ro'yxatida yo'qsiz. UID-ni nusxalab Firestore-da sozlang:
                 </p>
-                <div className="flex items-center gap-2 bg-background p-3 rounded-lg border border-green-500/30 font-code text-xs shadow-inner">
-                  <span className="flex-1 truncate font-bold text-primary">{userUid}</span>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10" onClick={copyUid}>
+                <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/10 font-code text-xs shadow-inner group">
+                  <span className="flex-1 truncate font-black text-primary tracking-tight">{userUid}</span>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/20 text-white/70 hover:text-white" onClick={copyUid}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="space-y-4 text-sm">
-                <div className="flex gap-3">
-                  <div className="flex-none w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">1</div>
+              <div className="space-y-4 text-sm px-2">
+                <div className="flex gap-4 group">
+                  <div className="flex-none w-8 h-8 rounded-xl bg-white/5 text-white/70 flex items-center justify-center text-xs font-black group-hover:bg-primary group-hover:text-white transition-all">1</div>
                   <div>
-                    <p className="font-bold flex items-center gap-2">
-                      <Database className="w-4 h-4" /> Firestore-ga kiring
+                    <p className="font-black text-white/90 text-xs uppercase tracking-wider flex items-center gap-2">
+                      <Database className="w-4 h-4 text-primary" /> Firestore-ga kiring
                     </p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      Firebase Console-da <b>rolesAdmin</b> nomli kolleksiya yarating.
+                    <p className="text-white/40 text-[11px] font-medium mt-1">
+                      Firebase Console-da <b>rolesAdmin</b> kolleksiyasini oching.
                     </p>
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <div className="flex-none w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">2</div>
+                <div className="flex gap-4 group">
+                  <div className="flex-none w-8 h-8 rounded-xl bg-white/5 text-white/70 flex items-center justify-center text-xs font-black group-hover:bg-primary group-hover:text-white transition-all">2</div>
                   <div>
-                    <p className="font-bold flex items-center gap-2">
-                      <Key className="w-4 h-4" /> Hujjat yarating
+                    <p className="font-black text-white/90 text-xs uppercase tracking-wider flex items-center gap-2">
+                      <Key className="w-4 h-4 text-primary" /> Hujjat yarating
                     </p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      <b>Document ID</b> joyiga yuqoridagi ko'k rangli <b>UID</b>-ni qo'ying.
+                    <p className="text-white/40 text-[11px] font-medium mt-1">
+                      <b>Document ID</b> joyiga yuqoridagi <b>UID</b>-ni qo'ying.
                     </p>
                   </div>
                 </div>
                 
-                <Button variant="outline" className="w-full mt-4" onClick={() => window.location.reload()}>
+                <Button variant="outline" className="w-full mt-6 h-11 rounded-xl border-white/10 text-white/70 hover:text-white hover:bg-white/5 font-bold" onClick={() => window.location.reload()}>
                   Bajarib bo'ldim, qayta yuklash
                 </Button>
               </div>
             </CardContent>
           )}
         </Card>
+
+        <p className="text-center mt-8 text-white/20 text-[10px] font-bold uppercase tracking-[0.2em]">
+          Powered by Firebase Studio & AI • 2024
+        </p>
       </div>
     </div>
   );

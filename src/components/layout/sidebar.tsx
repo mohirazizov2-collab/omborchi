@@ -15,6 +15,7 @@ import {
   Archive,
   Globe,
   User as UserIcon,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -27,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/firebase";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function OmniSidebar() {
   const pathname = usePathname();
@@ -62,36 +64,40 @@ export function OmniSidebar() {
     : (user?.email ? user.email[0].toUpperCase() : 'U');
 
   return (
-    <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0">
-      <div className="flex items-center justify-between px-6 h-16 border-b">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
-            <Warehouse className="w-5 h-5" />
+    <div className="flex flex-col w-72 bg-card/50 backdrop-blur-xl border-r h-screen sticky top-0 transition-all duration-300">
+      <div className="flex items-center justify-between px-6 h-20 border-b/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 transition-transform hover:scale-105 active:scale-95">
+            <Warehouse className="w-6 h-6" />
           </div>
-          <span className="font-headline font-bold text-xl tracking-tight text-foreground">omborchi.uz</span>
+          <div className="flex flex-col">
+            <span className="font-headline font-bold text-xl tracking-tight text-foreground leading-none">omborchi.uz</span>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mt-1">Enterprise Solution</span>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
+      <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8 scrollbar-none">
         <div className="flex gap-2 px-2">
           <div className="flex-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full justify-between gap-2 bg-accent/20 border-none h-9">
+                <Button variant="outline" className="w-full justify-between gap-2 bg-muted/40 border-none h-10 hover:bg-muted/60 transition-all rounded-xl">
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs font-medium uppercase">{language}</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">{language}</span>
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuContent align="start" className="w-48 rounded-xl border-none shadow-2xl">
                 {languages.map((l) => (
                   <DropdownMenuItem 
                     key={l.code} 
                     onClick={() => setLanguage(l.code as any)}
-                    className={cn(language === l.code && "bg-primary/10 text-primary")}
+                    className={cn("gap-2 rounded-lg py-2 cursor-pointer transition-colors", language === l.code && "bg-primary/10 text-primary font-bold")}
                   >
-                    <span className="mr-2">{l.flag}</span> {l.name}
+                    <span className="text-lg">{l.flag}</span> 
+                    <span className="text-sm font-medium">{l.name}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -100,83 +106,97 @@ export function OmniSidebar() {
           <ThemeToggle />
         </div>
 
-        <div>
-          <h3 className="px-2 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider font-headline">
-            {t.nav.menu}
-          </h3>
-          <nav className="space-y-1">
-            {navigation.filter(item => !item.hide).map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  <item.icon
-                    className={cn(
-                      "w-5 h-5",
-                      item.rotate && "rotate-180",
-                      isActive ? "text-primary" : "text-muted-foreground"
-                    )}
-                  />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        {isAdmin && (
+        <div className="space-y-4">
           <div>
-            <h3 className="px-2 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider font-headline">
-              {t.nav.administration}
+            <h3 className="px-4 mb-3 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] font-headline">
+              {t.nav.menu}
             </h3>
             <nav className="space-y-1">
-              {adminNavigation.filter(item => !item.hide).map((item) => {
+              {navigation.filter(item => !item.hide).map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all group",
                       isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                   >
-                    <item.icon
-                      className={cn(
-                        "w-5 h-5",
-                        isActive ? "text-primary" : "text-muted-foreground"
-                      )}
-                    />
-                    {item.name}
+                    <div className="flex items-center gap-3">
+                      <item.icon
+                        className={cn(
+                          "w-5 h-5 transition-transform group-hover:scale-110",
+                          item.rotate && "rotate-180",
+                          isActive ? "text-primary-foreground" : "text-muted-foreground/70 group-hover:text-primary"
+                        )}
+                      />
+                      {item.name}
+                    </div>
+                    {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
                   </Link>
                 );
               })}
             </nav>
           </div>
-        )}
+
+          {isAdmin && (
+            <div className="pt-2 border-t border-muted/30">
+              <h3 className="px-4 mb-3 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] font-headline">
+                {t.nav.administration}
+              </h3>
+              <nav className="space-y-1">
+                {adminNavigation.filter(item => !item.hide).map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all group",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon
+                          className={cn(
+                            "w-5 h-5 transition-transform group-hover:scale-110",
+                            isActive ? "text-primary-foreground" : "text-muted-foreground/70 group-hover:text-primary"
+                          )}
+                        />
+                        {item.name}
+                      </div>
+                      {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          )}
+        </div>
       </div>
 
-      <Link href="/profile" className="p-4 border-t bg-accent/50 hover:bg-accent transition-colors">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-bold">
-            {userInitials}
+      <div className="p-4">
+        <Link href="/profile" className="block p-3 rounded-2xl bg-muted/40 hover:bg-muted/60 transition-all border border-transparent hover:border-primary/20 group">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 border-2 border-background shadow-md">
+              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                {userInitials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{user?.displayName || (user?.email?.split('@')[0] || 'User')}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">{role}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold truncate">{user?.displayName || (user?.email?.split('@')[0] || 'User')}</span>
-            <span className="text-xs text-muted-foreground truncate font-medium">{role}</span>
-          </div>
-        </div>
-      </Link>
+        </Link>
+      </div>
     </div>
   );
 }
