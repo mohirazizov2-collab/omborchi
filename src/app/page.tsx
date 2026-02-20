@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,12 @@ const recentMovements = [
 ];
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="flex min-h-screen">
       <OmniSidebar />
@@ -130,19 +137,23 @@ export default function DashboardPage() {
               <CardDescription>Comparison between stock inflow and outflow over time.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={{ 
-                stockIn: { label: "Stock In", color: "hsl(var(--chart-1))" },
-                stockOut: { label: "Stock Out", color: "hsl(var(--chart-2))" }
-              }}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} />
-                  <Tooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="stockIn" fill="var(--color-stockIn)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="stockOut" fill="var(--color-stockOut)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ChartContainer>
+              {mounted ? (
+                <ChartContainer config={{ 
+                  stockIn: { label: "Stock In", color: "hsl(var(--chart-1))" },
+                  stockOut: { label: "Stock Out", color: "hsl(var(--chart-2))" }
+                }}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="stockIn" fill="var(--color-stockIn)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="stockOut" fill="var(--color-stockOut)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ChartContainer>
+              ) : (
+                <div className="h-[300px] w-full bg-accent/20 animate-pulse rounded-lg" />
+              )}
             </CardContent>
           </Card>
 
