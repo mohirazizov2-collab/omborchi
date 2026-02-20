@@ -4,7 +4,6 @@ import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * @fileOverview Google Gemini orqali Genkit konfiguratsiyasi.
- * OpenAI kvotasi tugagani sababli barqaror modelga o'tkazildi.
  */
 
 export const ai = genkit({
