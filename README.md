@@ -4,14 +4,10 @@ Bu NextJS va Firebase yordamida yaratilgan zamonaviy ombor boshqaruvi tizimi.
 
 ## AI Funksiyalari
 
-Tizimda AI chat va hisobot tahlili ishlashi uchun Gemini API kaliti talab qilinadi.
+Tizimda AI chat va hisobot tahlili ishlashi uchun Gemini API kaliti sozlangan.
 
 ### API Kalitini sozlash:
-
-1. [Google AI Studio](https://aistudio.google.com/app/apikey) saytidan bepul API kaliti oling.
-2. Loyihangizning sozlamalarida (Environment Variables) quyidagi o'zgaruvchini yarating:
-   - Kalit nomi: `GOOGLE_GENAI_API_KEY`
-   - Qiymati: `Sizning_API_kalitingiz`
+API kaliti `.env` faylida `GOOGLE_GENAI_API_KEY` nomi ostida saqlanadi.
 
 ### Imkoniyatlar:
 - **Dashboard**: Real-vaqtda zaxira tahlili.
