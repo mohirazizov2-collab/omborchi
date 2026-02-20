@@ -15,7 +15,8 @@ export const translations = {
       userManagement: 'Foydalanuvchilar',
       settings: 'Sozlamalar',
       menu: 'Menyu',
-      administration: 'Administratsiya'
+      administration: 'Administratsiya',
+      profile: 'Profil'
     },
     dashboard: {
       title: 'Boshqaruv paneli',
@@ -28,6 +29,20 @@ export const translations = {
       lowStockAlerts: 'Kam qolgan mahsulotlar',
       recentMovements: 'Oxirgi harakatlar',
       viewAll: 'Hammasini ko\'rish'
+    },
+    profile: {
+      title: 'Foydalanuvchi profili',
+      description: 'Shaxsiy ma\'lumotlar va hisob sozlamalari.',
+      personalInfo: 'Shaxsiy ma\'lumotlar',
+      accountType: 'Hisob turi',
+      anonymous: 'Anonim foydalanuvchi',
+      authenticated: 'Tasdiqlangan foydalanuvchi',
+      userId: 'Foydalanuvchi ID',
+      displayName: 'To\'liq ism',
+      email: 'Elektron pochta',
+      lastLogin: 'Oxirgi kirish',
+      signOut: 'Tizimdan chiqish',
+      editProfile: 'Profilni tahrirlash'
     },
     warehouses: {
       title: 'Omborxonalar',
@@ -156,7 +171,8 @@ export const translations = {
       userManagement: 'Пользователи',
       settings: 'Настройки',
       menu: 'Меню',
-      administration: 'Администрирование'
+      administration: 'Администрирование',
+      profile: 'Профиль'
     },
     dashboard: {
       title: 'Панель управления',
@@ -169,6 +185,20 @@ export const translations = {
       lowStockAlerts: 'Низкий уровень запасов',
       recentMovements: 'Последние движения',
       viewAll: 'Посмотреть все'
+    },
+    profile: {
+      title: 'Профиль пользователя',
+      description: 'Личная информация и настройки аккаунта.',
+      personalInfo: 'Личная информация',
+      accountType: 'Тип аккаунта',
+      anonymous: 'Анонимный пользователь',
+      authenticated: 'Авторизованный пользователь',
+      userId: 'ID пользователя',
+      displayName: 'Полное имя',
+      email: 'Эл. почта',
+      lastLogin: 'Последний вход',
+      signOut: 'Выйти из системы',
+      editProfile: 'Редактировать профиль'
     },
     warehouses: {
       title: 'Склады',
@@ -297,7 +327,8 @@ export const translations = {
       userManagement: 'Users',
       settings: 'Settings',
       menu: 'Menu',
-      administration: 'Administration'
+      administration: 'Administration',
+      profile: 'Profile'
     },
     dashboard: {
       title: 'Dashboard',
@@ -310,6 +341,20 @@ export const translations = {
       lowStockAlerts: 'Low Stock Alerts',
       recentMovements: 'Recent Movements',
       viewAll: 'View All Alerts'
+    },
+    profile: {
+      title: 'User Profile',
+      description: 'Personal information and account settings.',
+      personalInfo: 'Personal Information',
+      accountType: 'Account Type',
+      anonymous: 'Anonymous User',
+      authenticated: 'Authenticated User',
+      userId: 'User ID',
+      displayName: 'Full Name',
+      email: 'Email',
+      lastLogin: 'Last Login',
+      signOut: 'Sign Out',
+      editProfile: 'Edit Profile'
     },
     warehouses: {
       title: 'Warehouses',

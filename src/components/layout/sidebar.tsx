@@ -15,6 +15,7 @@ import {
   BarChart3,
   Archive,
   Globe,
+  User as UserIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -25,10 +26,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { useUser } from "@/firebase";
 
 export function OmniSidebar() {
   const pathname = usePathname();
   const { t, language, setLanguage } = useLanguage();
+  const { user } = useUser();
 
   const navigation = [
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
@@ -51,6 +54,10 @@ export function OmniSidebar() {
     { code: 'ru', name: 'Русский', flag: '🇷🇺' },
     { code: 'en', name: 'English', flag: '🇺🇸' },
   ];
+
+  const userInitials = user?.displayName 
+    ? user.displayName.split(' ').map(n => n[0]).join('')
+    : (user?.email ? user.email[0].toUpperCase() : 'U');
 
   return (
     <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0">
@@ -154,17 +161,17 @@ export function OmniSidebar() {
         </div>
       </div>
 
-      <div className="p-4 border-t bg-accent/50">
+      <Link href="/profile" className="p-4 border-t bg-accent/50 hover:bg-accent transition-colors">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-bold">
-            JD
+            {userInitials}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold truncate">John Doe</span>
-            <span className="text-xs text-muted-foreground truncate">Admin</span>
+            <span className="text-sm font-semibold truncate">{user?.displayName || (user?.email?.split('@')[0] || 'User')}</span>
+            <span className="text-xs text-muted-foreground truncate">{user?.isAnonymous ? t.profile.anonymous : 'Admin'}</span>
           </div>
         </div>
-      </div>
+      </Link>
     </div>
   );
 }
