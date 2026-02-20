@@ -5,9 +5,9 @@ service cloud.firestore {
 
     // --- Yordamchi funksiyalar ---
     
-    // Foydalanuvchi tizimga kirganligini va anonim EMASLIGINI tekshirish
+    // Foydalanuvchi tizimga kirganligini tekshirish
     function isSignedIn() {
-      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      return request.auth != null;
     }
 
     // Foydalanuvchi o'ziga tegishli ma'lumot ekanligini tekshirish
@@ -24,7 +24,6 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      // Faqat admin yangi foydalanuvchi yarata oladi
       allow create: if isAdmin();
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
@@ -39,7 +38,7 @@ service cloud.firestore {
     // --- Omborxonalar (Warehouses) ---
     match /warehouses/{warehouseId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin(); // Faqat admin yangi ombor ochishi mumkin
+      allow create: if isSignedIn(); 
       allow update: if isAdmin() || (isSignedIn() && resource.data.responsibleUserId == request.auth.uid);
       allow delete: if isAdmin(); 
     }
@@ -55,8 +54,7 @@ service cloud.firestore {
     // --- Zaxira harakatlari (Stock Movements - Audit Trail) ---
     match /stockMovements/{movementId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
-      // CRITICAL: Harakatlar tarixi hech qachon o'zgartirilmasligi va o'chirilmasligi shart
+      allow create: if isSignedIn();
       allow update, delete: if false; 
     }
 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -39,29 +40,29 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  // Fetch data from Firebase - only when user is available to avoid permission errors
+  // Fetch data from Firebase - only when user is available and fully authenticated
   const warehousesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
+    if (!db || !user || authLoading) return null;
     return collection(db, "warehouses");
-  }, [db, user]);
+  }, [db, user, authLoading]);
   const { data: warehouses, isLoading: warehousesLoading } = useCollection(warehousesQuery);
 
   const productsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
+    if (!db || !user || authLoading) return null;
     return collection(db, "products");
-  }, [db, user]);
+  }, [db, user, authLoading]);
   const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
 
   const recentMovementsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
+    if (!db || !user || authLoading) return null;
     return query(collection(db, "stockMovements"), orderBy("movementDate", "desc"), limit(5));
-  }, [db, user]);
+  }, [db, user, authLoading]);
   const { data: movements } = useCollection(recentMovementsQuery);
 
   const stockStats = [
     { 
       label: t.dashboard.totalStockValue, 
-      value: (productsLoading || authLoading) ? "..." : `$${products?.reduce((acc, p) => acc + (p.salePrice * (p.stock || 0)), 0).toLocaleString() || 0}`, 
+      value: (productsLoading || authLoading || !products) ? "..." : `$${products.reduce((acc, p) => acc + (p.salePrice * (p.stock || 0)), 0).toLocaleString()}`, 
       trend: "+0%", 
       trendIcon: TrendingUp,
       trendColor: "text-green-500",
@@ -70,7 +71,7 @@ export default function DashboardPage() {
     },
     { 
       label: t.dashboard.activeWarehouses, 
-      value: (warehousesLoading || authLoading) ? "..." : (warehouses?.length || 0).toString(), 
+      value: (warehousesLoading || authLoading || !warehouses) ? "..." : (warehouses.length).toString(), 
       trend: "+0", 
       trendIcon: ArrowUpRight,
       trendColor: "text-blue-500",
