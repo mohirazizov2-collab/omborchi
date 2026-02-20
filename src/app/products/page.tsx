@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Package, Search, Plus, Filter, MoreHorizontal } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
 
 const products = [
   { id: 1, name: "Intel Core i9-13900K", sku: "CPU-I9-139", category: "Processors", stock: 12, price: "$589.00", status: "Low Stock" },
@@ -16,17 +18,19 @@ const products = [
 ];
 
 export default function ProductsPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex min-h-screen">
       <OmniSidebar />
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">Products Catalog</h1>
-            <p className="text-muted-foreground mt-1">Manage your inventory items, SKUs, and stock levels.</p>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.products.title}</h1>
+            <p className="text-muted-foreground mt-1">{t.products.description}</p>
           </div>
           <Button className="gap-2">
-            <Plus className="w-4 h-4" /> Add New Product
+            <Plus className="w-4 h-4" /> {t.products.addNew}
           </Button>
         </header>
 
@@ -34,10 +38,10 @@ export default function ProductsPage() {
           <CardContent className="p-4 flex gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search by name, SKU or category..." className="pl-10 bg-accent/20 border-none" />
+              <Input placeholder={t.products.search} className="pl-10 bg-accent/20 border-none" />
             </div>
             <Button variant="outline" className="gap-2">
-              <Filter className="w-4 h-4" /> Filter
+              <Filter className="w-4 h-4" /> {t.actions.filter}
             </Button>
           </CardContent>
         </Card>
@@ -48,12 +52,12 @@ export default function ProductsPage() {
               <table className="w-full text-sm text-left">
                 <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
                   <tr>
-                    <th className="px-6 py-4 font-semibold">Product info</th>
-                    <th className="px-6 py-4 font-semibold">Category</th>
-                    <th className="px-6 py-4 font-semibold">SKU</th>
-                    <th className="px-6 py-4 font-semibold">Stock</th>
-                    <th className="px-6 py-4 font-semibold">Price</th>
-                    <th className="px-6 py-4 font-semibold">Status</th>
+                    <th className="px-6 py-4 font-semibold">{t.products.productInfo}</th>
+                    <th className="px-6 py-4 font-semibold">{t.products.category}</th>
+                    <th className="px-6 py-4 font-semibold">{t.products.sku}</th>
+                    <th className="px-6 py-4 font-semibold">{t.products.stock}</th>
+                    <th className="px-6 py-4 font-semibold">{t.products.price}</th>
+                    <th className="px-6 py-4 font-semibold">{t.products.status}</th>
                     <th className="px-6 py-4 font-semibold"></th>
                   </tr>
                 </thead>

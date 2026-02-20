@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,11 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 import { 
   TrendingUp, 
   TrendingDown, 
   Box, 
-  Warehouse, 
+  Warehouse as WarehouseIcon, 
   ArrowUpRight, 
   ArrowDownRight, 
   AlertTriangle,
@@ -27,73 +29,74 @@ const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false 
 const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
 const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
 
-const stockStats = [
-  { 
-    label: "Total Stock Value", 
-    value: "$4,239,000", 
-    trend: "+12.5%", 
-    trendIcon: TrendingUp,
-    trendColor: "text-green-500",
-    icon: Box,
-    color: "bg-blue-100 text-blue-600"
-  },
-  { 
-    label: "Active Warehouses", 
-    value: "14", 
-    trend: "+2", 
-    trendIcon: ArrowUpRight,
-    trendColor: "text-blue-500",
-    icon: Warehouse,
-    color: "bg-purple-100 text-purple-600"
-  },
-  { 
-    label: "Monthly Stock In", 
-    value: "12,450", 
-    trend: "+18%", 
-    trendIcon: TrendingUp,
-    trendColor: "text-green-500",
-    icon: ArrowDownRight,
-    color: "bg-green-100 text-green-600"
-  },
-  { 
-    label: "Monthly Stock Out", 
-    value: "10,230", 
-    trend: "+5%", 
-    trendIcon: TrendingDown,
-    trendColor: "text-red-500",
-    icon: ArrowUpRight,
-    color: "bg-orange-100 text-orange-600"
-  },
-];
-
-const chartData = [
-  { month: "Jan", stockIn: 450, stockOut: 300 },
-  { month: "Feb", stockIn: 520, stockOut: 380 },
-  { month: "Mar", stockIn: 480, stockOut: 420 },
-  { month: "Apr", stockIn: 610, stockOut: 450 },
-  { month: "May", stockIn: 590, stockOut: 480 },
-  { month: "Jun", stockIn: 720, stockOut: 510 },
-];
-
-const lowStockItems = [
-  { name: "Intel Core i9-13900K", sku: "CPU-I9-139", stock: 12, threshold: 20 },
-  { name: "NVIDIA RTX 4090", sku: "GPU-4090-FE", stock: 4, threshold: 10 },
-  { name: "Samsung 980 Pro 2TB", sku: "SSD-SAM-980", stock: 15, threshold: 30 },
-  { name: "Corsair Vengeance 32GB", sku: "RAM-COR-32", stock: 8, threshold: 15 },
-];
-
-const recentMovements = [
-  { id: "M-1029", type: "Stock In", product: "MacBook Pro M2", quantity: 50, warehouse: "Main Hub", date: "2 hours ago" },
-  { id: "M-1028", type: "Transfer", product: "iPhone 15 Pro", quantity: 20, warehouse: "East Branch", date: "5 hours ago" },
-  { id: "M-1027", type: "Stock Out", product: "iPad Air", quantity: 15, warehouse: "North Outlet", date: "1 day ago" },
-];
-
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const stockStats = [
+    { 
+      label: t.dashboard.totalStockValue, 
+      value: "$4,239,000", 
+      trend: "+12.5%", 
+      trendIcon: TrendingUp,
+      trendColor: "text-green-500",
+      icon: Box,
+      color: "bg-blue-100 text-blue-600"
+    },
+    { 
+      label: t.dashboard.activeWarehouses, 
+      value: "14", 
+      trend: "+2", 
+      trendIcon: ArrowUpRight,
+      trendColor: "text-blue-500",
+      icon: WarehouseIcon,
+      color: "bg-purple-100 text-purple-600"
+    },
+    { 
+      label: t.dashboard.monthlyStockIn, 
+      value: "12,450", 
+      trend: "+18%", 
+      trendIcon: TrendingUp,
+      trendColor: "text-green-500",
+      icon: ArrowDownRight,
+      color: "bg-green-100 text-green-600"
+    },
+    { 
+      label: t.dashboard.monthlyStockOut, 
+      value: "10,230", 
+      trend: "+5%", 
+      trendIcon: TrendingDown,
+      trendColor: "text-red-500",
+      icon: ArrowUpRight,
+      color: "bg-orange-100 text-orange-600"
+    },
+  ];
+
+  const chartData = [
+    { month: "Jan", stockIn: 450, stockOut: 300 },
+    { month: "Feb", stockIn: 520, stockOut: 380 },
+    { month: "Mar", stockIn: 480, stockOut: 420 },
+    { month: "Apr", stockIn: 610, stockOut: 450 },
+    { month: "May", stockIn: 590, stockOut: 480 },
+    { month: "Jun", stockIn: 720, stockOut: 510 },
+  ];
+
+  const lowStockItems = [
+    { name: "Intel Core i9-13900K", sku: "CPU-I9-139", stock: 12, threshold: 20 },
+    { name: "NVIDIA RTX 4090", sku: "GPU-4090-FE", stock: 4, threshold: 10 },
+    { name: "Samsung 980 Pro 2TB", sku: "SSD-SAM-980", stock: 15, threshold: 30 },
+    { name: "Corsair Vengeance 32GB", sku: "RAM-COR-32", stock: 8, threshold: 15 },
+  ];
+
+  const recentMovements = [
+    { id: "M-1029", type: "Stock In", product: "MacBook Pro M2", quantity: 50, warehouse: "Main Hub", date: "2 hours ago" },
+    { id: "M-1028", type: "Transfer", product: "iPhone 15 Pro", quantity: 20, warehouse: "East Branch", date: "5 hours ago" },
+    { id: "M-1027", type: "Stock Out", product: "iPad Air", quantity: 15, warehouse: "North Outlet", date: "1 day ago" },
+  ];
 
   return (
     <div className="flex min-h-screen">
@@ -101,12 +104,12 @@ export default function DashboardPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Overview of OmniStock inventory and warehouse operations.</p>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.dashboard.title}</h1>
+            <p className="text-muted-foreground mt-1">{t.dashboard.description}</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline">Download Report</Button>
-            <Button>+ New Operation</Button>
+            <Button variant="outline">{t.actions.downloadReport}</Button>
+            <Button>{t.actions.newOperation}</Button>
           </div>
         </header>
 
@@ -137,8 +140,7 @@ export default function DashboardPage() {
           {/* Main Chart */}
           <Card className="lg:col-span-2 border-none shadow-sm">
             <CardHeader>
-              <CardTitle className="font-headline font-bold text-lg">Stock Movements</CardTitle>
-              <CardDescription>Comparison between stock inflow and outflow over time.</CardDescription>
+              <CardTitle className="font-headline font-bold text-lg">{t.dashboard.stockMovements}</CardTitle>
             </CardHeader>
             <CardContent>
               {mounted ? (
@@ -164,8 +166,7 @@ export default function DashboardPage() {
           <Card className="border-none shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="font-headline font-bold text-lg">Low Stock Alerts</CardTitle>
-                <CardDescription>Items below threshold.</CardDescription>
+                <CardTitle className="font-headline font-bold text-lg">{t.dashboard.lowStockAlerts}</CardTitle>
               </div>
               <AlertTriangle className="text-orange-500 w-5 h-5" />
             </CardHeader>
@@ -179,13 +180,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-destructive">{item.stock} left</p>
-                      <p className="text-[10px] text-muted-foreground">Min: {item.threshold}</p>
                     </div>
                   </div>
                 ))}
               </div>
               <Button variant="link" className="w-full mt-4 text-xs">
-                View All Alerts <ChevronRight className="w-3 h-3 ml-1" />
+                {t.dashboard.viewAll} <ChevronRight className="w-3 h-3 ml-1" />
               </Button>
             </CardContent>
           </Card>
@@ -194,20 +194,19 @@ export default function DashboardPage() {
         {/* Recent Transactions Table */}
         <Card className="border-none shadow-sm">
           <CardHeader>
-            <CardTitle className="font-headline font-bold text-lg">Recent Movements</CardTitle>
-            <CardDescription>Latest inventory transactions across all warehouses.</CardDescription>
+            <CardTitle className="font-headline font-bold text-lg">{t.dashboard.recentMovements}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
                   <tr>
-                    <th className="px-6 py-3 font-semibold">ID</th>
-                    <th className="px-6 py-3 font-semibold">Type</th>
-                    <th className="px-6 py-3 font-semibold">Product</th>
-                    <th className="px-6 py-3 font-semibold">Quantity</th>
-                    <th className="px-6 py-3 font-semibold">Warehouse</th>
-                    <th className="px-6 py-3 font-semibold">Date</th>
+                    <th className="px-6 py-3 font-semibold">{t.common.id}</th>
+                    <th className="px-6 py-3 font-semibold">{t.common.type}</th>
+                    <th className="px-6 py-3 font-semibold">{t.common.product}</th>
+                    <th className="px-6 py-3 font-semibold">{t.common.quantity}</th>
+                    <th className="px-6 py-3 font-semibold">{t.common.warehouse}</th>
+                    <th className="px-6 py-3 font-semibold">{t.common.date}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
