@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,12 +17,15 @@ import {
   AlertTriangle,
   ChevronRight
 } from "lucide-react";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+
+// Dynamically import Recharts to avoid SSR errors
+const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
+const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
+const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
+const XAxis = dynamic(() => import("recharts").then(m => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
+const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
 
 const stockStats = [
   { 
@@ -138,19 +142,18 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {mounted ? (
-                <ChartContainer config={{ 
-                  stockIn: { label: "Stock In", color: "hsl(var(--chart-1))" },
-                  stockOut: { label: "Stock Out", color: "hsl(var(--chart-2))" }
-                }}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} />
-                    <Tooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="stockIn" fill="var(--color-stockIn)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="stockOut" fill="var(--color-stockOut)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                      <YAxis tickLine={false} axisLine={false} />
+                      <Tooltip />
+                      <Bar dataKey="stockIn" fill="#2E68B8" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="stockOut" fill="#669995" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
                 <div className="h-[300px] w-full bg-accent/20 animate-pulse rounded-lg" />
               )}
