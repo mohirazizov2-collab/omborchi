@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -101,7 +100,7 @@ export default function StockInPage() {
   return (
     <div className="flex min-h-screen">
       <OmniSidebar />
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <header className="mb-8">
           <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.stockIn.title}</h1>
           <p className="text-muted-foreground mt-1">{t.stockIn.description}</p>
@@ -109,7 +108,7 @@ export default function StockInPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-sm animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
               <CardHeader>
                 <CardTitle className="font-headline">{t.stockIn.dnDetails}</CardTitle>
               </CardHeader>
@@ -150,7 +149,7 @@ export default function StockInPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-sm animate-in fade-in slide-in-from-left-4 duration-700 delay-200">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="font-headline">{t.stockIn.productItems}</CardTitle>
@@ -160,8 +159,8 @@ export default function StockInPage() {
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
-                {items.map((item) => (
-                  <div key={item.id} className="flex gap-4 items-end p-4 rounded-lg bg-accent/20 border group relative">
+                {items.map((item, idx) => (
+                  <div key={item.id} className="flex gap-4 items-end p-4 rounded-lg bg-accent/20 border group relative animate-in fade-in slide-in-from-right-2 duration-300">
                     <div className="flex-1 space-y-2">
                       <Label className="text-xs">{t.common.product}</Label>
                       <Select 
@@ -211,7 +210,7 @@ export default function StockInPage() {
           </div>
 
           <div className="space-y-6">
-            <Card className="border-none shadow-sm h-fit sticky top-8">
+            <Card className="border-none shadow-sm h-fit sticky top-8 animate-in fade-in slide-in-from-right-4 duration-500 delay-300">
               <CardHeader>
                 <CardTitle className="font-headline">{t.common.summary}</CardTitle>
               </CardHeader>
@@ -226,7 +225,7 @@ export default function StockInPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-3">
-                <Button className="w-full h-11 text-lg" onClick={handleProcess} disabled={loading}>
+                <Button className="w-full h-11 text-lg font-bold" onClick={handleProcess} disabled={loading}>
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : t.stockIn.process}
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => toast({ title: "Saqlandi", description: "Qoralama muvaffaqiyatli saqlandi." })}>

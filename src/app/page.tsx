@@ -75,7 +75,7 @@ export default function DashboardPage() {
       trendIcon: TrendingUp,
       trendColor: "text-green-500",
       icon: Box,
-      color: "bg-blue-100 text-blue-600"
+      color: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
     },
     { 
       label: t.dashboard.activeWarehouses, 
@@ -84,7 +84,7 @@ export default function DashboardPage() {
       trendIcon: ArrowUpRight,
       trendColor: "text-blue-500",
       icon: WarehouseIcon,
-      color: "bg-purple-100 text-purple-600"
+      color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
     },
     { 
       label: t.dashboard.monthlyStockIn, 
@@ -93,7 +93,7 @@ export default function DashboardPage() {
       trendIcon: TrendingUp,
       trendColor: "text-green-500",
       icon: ArrowDownRight,
-      color: "bg-green-100 text-green-600"
+      color: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
     },
     { 
       label: t.dashboard.monthlyStockOut, 
@@ -102,7 +102,7 @@ export default function DashboardPage() {
       trendIcon: ArrowUpRight,
       trendColor: "text-red-500",
       icon: ArrowUpRight,
-      color: "bg-orange-100 text-orange-600"
+      color: "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
     },
   ];
 
@@ -117,7 +117,7 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <OmniSidebar />
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">{t.dashboard.title}</h1>
@@ -125,13 +125,13 @@ export default function DashboardPage() {
           </div>
           <div className="flex gap-3">
             <Button variant="outline">{t.actions.downloadReport}</Button>
-            <Button className="text-white">{t.actions.newOperation}</Button>
+            <Button className="text-white font-bold">{t.actions.newOperation}</Button>
           </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stockStats.map((stat) => (
-            <Card key={stat.label} className="border-none shadow-sm bg-card hover:shadow-md transition-shadow">
+          {stockStats.map((stat, idx) => (
+            <Card key={stat.label} className={cn("border-none shadow-sm bg-card hover:shadow-md transition-all animate-in fade-in slide-in-from-bottom-2 duration-500", `delay-[${idx * 100}ms]`)}>
               <CardContent className="pt-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className={cn("p-2 rounded-lg", stat.color)}>
@@ -152,7 +152,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <Card className="lg:col-span-2 border-none shadow-sm">
+          <Card className="lg:col-span-2 border-none shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
             <CardHeader>
               <CardTitle className="font-headline font-bold text-lg">{t.dashboard.stockMovements}</CardTitle>
             </CardHeader>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} />
                     <YAxis tickLine={false} axisLine={false} />
-                    <Tooltip />
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                     <Bar dataKey="stockIn" fill="#2E68B8" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="stockOut" fill="#669995" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -172,7 +172,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm">
+          <Card className="border-none shadow-sm animate-in fade-in slide-in-from-right-4 duration-700">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="font-headline font-bold text-lg">{t.dashboard.lowStockAlerts}</CardTitle>
@@ -182,7 +182,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="space-y-4">
                 {lowStockItems.length > 0 ? lowStockItems.map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border">
+                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border hover:bg-accent/50 transition-colors">
                     <div>
                       <p className="text-sm font-semibold truncate max-w-[140px]">{item.name}</p>
                       <p className="text-xs text-muted-foreground font-code">{item.sku}</p>
@@ -202,7 +202,7 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <Card className="border-none shadow-sm">
+        <Card className="border-none shadow-sm animate-in fade-in slide-in-from-bottom-6 duration-700">
           <CardHeader>
             <CardTitle className="font-headline font-bold text-lg">{t.dashboard.recentMovements}</CardTitle>
           </CardHeader>

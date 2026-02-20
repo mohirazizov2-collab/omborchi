@@ -82,7 +82,7 @@ export default function ProductsPage() {
   return (
     <div className="flex min-h-screen">
       <OmniSidebar />
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">{t.products.title}</h1>
@@ -91,11 +91,11 @@ export default function ProductsPage() {
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 font-bold text-white">
                 <Plus className="w-4 h-4" /> {t.products.addNew}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="animate-in zoom-in-95 duration-300">
               <DialogHeader>
                 <DialogTitle>{t.products.addNew}</DialogTitle>
               </DialogHeader>
@@ -145,7 +145,7 @@ export default function ProductsPage() {
           </Dialog>
         </header>
 
-        <Card className="border-none shadow-sm mb-8">
+        <Card className="border-none shadow-sm mb-8 animate-in fade-in slide-in-from-top-2 duration-500 delay-100">
           <CardContent className="p-4 flex gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
@@ -162,7 +162,7 @@ export default function ProductsPage() {
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Card className="border-none shadow-sm">
+          <Card className="border-none shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700 delay-200">
             <div className="relative overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">

@@ -78,7 +78,7 @@ export default function WarehousesPage() {
   return (
     <div className="flex min-h-screen">
       <OmniSidebar />
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">{t.warehouses.title}</h1>
@@ -87,11 +87,11 @@ export default function WarehousesPage() {
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 font-bold text-white">
                 <Plus className="w-4 h-4" /> {t.warehouses.addNew}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="animate-in zoom-in-95 duration-300">
               <DialogHeader>
                 <DialogTitle>{t.warehouses.addNew}</DialogTitle>
               </DialogHeader>
@@ -131,7 +131,7 @@ export default function WarehousesPage() {
           </Dialog>
         </header>
 
-        <div className="mb-6 flex gap-4">
+        <div className="mb-6 flex gap-4 animate-in fade-in slide-in-from-top-2 duration-500 delay-100">
           <Input placeholder={t.warehouses.search} className="max-w-md bg-card" />
           <Button variant="outline">{t.actions.filter}</Button>
         </div>
@@ -141,9 +141,9 @@ export default function WarehousesPage() {
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-700 delay-200">
             {warehouses && warehouses.map((w: any) => (
-              <Card key={w.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
+              <Card key={w.id} className="border-none shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
                 <CardHeader className="flex flex-row items-start justify-between pb-2">
                   <div className="space-y-1">
                     <CardTitle className="text-lg font-headline font-bold">{w.name}</CardTitle>
