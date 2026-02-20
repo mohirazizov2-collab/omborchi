@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "Warehouse": {
@@ -32,7 +31,7 @@
     },
     "StockMovement": {
       "title": "StockMovement",
-      "description": "Zaxira harakati: kirim, chiqim va transferlar tarixi.",
+      "description": "Audit Trail: Zaxira harakati tarixi. Hech qachon o'chirib bo'lmaydi.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -47,7 +46,8 @@
     }
   },
   "auth": {
-    "providers": ["anonymous", "password"]
+    "providers": ["anonymous", "password"],
+    "securityPolicy": "Strict: Authenticated users only. Audit trail immutable."
   },
   "firestore": {
     "/warehouses/{warehouseId}": {
@@ -60,7 +60,11 @@
     },
     "/stockMovements/{movementId}": {
       "schema": "#/entities/StockMovement",
-      "description": "Barcha omborlardagi mahsulotlar harakati tarixi."
+      "description": "Audit Trail: O'chirilishi taqiqlangan harakatlar tarixi."
+    },
+    "/users/{userId}": {
+      "schema": { "type": "object" },
+      "description": "Foydalanuvchi profillari."
     }
   }
 }
