@@ -5,7 +5,7 @@ import { LanguageProvider } from '@/lib/i18n/context';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'OmniStock - Advanced Inventory Management',
+  title: 'omborchi.uz - Advanced Inventory Management',
   description: 'AI-powered inventory and warehouse management system for modern enterprises.',
 };
 

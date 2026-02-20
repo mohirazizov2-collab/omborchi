@@ -1,3 +1,4 @@
+
 export type Language = 'uz' | 'ru' | 'en';
 
 export const translations = {
@@ -18,7 +19,7 @@ export const translations = {
     },
     dashboard: {
       title: 'Boshqaruv paneli',
-      description: 'OmniStock inventar va ombor operatsiyalari umumiy ko\'rinishi.',
+      description: 'omborchi.uz inventar va ombor operatsiyalari umumiy ko\'rinishi.',
       totalStockValue: 'Jami zaxira qiymati',
       activeWarehouses: 'Faol omborlar',
       monthlyStockIn: 'Oylik kirish',
@@ -99,7 +100,7 @@ export const translations = {
     },
     settings: {
       title: 'Tizim sozlamalari',
-      description: 'OmniStock global parametrlarini va xavfsizlikni sozlash.',
+      description: 'omborchi.uz global parametrlarini va xavfsizlikni sozlash.',
       general: 'Umumiy konfiguratsiya',
       companyName: 'Kompaniya nomi',
       currency: 'Valyuta',
@@ -159,7 +160,7 @@ export const translations = {
     },
     dashboard: {
       title: 'Панель управления',
-      description: 'Обзор инвентаря и складских операций OmniStock.',
+      description: 'Обзор инвентаря и складских операций omborchi.uz.',
       totalStockValue: 'Общая стоимость запасов',
       activeWarehouses: 'Активные склады',
       monthlyStockIn: 'Месячный приход',
@@ -240,7 +241,7 @@ export const translations = {
     },
     settings: {
       title: 'Системные настройки',
-      description: 'Настройка глобальных параметров OmniStock и безопасности.',
+      description: 'Настройка глобальных параметров omborchi.uz и безопасности.',
       general: 'Общая конфигурация',
       companyName: 'Название компании',
       currency: 'Валюта',
@@ -300,7 +301,7 @@ export const translations = {
     },
     dashboard: {
       title: 'Dashboard',
-      description: 'Overview of OmniStock inventory and warehouse operations.',
+      description: 'Overview of omborchi.uz inventory and warehouse operations.',
       totalStockValue: 'Total Stock Value',
       activeWarehouses: 'Active Warehouses',
       monthlyStockIn: 'Monthly Stock In',
@@ -381,7 +382,7 @@ export const translations = {
     },
     settings: {
       title: 'System Settings',
-      description: 'Configure OmniStock global parameters and security.',
+      description: 'Configure omborchi.uz global parameters and security.',
       general: 'General Configuration',
       companyName: 'Company Name',
       currency: 'Currency',
