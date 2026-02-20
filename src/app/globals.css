@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -55,11 +54,9 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body selection:bg-primary/20 antialiased overflow-x-hidden;
-    background-image: 
-      radial-gradient(at 0% 0%, hsla(217, 91%, 60%, 0.03) 0, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(27, 87%, 67%, 0.03) 0, transparent 50%);
-    background-attachment: fixed;
+    @apply bg-background text-foreground font-body antialiased selection:bg-primary/20;
+    /* Murakkab gradientlar soddalashtirildi */
+    background-color: hsl(var(--background));
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline font-bold tracking-tight;
@@ -68,39 +65,29 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card/60 backdrop-blur-xl border border-white/5 dark:border-white/5 shadow-xl;
+    @apply bg-card border border-border/50 shadow-sm transition-shadow duration-200 hover:shadow-md;
   }
   
   .sidebar-item-active {
-    @apply bg-primary/10 text-primary relative;
+    @apply bg-primary/10 text-primary;
   }
 
   .premium-button {
-    @apply transition-all duration-200 active:scale-[0.97] hover:shadow-lg hover:shadow-primary/20;
+    @apply transition-all duration-150 active:scale-[0.98];
   }
 
   .page-transition {
-    @apply animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out;
+    @apply animate-in fade-in duration-300 ease-out;
   }
 }
 
-@keyframes slow-gradient {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* Scrollbar optimizatsiyasi */
+::-webkit-scrollbar {
+  width: 6px;
 }
-
-.animate-slow-gradient {
-  background-size: 200% 200%;
-  animation: slow-gradient 15s ease infinite;
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
 }
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
 }
