@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -86,7 +85,7 @@ export default function ProductsPage() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.products.title}</h1>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">{t.products.title}</h1>
             <p className="text-muted-foreground mt-1">{t.products.description}</p>
           </div>
           
