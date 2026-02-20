@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck, Copy, CheckCircle2 } from "lucide-react";
+import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck, Copy, CheckCircle2, Database, Key } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,8 +39,6 @@ export default function LoginPage() {
         title: "Tizimga kirildi",
         description: "Endi quyidagi UID orqali Super Adminni faollashtiring.",
       });
-      // Muvaffaqiyatli bo'lsa, FirebaseClientProvider avtomatik ravishda Dashboardga o'tkazadi
-      // Agar rolesAdmin-da bo'lmasa, quyida ko'rsatma chiqadi.
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -62,7 +60,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background text-foreground">
       <div className="absolute top-4 right-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -88,7 +86,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <Card className="border-none shadow-xl">
+        <Card className="border-none shadow-xl bg-card">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold font-headline text-center flex items-center justify-center gap-2">
               <ShieldCheck className="w-6 h-6 text-primary" /> {t.auth.loginTitle}
@@ -112,7 +110,6 @@ export default function LoginPage() {
                     <Input 
                       id="email" 
                       type="email" 
-                      placeholder="admin@omborchi.uz" 
                       className="pl-10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -143,40 +140,48 @@ export default function LoginPage() {
             </form>
           ) : (
             <CardContent className="space-y-6 pt-2">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-3">
-                <div className="flex items-center gap-2 text-green-700 font-bold">
+              <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl space-y-3">
+                <div className="flex items-center gap-2 text-green-600 font-bold">
                   <CheckCircle2 className="w-5 h-5" /> Autentifikatsiya muvaffaqiyatli!
                 </div>
-                <p className="text-sm text-green-600">
+                <p className="text-sm text-green-700/80">
                   Lekin siz hali <b>rolesAdmin</b> ro'yxatida yo'qsiz. Quyidagi UID-ni nusxalab, Firestore-da sozlang:
                 </p>
-                <div className="flex items-center gap-2 bg-white p-2 rounded border border-green-200 font-code text-xs">
-                  <span className="flex-1 truncate">{userUid}</span>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={copyUid}>
+                <div className="flex items-center gap-2 bg-background p-3 rounded-lg border border-green-500/30 font-code text-xs shadow-inner">
+                  <span className="flex-1 truncate font-bold text-primary">{userUid}</span>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10" onClick={copyUid}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="space-y-3 text-sm">
-                <p className="font-bold text-primary flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[10px]">1</div>
-                  Firestore-ga kiring
-                </p>
-                <p className="ml-7 text-muted-foreground">
-                  <b>rolesAdmin</b> nomli kolleksiya oching.
-                </p>
+              <div className="space-y-4 text-sm">
+                <div className="flex gap-3">
+                  <div className="flex-none w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">1</div>
+                  <div>
+                    <p className="font-bold flex items-center gap-2">
+                      <Database className="w-4 h-4" /> Firestore-ga kiring
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Firebase Console-da <b>rolesAdmin</b> nomli kolleksiya yarating.
+                    </p>
+                  </div>
+                </div>
 
-                <p className="font-bold text-primary flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[10px]">2</div>
-                  Hujjat (Document) yarating
-                </p>
-                <p className="ml-7 text-muted-foreground">
-                  <b>Document ID</b> degan joyiga yuqoridagi <b>UID</b>-ni qo'ying.
-                </p>
+                <div className="flex gap-3">
+                  <div className="flex-none w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">2</div>
+                  <div>
+                    <p className="font-bold flex items-center gap-2">
+                      <Key className="w-4 h-4" /> Hujjat yarating
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      <b>Document ID</b> joyiga yuqoridagi ko'k rangli <b>UID</b>-ni qo'ying.
+                    </p>
+                  </div>
+                </div>
                 
                 <Button variant="outline" className="w-full mt-4" onClick={() => window.location.reload()}>
-                  Sozlab bo'ldim, qayta yuklash
+                  Bajarib bo'ldim, qayta yuklash
                 </Button>
               </div>
             </CardContent>
