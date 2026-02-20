@@ -36,7 +36,7 @@ export default function UsersPage() {
   const [formData, setFormData] = useState({
     displayName: "",
     email: "",
-    role: "Operator"
+    role: "Warehouse Worker"
   });
 
   const usersQuery = useMemoFirebase(() => {
@@ -76,7 +76,7 @@ export default function UsersPage() {
           description: "Foydalanuvchi profili yaratildi. Endi unga Firebase Console orqali login ochib bering.",
         });
         setIsDialogOpen(false);
-        setFormData({ displayName: "", email: "", role: "Operator" });
+        setFormData({ displayName: "", email: "", role: "Warehouse Worker" });
       })
       .catch((err) => {
         console.error(err);
@@ -150,9 +150,7 @@ export default function UsersPage() {
                     <SelectContent>
                       <SelectItem value="Super Admin">Super Admin</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Warehouse Manager">Menejer</SelectItem>
                       <SelectItem value="Warehouse Worker">Omborchi</SelectItem>
-                      <SelectItem value="Operator">Operator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -203,7 +201,7 @@ export default function UsersPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4 text-blue-500" />
-                            <span>{u.role || 'Operator'}</span>
+                            <span>{u.role || 'Xodim'}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
