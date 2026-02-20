@@ -39,9 +39,11 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
+  const [currentDateString, setCurrentDateString] = useState("");
 
   useEffect(() => {
     setMounted(true);
+    setCurrentDateString(new Date().toLocaleDateString('uz-UZ', { month: 'long', day: 'numeric', year: 'numeric' }));
   }, []);
 
   const warehousesQuery = useMemoFirebase(() => {
@@ -151,7 +153,7 @@ export default function DashboardPage() {
               className="flex items-center gap-2 mb-1"
             >
               <Badge variant="outline" className="text-[10px] uppercase font-black tracking-widest bg-primary/5 text-primary border-primary/20 px-3">Operational</Badge>
-              <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-50">• {new Date().toLocaleDateString('uz-UZ', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+              <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-50">• {currentDateString}</span>
             </motion.div>
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.dashboard.title}</h1>
             <p className="text-muted-foreground font-medium text-sm">{t.dashboard.description}</p>

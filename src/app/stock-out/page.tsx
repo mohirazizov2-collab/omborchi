@@ -136,10 +136,10 @@ export default function StockOutPage() {
                   <Label htmlFor="order_number">{t.stockOut.refNumber}</Label>
                   <div className="relative">
                     <Truck className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    <input 
+                    <Input 
                       id="order_number" 
                       placeholder="ORD-998877" 
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-10 text-sm"
+                      className="pl-10"
                       value={orderNumber}
                       onChange={(e) => setOrderNumber(e.target.value)}
                     />
