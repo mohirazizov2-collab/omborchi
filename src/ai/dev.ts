@@ -1,8 +1,10 @@
+
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/generate-backend-project-structure.ts';
-import '@/ai/flows/generate-database-schema.ts';
-import '@/ai/flows/generate-backend-api-boilerplate.ts';
-import '@/ai/flows/analyze-reports-flow.ts';
-import '@/ai/flows/chat-flow.ts';
+// Barcha AI oqimlarini (flows) import qilish
+import '@/ai/flows/analyze-reports-flow';
+import '@/ai/flows/chat-flow';
+import '@/ai/flows/generate-database-schema';
+import '@/ai/flows/generate-backend-project-structure';
+import '@/ai/flows/generate-backend-api-boilerplate';

@@ -3,8 +3,8 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview Google Gemini orqali Genkit konfiguratsiyasi.
- * Siz taqdim etgan API kalitidan foydalaniladi.
+ * @fileOverview AI konfiguratsiyasi.
+ * Farruxbek taqdim etgan Gemini API kalitidan foydalaniladi.
  */
 
 export const ai = genkit({
@@ -15,5 +15,5 @@ export const ai = genkit({
   ],
 });
 
-// Barqaror Gemini 1.5 Flash modeli
+// Barqaror va bepul kvotaga ega model
 export const model = 'googleai/gemini-1.5-flash';
