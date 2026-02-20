@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Mail, Globe } from "lucide-react";
+import { Loader2, Lock, Mail, Globe, AlertCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function LoginPage() {
@@ -33,7 +33,11 @@ export default function LoginPage() {
       router.push("/");
     } catch (err: any) {
       console.error(err);
-      setError(t.auth.errorInvalid);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError(t.auth.errorInvalid);
+      } else {
+        setError("Tizimga kirishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+      }
     } finally {
       setLoading(false);
     }
@@ -68,13 +72,14 @@ export default function LoginPage() {
 
         <Card className="border-none shadow-xl">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold font-headline">{t.auth.loginTitle}</CardTitle>
-            <CardDescription>{t.auth.loginDescription}</CardDescription>
+            <CardTitle className="text-2xl font-bold font-headline text-center">{t.auth.loginTitle}</CardTitle>
+            <CardDescription className="text-center">{t.auth.loginDescription}</CardDescription>
           </CardHeader>
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
               {error && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20">
+                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
                   {error}
                 </div>
               )}
@@ -85,7 +90,7 @@ export default function LoginPage() {
                   <Input 
                     id="email" 
                     type="email" 
-                    placeholder="name@company.uz" 
+                    placeholder="admin@omborchi.uz" 
                     className="pl-10"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -96,9 +101,6 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label htmlFor="password">{t.auth.passwordLabel}</Label>
-                  <Button variant="link" size="sm" className="px-0 text-xs text-primary/70">
-                    {t.auth.forgotPassword}
-                  </Button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
@@ -117,9 +119,14 @@ export default function LoginPage() {
               <Button type="submit" className="w-full h-11 text-lg font-semibold" disabled={loading}>
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : t.auth.loginButton}
               </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                {t.auth.noAccount}
-              </p>
+              <div className="text-center space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  {t.auth.noAccount}
+                </p>
+                <div className="p-2 bg-accent/30 rounded border text-[10px] text-muted-foreground leading-tight">
+                  Eslatma: Birinchi Super Admin hisobi Firebase Console orqali yaratilishi va UID 'rolesAdmin' kolleksiyasiga qo'shilishi kerak.
+                </div>
+              </div>
             </CardFooter>
           </form>
         </Card>
