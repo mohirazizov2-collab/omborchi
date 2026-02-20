@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -29,13 +31,21 @@ export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
   const db = useFirestore();
-  const { user } = useUser();
+  const { user, role, isUserLoading: authLoading } = useUser();
+  const router = useRouter();
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AnalyzeReportsOutput | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Role Guard
+  useEffect(() => {
+    if (!authLoading && role === "Omborchi") {
+      router.push("/");
+    }
+  }, [role, authLoading, router]);
 
   const productsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -49,7 +59,13 @@ export default function ReportsPage() {
   }, [db, user]);
   const { data: warehouses, isLoading: warehousesLoading } = useCollection(warehousesQuery);
 
-  if (!mounted) return null;
+  if (!mounted || authLoading || role === "Omborchi") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const totalValue = (products || []).reduce((acc, p) => acc + (p.salePrice * (p.stock || 0)), 0);
   const lowStockCount = (products || []).filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length;

@@ -28,10 +28,12 @@ import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 export default function ProductsPage() {
   const { t } = useLanguage();
   const db = useFirestore();
-  const { user, isUserLoading: authLoading } = useUser();
+  const { user, role, isUserLoading: authLoading } = useUser();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const canEdit = role === "Super Admin" || role === "Admin";
 
   const [formData, setFormData] = useState({
     name: "",
@@ -107,64 +109,66 @@ export default function ProductsPage() {
             <p className="text-sm text-muted-foreground mt-1 font-medium">{t.products.description}</p>
           </div>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white">
-                <Plus className="w-4 h-4" /> {t.products.addNew}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-[2rem] border-white/5 bg-black/90 backdrop-blur-2xl text-white">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-black tracking-tight">{t.products.addNew}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-6 py-6">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Mahsulot nomi</Label>
-                  <Input 
-                    className="h-12 rounded-2xl bg-white/5 border-white/10"
-                    value={formData.name} 
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Masalan: Intel Core i9" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">SKU</Label>
-                  <Input 
-                    className="h-12 rounded-2xl bg-white/5 border-white/10"
-                    value={formData.sku} 
-                    onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                    placeholder="PRD-12345" 
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Narxi ($)</Label>
-                    <Input 
-                      type="number"
-                      className="h-12 rounded-2xl bg-white/5 border-white/10"
-                      value={formData.price} 
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Zaxira miqdori</Label>
-                    <Input 
-                      type="number"
-                      className="h-12 rounded-2xl bg-white/5 border-white/10"
-                      value={formData.stock} 
-                      onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter className="gap-2">
-                <Button variant="ghost" className="rounded-2xl h-12" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
-                <Button className="rounded-2xl h-12 px-8 bg-primary text-white font-black uppercase tracking-widest text-[10px]" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t.actions.save}
+          {canEdit && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white">
+                  <Plus className="w-4 h-4" /> {t.products.addNew}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="rounded-[2rem] border-white/5 bg-black/90 backdrop-blur-2xl text-white">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black tracking-tight">{t.products.addNew}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6 py-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Mahsulot nomi</Label>
+                    <Input 
+                      className="h-12 rounded-2xl bg-white/5 border-white/10"
+                      value={formData.name} 
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      placeholder="Masalan: Intel Core i9" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">SKU</Label>
+                    <Input 
+                      className="h-12 rounded-2xl bg-white/5 border-white/10"
+                      value={formData.sku} 
+                      onChange={(e) => setFormData({...formData, sku: e.target.value})}
+                      placeholder="PRD-12345" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Narxi ($)</Label>
+                      <Input 
+                        type="number"
+                        className="h-12 rounded-2xl bg-white/5 border-white/10"
+                        value={formData.price} 
+                        onChange={(e) => setFormData({...formData, price: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Zaxira miqdori</Label>
+                      <Input 
+                        type="number"
+                        className="h-12 rounded-2xl bg-white/5 border-white/10"
+                        value={formData.stock} 
+                        onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button variant="ghost" className="rounded-2xl h-12" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
+                  <Button className="rounded-2xl h-12 px-8 bg-primary text-white font-black uppercase tracking-widest text-[10px]" onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t.actions.save}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </header>
 
         <Card className="border-none glass-card mb-8">
@@ -200,7 +204,7 @@ export default function ProductsPage() {
                     <th className="px-6 py-5">{t.products.stock}</th>
                     <th className="px-6 py-5">{t.products.price}</th>
                     <th className="px-6 py-5">{t.products.status}</th>
-                    <th className="px-6 py-5"></th>
+                    {canEdit && <th className="px-6 py-5"></th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -237,30 +241,32 @@ export default function ProductsPage() {
                             {(p.stock || 0) > (p.lowStockThreshold || 10) ? "In Stock" : "Low Stock"}
                           </Badge>
                         </td>
-                        <td className="px-6 py-5 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary">
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9 rounded-xl hover:bg-rose-500/10 text-rose-500"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(p.id);
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
+                        {canEdit && (
+                          <td className="px-6 py-5 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary">
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-9 w-9 rounded-xl hover:bg-rose-500/10 text-rose-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(p.id);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        )}
                       </motion.tr>
                     ))}
                   </AnimatePresence>
                   {filteredProducts.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-32 text-center">
+                      <td colSpan={canEdit ? 7 : 6} className="px-6 py-32 text-center">
                         <Package className="w-12 h-12 text-muted/10 mx-auto mb-4" />
                         <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em]">No products found</p>
                       </td>

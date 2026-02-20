@@ -1,8 +1,8 @@
+
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Warehouse,
@@ -34,21 +34,23 @@ export function OmniSidebar() {
   const { t, language, setLanguage } = useLanguage();
   const { user, role } = useUser();
 
-  const isAdmin = role === "Super Admin" || role === "Admin";
+  const isSuperAdmin = role === "Super Admin";
+  const isAdmin = role === "Admin" || isSuperAdmin;
+  const isOmborchi = role === "Omborchi";
 
   const navigation = [
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
-    { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: !isAdmin },
+    { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
     { name: t.nav.products, href: "/products", icon: Package },
     { name: t.nav.stockIn, href: "/stock-in", icon: Archive },
     { name: t.nav.stockOut, href: "/stock-out", icon: Archive },
     { name: t.nav.transfers, href: "/transfers", icon: ArrowRightLeft },
-    { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: !isAdmin },
-    { name: t.nav.systemGen, href: "/system-gen", icon: Database, hide: role !== "Super Admin" },
+    { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
+    { name: t.nav.systemGen, href: "/system-gen", icon: Database, hide: !isSuperAdmin },
   ];
 
   const adminNavigation = [
-    { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isAdmin },
+    { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isSuperAdmin },
     { name: t.nav.settings, href: "/settings", icon: Settings, hide: !isAdmin },
   ];
 
@@ -112,7 +114,7 @@ export function OmniSidebar() {
           })}
         </nav>
 
-        {isAdmin && (
+        {(isAdmin || isSuperAdmin) && (
           <div className="pt-4 border-t space-y-1">
             <p className="px-3 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">Admin</p>
             {adminNavigation.filter(item => !item.hide).map((item) => {
