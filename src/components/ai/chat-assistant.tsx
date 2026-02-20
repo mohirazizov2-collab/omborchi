@@ -54,9 +54,9 @@ export function ChatAssistant() {
       if (errorStr.includes('429')) {
         errorMessage = "AI limiti tugadi. Iltimos, 1 daqiqa kuting.";
       } else if (errorStr.includes('key') || errorStr.includes('api') || errorStr.includes('valid')) {
-        errorMessage = "API kaliti (GEMINI_API_KEY) topilmadi yoki xato. Iltimos, Firebase Console-da 'Environment Variables' qismini tekshiring.";
+        errorMessage = "API kaliti xato yoki ruxsat berilmagan. Kalitni Google AI Studio-da tekshiring.";
       } else {
-        errorMessage = `Tizimda xatolik: ${error.message || 'Server bilan aloqa uzildi'}`;
+        errorMessage = `Xato: ${error.message || 'Server bilan aloqa uzildi'}`;
       }
 
       setMessages(prev => [...prev, { 
