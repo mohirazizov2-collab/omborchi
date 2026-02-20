@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -53,8 +54,8 @@ export function ChatAssistant() {
       
       if (errorStr.includes('429')) {
         errorMessage = "AI limiti tugadi. Iltimos, 1 daqiqa kuting.";
-      } else if (errorStr.includes('key') || errorStr.includes('api') || errorStr.includes('valid')) {
-        errorMessage = "API kaliti xato yoki ruxsat berilmagan. Kalitni Google AI Studio-da tekshiring.";
+      } else if (errorStr.includes('key') || errorStr.includes('api') || errorStr.includes('valid') || errorStr.includes('permission')) {
+        errorMessage = "API kaliti xato yoki ruxsat berilmagan. Google AI Studio-ga kirib, Gemini API yoqilganligini tekshiring.";
       } else {
         errorMessage = `Xato: ${error.message || 'Server bilan aloqa uzildi'}`;
       }
@@ -113,7 +114,7 @@ export function ChatAssistant() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setMessages([{ role: 'model', content: "Suhbat tozalandi. Sizga yana qanday yordam bera olaman?" }])}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setMessages([{ role: 'model', content: "Assalomu alaykum! Men Omborchi AI yordamchisiman. Sizga qanday yordam bera olaman?" }])}>
                       <RefreshCcw className="w-3.5 h-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setIsOpen(false)}>
