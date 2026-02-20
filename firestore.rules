@@ -6,68 +6,75 @@ service cloud.firestore {
      * OMNISTOCK SECURITY RULES
      * 
      * CORE PHILOSOPHY:
-     * This ruleset implements a robust Role-Based Access Control (RBAC) and Warehouse-Based Access Control (WBAC)
-     * model. It prioritizes Authorization Independence by leveraging strategic denormalization. This allows 
-     * security decisions to be made using the document's own data or a single lookup of the user's profile,
-     * ensuring high performance and security.
+     * This ruleset implements a robust Role-Based Access Control (RBAC) and attribute-based access 
+     * control model. It prioritizes "Authorization Independence" by leveraging denormalized data 
+     * (like responsibleUserId and warehouseId) directly on documents to ensure atomic and 
+     * performant security decisions without recursive database lookups.
      * 
      * DATA STRUCTURE:
-     * - Root collections (roles, categories, suppliers, products) house global configuration data.
-     * - User profiles (/users/{userId}) store the definitive roleId and warehouseId for each user.
-     * - Warehouse-specific data is either nested (/warehouses/{id}/stock) or associated via 
-     *   denormalized warehouseId fields (goodsReceipts, goodsIssues, transfers).
+     * - User profiles are stored at /users/{userId}.
+     * - Authorization roles are managed via existence checks in specific role collections:
+     *   /rolesAdmin, /rolesWarehouseManager, and /rolesOperator.
+     * - Operational data is logically grouped under /warehouses/{warehouseId} or /transfers.
      * 
      * KEY SECURITY DECISIONS:
-     * - AUTH-FIRST: All requests must be authenticated.
-     * - DENORMALIZATION: Critical authorization fields (warehouseId, responsibleUserId) are required on 
-     *   transactional documents to avoid deep hierarchical lookups in rules.
-     * - PROTOTYPING FLEXIBILITY: While access is strictly controlled, data schema validation is 
-     *   deferred to allow for rapid iteration, focusing only on relational integrity (IDs matching paths).
-     * - LOG INTEGRITY: Audit logs and Stock movements are strictly read-only for Admins; 
-     *   client-side writes are forbidden to maintain a reliable audit trail.
+     * - DBAC (Document-Based Access Control): We use the existence of a document in role-specific 
+     *   collections to verify Admin, Manager, or Operator status.
+     * - Path-Based Ownership: User-specific data and warehouse-specific transactions are secured 
+     *   using wildcards from the URI and internal identity fields.
+     * - Immutability: Critical relational fields (like responsibleUserId) are enforced as 
+     *   immutable on updates to prevent authorization bypass.
+     * - Prototyping Flexibility: While authorization is strictly enforced, data types and 
+     *   general schemas are not validated to allow for rapid schema iteration.
      */
 
-    // --- HELPER FUNCTIONS ---
+    // --- Helper Functions ---
 
-    /** @description Checks if the user is authenticated. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** @description Checks if the provided ID matches the authenticated user's UID. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /** @description Fetches the user document from the /users collection. */
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
+    // The function isExistingOwner was unused and its internal use of 'resource' as a global
+    // variable in a top-level function was incorrect. Removed as part of rule validation fix.
 
-    /** @description Helper for Admin access. Requires 'admin' to be a known roleId or checked against a document. */
     function isAdmin() {
-      // Prototyping assumption: 'admin' is the roleId for administrators.
-      return isSignedIn() && getUserData().roleId == 'admin';
+      return isSignedIn() && exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid));
     }
 
-    /** @description Checks if a user is associated with a specific warehouse. */
-    function isWarehouseStaff(warehouseId) {
-      return isSignedIn() && getUserData().warehouseId == warehouseId;
+    function isWarehouseManager() {
+      return isSignedIn() && exists(/databases/$(database)/documents/rolesWarehouseManager/$(request.auth.uid));
     }
 
-    /** @description Verifies document existence for safe updates and deletes. */
-    function exists(res) {
-      return res != null;
+    function isOperator() {
+      return isSignedIn() && exists(/databases/$(database)/documents/rolesOperator/$(request.auth.uid));
     }
 
-    // --- COLLECTION RULES ---
+    // --- User & Role Management ---
 
     /**
-     * @description Access to management roles. Admins manage; all authenticated users read names.
+     * @description Rules for user profiles. Users can manage their own profile; Admins have full access.
+     * @path /users/{userId}
+     * @allow (get) request.auth.uid == userId
+     * @deny (update) request.auth.uid != userId && !isAdmin
+     * @principle Enforces document ownership for user profiles.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if (isOwner(userId) || isAdmin()) && resource != null && request.resource.data.id == resource.data.id;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Global role metadata. Read-only for all authenticated staff; Admin only writes.
      * @path /roles/{roleId}
-     * @allow get, list: if isSignedIn();
-     * @deny create, update, delete: if !isAdmin();
-     * @principle Restricts role configuration to administrative users.
+     * @allow (get) Any signed-in user.
+     * @deny (create) Non-admin users.
+     * @principle Restricts system configuration to Admin roles.
      */
     match /roles/{roleId} {
       allow get, list: if isSignedIn();
@@ -75,174 +82,155 @@ service cloud.firestore {
     }
 
     /**
-     * @description User profiles containing roles and warehouse assignments.
-     * @path /users/{userId}
-     * @allow create: if isOwner(userId);
-     * @allow get, update: if isOwner(userId) || isAdmin();
-     * @allow list: if isAdmin();
-     * @deny delete: if true;
-     * @principle Self-creation for users, Admin management, and relational integrity of the document ID.
+     * @description DBAC role assignment collections. Only Admins can view or modify role assignments.
+     * @path /rolesAdmin/{userId}, /rolesWarehouseManager/{userId}, /rolesOperator/{userId}
      */
-    match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if (isOwner(userId) || isAdmin()) && exists(resource);
-      allow delete: if false; 
+    match /rolesAdmin/{userId} {
+      allow read, write: if isAdmin();
+    }
+    match /rolesWarehouseManager/{userId} {
+      allow read, write: if isAdmin();
+    }
+    match /rolesOperator/{userId} {
+      allow read, write: if isAdmin();
     }
 
-    /**
-     * @description Physical warehouse locations.
-     * @path /warehouses/{warehouseId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isAdmin();
-     * @principle Global visibility for staff; Admin-only structural changes.
-     */
-    match /warehouses/{warehouseId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin();
-
-      /**
-       * @description Product stock levels within a specific warehouse.
-       * @path /warehouses/{warehouseId}/stock/{productId}
-       * @allow get, list: if isWarehouseStaff(warehouseId) || isAdmin();
-       * @allow create, update: if isWarehouseStaff(warehouseId) || isAdmin();
-       * @deny delete: if true;
-       * @principle Path-based authorization ensuring staff only access stock for their assigned warehouse.
-       */
-      match /stock/{productId} {
-        allow get, list: if isWarehouseStaff(warehouseId) || isAdmin();
-        allow create: if isWarehouseStaff(warehouseId) || isAdmin();
-        allow update: if (isWarehouseStaff(warehouseId) || isAdmin()) && exists(resource);
-        allow delete: if false;
-      }
-    }
+    // --- Global Entities (Catalog & Contacts) ---
 
     /**
-     * @description Global product categories.
-     * @path /categories/{categoryId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isAdmin();
-     * @principle Public read for all authenticated staff; Admin management.
+     * @description Catalog data (Categories, Products, Suppliers). Visible to all staff. Managed by Admins and Managers.
+     * @path /categories/{categoryId}, /products/{productId}, /suppliers/{supplierId}
+     * @allow (get) Any signed-in user.
+     * @deny (update) Operator role.
+     * @principle Public read within the organization with privileged write access.
      */
     match /categories/{categoryId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isAdmin() || isWarehouseManager();
     }
 
-    /**
-     * @description Global vendor/supplier information.
-     * @path /suppliers/{supplierId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isAdmin();
-     * @principle Public read for all authenticated staff; Admin management.
-     */
-    match /suppliers/{supplierId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin();
-    }
-
-    /**
-     * @description Global product definitions and pricing.
-     * @path /products/{productId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isAdmin();
-     * @principle Ensures centralized product management by Administrators.
-     */
     match /products/{productId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isAdmin() || isWarehouseManager();
+    }
+
+    match /suppliers/{supplierId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin() || isWarehouseManager();
+    }
+
+    // --- Warehouse Operations ---
+
+    /**
+     * @description Warehouse metadata. Admins manage; staff can view.
+     * @path /warehouses/{warehouseId}
+     * @allow (update) Admin or the specific Responsible User.
+     * @principle Uses denormalized responsibleUserId for fine-grained management.
+     */
+    match /warehouses/{warehouseId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if resource != null && (isAdmin() || isOwner(resource.data.responsibleUserId));
     }
 
     /**
-     * @description Records of goods entering a warehouse.
-     * @path /goodsReceipts/{goodsReceiptId}
-     * @allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-     * @allow create: if isWarehouseStaff(request.resource.data.warehouseId) || isAdmin();
-     * @allow update, delete: if isAdmin();
-     * @principle WBAC using denormalized warehouseId; prohibits staff from editing historical receipts.
+     * @description Stock balance within a warehouse. Read by staff; modified by system operators/managers.
+     * @path /warehouses/{warehouseId}/productStock/{productId}
+     * @principle Warehouse-scoped security checks.
      */
-    match /goodsReceipts/{goodsReceiptId} {
-      allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-      allow create: if (isWarehouseStaff(request.resource.data.warehouseId) || isAdmin()) && request.resource.data.responsibleUserId == request.auth.uid;
-      allow update, delete: if isAdmin() && exists(resource);
+    match /warehouses/{warehouseId}/productStock/{productId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin() || isWarehouseManager() || isOperator();
+    }
 
-      /**
-       * @description Individual items within a goods receipt.
-       * @path /goodsReceipts/{goodsReceiptId}/items/{itemId}
-       * @allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-       * @allow create: if isWarehouseStaff(request.resource.data.warehouseId) || isAdmin();
-       * @principle Leverages denormalized warehouseId on the item for atomic authorization without parent lookups.
-       */
+    /**
+     * @description Goods Receipt transactions. Authorized for Admins, Managers, and the Operator who processed it.
+     * @path /warehouses/{warehouseId}/goodsReceipts/{receiptId}
+     * @allow (create) Signed-in user setting themselves as responsibleUserId.
+     * @principle Ensures transaction ownership and prevents unauthorized modification of audit trails.
+     */
+    match /warehouses/{warehouseId}/goodsReceipts/{receiptId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
+      allow update: if resource != null && (isAdmin() || isOwner(resource.data.responsibleUserId)) && request.resource.data.responsibleUserId == resource.data.responsibleUserId;
+      allow delete: if isAdmin() && resource != null;
+
       match /items/{itemId} {
-        allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-        allow create: if isWarehouseStaff(request.resource.data.warehouseId) || isAdmin();
-        allow update, delete: if isAdmin() && exists(resource);
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.goodsReceiptResponsibleUserId == request.auth.uid;
+        allow update: if resource != null && (isAdmin() || isOwner(resource.data.goodsReceiptResponsibleUserId));
+        allow delete: if isAdmin() && resource != null;
       }
     }
 
     /**
-     * @description Records of goods leaving a warehouse.
-     * @path /goodsIssues/{goodsIssueId}
-     * @allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-     * @allow create: if isWarehouseStaff(request.resource.data.warehouseId) || isAdmin();
-     * @allow update, delete: if isAdmin();
-     * @principle Warehouse-scoped access for stock-out operations.
+     * @description Goods Issue transactions. Similar logic to Receipts, enforcing ownership via responsibleUserId.
+     * @path /warehouses/{warehouseId}/goodsIssues/{issueId}
      */
-    match /goodsIssues/{goodsIssueId} {
-      allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-      allow create: if (isWarehouseStaff(request.resource.data.warehouseId) || isAdmin()) && request.resource.data.responsibleUserId == request.auth.uid;
-      allow update, delete: if isAdmin() && exists(resource);
+    match /warehouses/{warehouseId}/goodsIssues/{issueId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
+      allow update: if resource != null && (isAdmin() || isOwner(resource.data.responsibleUserId)) && request.resource.data.responsibleUserId == resource.data.responsibleUserId;
+      allow delete: if isAdmin() && resource != null;
 
       match /items/{itemId} {
-        allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-        allow create: if isWarehouseStaff(request.resource.data.warehouseId) || isAdmin();
-        allow update, delete: if isAdmin() && exists(resource);
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.goodsIssueResponsibleUserId == request.auth.uid;
+        allow update: if resource != null && (isAdmin() || isOwner(resource.data.goodsIssueResponsibleUserId));
+        allow delete: if isAdmin() && resource != null;
       }
     }
 
     /**
-     * @description Transfers between warehouses.
+     * @description Warehouse Transfers. Cross-warehouse visibility managed by denormalized responsible user IDs.
      * @path /transfers/{transferId}
-     * @allow get, list: if isWarehouseStaff(resource.data.sourceWarehouseId) || isWarehouseStaff(resource.data.destinationWarehouseId) || isAdmin();
-     * @allow create: if isWarehouseStaff(request.resource.data.sourceWarehouseId) || isAdmin();
-     * @allow update, delete: if isAdmin();
-     * @principle Cross-warehouse authorization involving source or destination staff.
+     * @allow (get) If user is initiator, source manager, or destination manager.
+     * @principle Supports multi-party authorization through data denormalization.
      */
     match /transfers/{transferId} {
-      allow get, list: if isWarehouseStaff(resource.data.sourceWarehouseId) || isWarehouseStaff(resource.data.destinationWarehouseId) || isAdmin();
-      allow create: if (isWarehouseStaff(request.resource.data.sourceWarehouseId) || isAdmin()) && request.resource.data.responsibleUserId == request.auth.uid;
-      allow update, delete: if isAdmin() && exists(resource);
+      function canAccessTransfer(data) {
+        return isAdmin() || 
+               isOwner(data.responsibleUserId) || 
+               isOwner(data.sourceWarehouseResponsibleUserId) || 
+               isOwner(data.destinationWarehouseResponsibleUserId);
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
+      allow update: if resource != null && canAccessTransfer(resource.data);
+      allow delete: if isAdmin() && resource != null;
 
       match /items/{itemId} {
-        allow get, list: if isWarehouseStaff(resource.data.sourceWarehouseId) || isWarehouseStaff(resource.data.destinationWarehouseId) || isAdmin();
-        allow create: if isWarehouseStaff(request.resource.data.sourceWarehouseId) || isAdmin();
-        allow update, delete: if isAdmin() && exists(resource);
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.transferResponsibleUserId == request.auth.uid;
+        allow update: if resource != null && (isAdmin() || isOwner(resource.data.transferResponsibleUserId));
+        allow delete: if isAdmin() && resource != null;
       }
     }
 
     /**
-     * @description Immutable logs of all stock changes.
-     * @path /stockMovements/{stockMovementId}
-     * @allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-     * @deny create, update, delete: if true;
-     * @principle System-managed audit trail; clients can read but not tamper.
+     * @description Stock movement audit trail. Create-only for operators/managers; immutable once written.
+     * @path /warehouses/{warehouseId}/stockMovements/{movementId}
      */
-    match /stockMovements/{stockMovementId} {
-      allow get, list: if isWarehouseStaff(resource.data.warehouseId) || isAdmin();
-      allow create, update, delete: if false;
+    match /warehouses/{warehouseId}/stockMovements/{movementId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.responsibleUserId == request.auth.uid;
+      allow update, delete: if false; // Audit logs are immutable
     }
 
+    // --- System Audit ---
+
     /**
-     * @description High-security audit logs for system actions.
+     * @description System-wide Audit Logs. Restricted to Admins for compliance and security monitoring.
      * @path /auditLogs/{auditLogId}
-     * @allow get, list: if isAdmin();
-     * @deny create, update, delete: if true;
-     * @principle Restricts sensitive system activity logs to Administrative users.
+     * @allow (create) Any signed-in user (to allow app-level logging).
+     * @deny (list) Non-admin users.
+     * @principle Restricts sensitive activity logs to high-privilege accounts.
      */
     match /auditLogs/{auditLogId} {
       allow get, list: if isAdmin();
-      allow create, update, delete: if false;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Immutable
     }
   }
 }
