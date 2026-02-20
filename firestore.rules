@@ -9,48 +9,36 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid));
-    }
-
     // --- Foydalanuvchilar ---
+    // MVP bosqichida tizimga kirgan har qanday xodimga o'qish va yozish ruxsatini beramiz
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     match /rolesAdmin/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     // --- Omborxonalar ---
     match /warehouses/{warehouseId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn(); 
-      allow update: if isSignedIn(); // Foydalanish oson bo'lishi uchun isSignedIn qilib turamiz
-      allow delete: if isAdmin(); 
+      allow read, write: if isSignedIn();
     }
 
     // --- Mahsulotlar ---
     match /products/{productId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn(); 
-      allow delete: if isAdmin(); 
+      allow read, write: if isSignedIn();
     }
 
     // --- Zaxira harakatlari (Audit Trail) ---
     match /stockMovements/{movementId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if false; // Hech qachon o'chirib va o'zgartirib bo'lmaydi
+      allow update, delete: if false; // Tarixni o'zgartirib bo'lmaydi
     }
 
-    // --- Default qoidalar ---
+    // --- Qolgan barcha hujjatlar ---
     match /{path=**} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
   }
 }

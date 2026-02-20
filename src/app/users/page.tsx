@@ -23,6 +23,8 @@ import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function UsersPage() {
   const { t } = useLanguage();
@@ -32,7 +34,6 @@ export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form state
   const [formData, setFormData] = useState({
     displayName: "",
     email: "",
@@ -57,8 +58,6 @@ export default function UsersPage() {
     }
 
     setIsSaving(true);
-    // Note: This only adds a profile to Firestore. 
-    // The actual login account must be created in Firebase Console by the Admin.
     const newUserRef = doc(collection(db, "users"));
     const userData = {
       id: newUserRef.id,
@@ -73,18 +72,17 @@ export default function UsersPage() {
       .then(() => {
         toast({
           title: "Muvaffaqiyatli",
-          description: "Foydalanuvchi profili yaratildi. Endi unga Firebase Console orqali login ochib bering.",
+          description: "Foydalanuvchi profili yaratildi.",
         });
         setIsDialogOpen(false);
         setFormData({ displayName: "", email: "", role: "Warehouse Worker" });
       })
-      .catch((err) => {
-        console.error(err);
-        toast({
-          variant: "destructive",
-          title: "Xatolik",
-          description: "Ma'lumotni saqlashda xatolik yuz berdi.",
-        });
+      .catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: newUserRef.path,
+          operation: 'create',
+          requestResourceData: userData
+        }));
       })
       .finally(() => setIsSaving(false));
   };
@@ -109,7 +107,7 @@ export default function UsersPage() {
               <DialogHeader>
                 <DialogTitle>Yangi foydalanuvchi qo'shish</DialogTitle>
                 <CardDescription>
-                  Foydalanuvchi ma'lumotlarini kiriting. Muhim: Login parolni Firebase Console-da o'zingiz yaratishingiz kerak.
+                  Foydalanuvchi ma'lumotlarini kiriting. Login parolni Firebase Console-da yaratishingiz kerak.
                 </CardDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -150,7 +148,7 @@ export default function UsersPage() {
                     <SelectContent>
                       <SelectItem value="Super Admin">Super Admin</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Warehouse Worker">Omborchi</SelectItem>
+                      <SelectItem value="Omborchi">Omborchi</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -222,7 +220,6 @@ export default function UsersPage() {
                           <div className="flex flex-col items-center gap-2 text-muted-foreground">
                             <UserX className="w-10 h-10 opacity-20" />
                             <p>Hozircha foydalanuvchilar yo'q.</p>
-                            <p className="text-xs">Foydalanuvchini taklif qilish uchun yuqoridagi tugmani bosing.</p>
                           </div>
                         </td>
                       </tr>
