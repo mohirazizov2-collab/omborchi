@@ -64,45 +64,60 @@ export default function LoginPage() {
     });
   };
 
-  const bgIcons = [Box, Package, Truck, Layers, Warehouse];
+  // Pre-defined background elements to ensure full screen coverage and avoid hydration clustering
+  const bgElements = [
+    { Icon: Box, size: 140, top: "10%", left: "5%", duration: 25, delay: 0 },
+    { Icon: Package, size: 180, top: "40%", left: "85%", duration: 35, delay: 2 },
+    { Icon: Truck, size: 220, top: "70%", left: "15%", duration: 30, delay: 5 },
+    { Icon: Layers, size: 160, top: "20%", left: "65%", duration: 40, delay: 1 },
+    { Icon: Warehouse, size: 200, top: "85%", left: "80%", duration: 32, delay: 3 },
+    { Icon: Box, size: 120, top: "5%", left: "45%", duration: 28, delay: 4 },
+    { Icon: Package, size: 150, top: "55%", left: "5%", duration: 38, delay: 6 },
+    { Icon: Truck, size: 190, top: "15%", left: "90%", duration: 42, delay: 2 },
+    { Icon: Box, size: 130, top: "45%", left: "40%", duration: 26, delay: 7 },
+  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#02040a] relative overflow-hidden font-body">
       {/* Sklad mavzusidagi animatsion orqa fon */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden bg-[#02040a]">
         {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '48px 48px' }} />
+        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '48px 48px' }} />
         
-        {/* Floating Warehouse Icons - Fixed for Hydration */}
-        {mounted && bgIcons.map((Icon, idx) => (
+        {/* Floating Warehouse Icons - Spread across screen */}
+        {mounted && bgElements.map((el, idx) => (
           <motion.div
             key={idx}
             initial={{ 
-              x: Math.random() * 100 + "%", 
-              y: Math.random() * 100 + "%", 
+              top: el.top, 
+              left: el.left,
               opacity: 0,
+              scale: 0.8,
               rotate: 0 
             }}
             animate={{ 
-              y: ["0%", "100%", "0%"],
-              x: ["0%", idx % 2 === 0 ? "5%" : "-5%", "0%"],
-              opacity: [0, 0.1, 0],
-              rotate: [0, 180, 360]
+              y: [0, -40, 0, 40, 0],
+              x: [0, 30, 0, -30, 0],
+              opacity: [0, 0.07, 0.07, 0],
+              rotate: [0, 90, 180, 270, 360],
+              scale: [0.8, 1, 1, 0.8]
             }}
             transition={{ 
-              duration: 20 + Math.random() * 20, 
+              duration: el.duration, 
               repeat: Infinity, 
+              delay: el.delay,
               ease: "linear" 
             }}
             className="absolute text-white"
           >
-            <Icon size={120 + Math.random() * 100} strokeWidth={0.5} />
+            <el.Icon size={el.size} strokeWidth={0.3} />
           </motion.div>
         ))}
 
-        {/* Blur gradients */}
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 rounded-full blur-[120px] animate-pulse delay-1000" />
+        {/* Cinematic Blur gradients */}
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[140px] animate-pulse" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-500/10 rounded-full blur-[140px] animate-pulse delay-1000" />
+        <div className="absolute top-[40%] left-[30%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px]" />
       </div>
       
       <div className="absolute top-6 right-6 z-20">
