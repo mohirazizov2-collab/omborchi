@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -25,6 +25,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [userUid, setUserUid] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,8 +73,8 @@ export default function LoginPage() {
         {/* Grid pattern */}
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '48px 48px' }} />
         
-        {/* Floating Warehouse Icons */}
-        {bgIcons.map((Icon, idx) => (
+        {/* Floating Warehouse Icons - Fixed for Hydration */}
+        {mounted && bgIcons.map((Icon, idx) => (
           <motion.div
             key={idx}
             initial={{ 
