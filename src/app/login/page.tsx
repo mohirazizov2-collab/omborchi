@@ -191,7 +191,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center mt-8 text-white/20 text-[10px] font-bold uppercase tracking-[0.2em]">
-          Powered by Firebase Studio & AI • 2024
+          omborchi.uz by X e M team © 2026
         </p>
       </div>
     </div>
