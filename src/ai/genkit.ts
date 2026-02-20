@@ -3,9 +3,7 @@ import { genkit } from 'genkit';
 import { openAI } from 'genkitx-openai';
 
 /**
- * @fileOverview Genkit AI konfiguratsiyasi.
- * 
- * OpenAI platformasiga o'tkazildi (genkitx-openai orqali).
+ * @fileOverview OpenAI platformasi orqali Genkit konfiguratsiyasi.
  */
 
 export const ai = genkit({
@@ -16,5 +14,5 @@ export const ai = genkit({
   ],
 });
 
-// OpenAI gpt-4o modeli o'rnatildi
+// OpenAI gpt-4o modeli
 export const model = 'openai/gpt-4o';
