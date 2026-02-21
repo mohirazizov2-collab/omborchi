@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 import {
   LayoutDashboard,
   Warehouse,
@@ -40,7 +41,8 @@ export function OmniSidebar() {
   const isAdmin = role === "Admin" || isSuperAdmin;
   const isOmborchi = role === "Omborchi";
 
-  const navigation = [
+  // Navigation memoization to prevent lag during navigation
+  const navigation = useMemo(() => [
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
     { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
     { name: t.nav.products, href: "/products", icon: Package },
@@ -51,26 +53,20 @@ export function OmniSidebar() {
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
     { name: t.nav.systemGen, href: "/system-gen", icon: Database, hide: !isSuperAdmin },
-  ];
+  ], [t, isAdmin, isSuperAdmin, isOmborchi]);
 
-  const adminNavigation = [
+  const adminNavigation = useMemo(() => [
     { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isSuperAdmin },
     { name: t.nav.settings, href: "/settings", icon: Settings, hide: !isAdmin },
-  ];
+  ], [t, isAdmin, isSuperAdmin]);
 
-  const languages = [
-    { code: 'uz', name: 'O\'zbek', flag: '🇺🇿' },
-    { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-    { code: 'en', name: 'English', flag: '🇺🇸' },
-  ];
-
-  const userInitials = user?.displayName 
+  const userInitials = useMemo(() => user?.displayName 
     ? user.displayName.split(' ').map(n => n[0]).join('')
-    : (user?.email ? user.email[0].toUpperCase() : 'U');
+    : (user?.email ? user.email[0].toUpperCase() : 'U'), [user]);
 
   return (
     <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
-      <div className="flex items-center px-6 h-16 border-b">
+      <div className="flex items-center px-6 h-16 border-b shrink-0">
         <Link href="/" className="flex items-center gap-3 group">
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
             <Warehouse className="w-5 h-5" />
@@ -79,7 +75,7 @@ export function OmniSidebar() {
         </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-hide">
         <div className="flex gap-2 px-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -87,12 +83,10 @@ export function OmniSidebar() {
                 <Globe className="w-3 h-3" /> {language}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-40">
-              {languages.map((l) => (
-                <DropdownMenuItem key={l.code} onClick={() => setLanguage(l.code as any)} className="gap-2 text-xs">
-                  <span>{l.flag}</span> {l.name}
-                </DropdownMenuItem>
-              ))}
+            <DropdownMenuContent align="start" className="w-40 rounded-xl">
+              <DropdownMenuItem onClick={() => setLanguage('uz')} className="gap-2 text-xs">🇺🇿 O'zbek</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLanguage('ru')} className="gap-2 text-xs">🇷🇺 Русский</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLanguage('en')} className="gap-2 text-xs">🇺🇸 English</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <ThemeToggle />
@@ -106,8 +100,8 @@ export function OmniSidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold transition-colors group",
-                  isActive ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 group",
+                  isActive ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -130,8 +124,8 @@ export function OmniSidebar() {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-colors group",
-                    isActive ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 group",
+                    isActive ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <item.icon className={cn("w-4 h-4", isActive ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
@@ -143,10 +137,10 @@ export function OmniSidebar() {
         )}
       </div>
 
-      <div className="p-4 mt-auto border-t">
+      <div className="p-4 border-t shrink-0">
         <Link href="/profile">
-          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted transition-colors cursor-pointer group">
-            <Avatar className="h-8 w-8">
+          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted transition-all cursor-pointer group">
+            <Avatar className="h-8 w-8 ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
               <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-black">{userInitials}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col min-w-0">

@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -78,31 +79,52 @@ export default function ReportsPage() {
   }, [db, user]);
   const { data: movements, isLoading: movementsLoading } = useCollection(movementsQuery);
 
+  // Optimizatsiya qilingan hisob-kitoblar (Map kesh yordamida)
   const financials = useMemo(() => {
     if (!movements || !products || !employees) return { revenue: 0, expenses: 0, profit: 0 };
 
-    const productMap = new Map(products.map(p => [p.id, p.salePrice || 0]));
-    const now = new Date();
+    const productMap = new Map();
+    for (let i = 0; i < products.length; i++) {
+      productMap.set(products[i].id, products[i].salePrice || 0);
+    }
+
+    const now = Date.now();
     const days = reportPeriod === 'weekly' ? 7 : 30;
-    const startDate = new Date();
-    startDate.setDate(now.getDate() - days);
+    const thresholdDate = now - (days * 24 * 60 * 60 * 1000);
 
-    const revenue = movements
-      .filter(m => m.movementType === 'StockOut' && new Date(m.movementDate) >= startDate)
-      .reduce((acc, m) => acc + (Math.abs(m.quantityChange) * (productMap.get(m.productId) || 0)), 0);
+    let revenue = 0;
+    for (let i = 0; i < movements.length; i++) {
+      const m = movements[i];
+      if (m.movementType === 'StockOut' && new Date(m.movementDate).getTime() >= thresholdDate) {
+        const price = productMap.get(m.productId) || 0;
+        revenue += Math.abs(m.quantityChange) * price;
+      }
+    }
 
-    const expenses = employees.reduce((acc, e) => {
+    let expenses = 0;
+    for (let i = 0; i < employees.length; i++) {
+      const e = employees[i];
       const monthlyTotal = (e.baseSalary || 0) + (e.bonus || 0) - (e.deductions || 0);
-      return acc + (reportPeriod === 'weekly' ? monthlyTotal / 4 : monthlyTotal);
-    }, 0);
+      expenses += (reportPeriod === 'weekly' ? monthlyTotal / 4 : monthlyTotal);
+    }
 
     return { revenue, expenses, profit: revenue - expenses };
   }, [movements, products, employees, reportPeriod]);
 
-  const totalValue = useMemo(() => (products || []).reduce((acc, p) => acc + ((p.salePrice || 0) * (p.stock || 0)), 0), [products]);
-  const lowStockCount = useMemo(() => (products || []).filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length, [products]);
+  const totalValue = useMemo(() => {
+    if (!products) return 0;
+    let total = 0;
+    for (let i = 0; i < products.length; i++) {
+      total += (products[i].salePrice || 0) * (products[i].stock || 0);
+    }
+    return total;
+  }, [products]);
 
-  const handleAiAnalyze = async () => {
+  const lowStockCount = useMemo(() => 
+    (products || []).filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length, 
+  [products]);
+
+  const handleAiAnalyze = useCallback(async () => {
     if (!products) return;
     setIsAiLoading(true);
     try {
@@ -127,9 +149,9 @@ export default function ReportsPage() {
     } finally {
       setIsAiLoading(false);
     }
-  };
+  }, [products, totalValue, warehouses, lowStockCount]);
 
-  if (!mounted || authLoading || role === "Omborchi") {
+  if (!mounted || authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -229,12 +251,12 @@ export default function ReportsPage() {
           </div>
         </section>
 
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {aiResult && (
             <motion.div 
-              initial={{ opacity: 0, scale: 0.98, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
               className="mb-12"
             >
               <Card className="border-none glass-card bg-primary/5 border border-primary/20 overflow-hidden relative rounded-[2.5rem]">

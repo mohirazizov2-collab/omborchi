@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -65,6 +66,7 @@
   .glass-card {
     @apply bg-card border border-border/50 shadow-sm transition-all duration-200;
     will-change: transform, opacity;
+    contain: content;
   }
   
   .premium-button {
@@ -73,7 +75,8 @@
   }
 
   .page-transition {
-    @apply animate-in fade-in duration-300 ease-out;
+    @apply animate-in fade-in duration-200 ease-out;
+    will-change: opacity, transform;
   }
 }
 
@@ -85,4 +88,14 @@
 }
 ::-webkit-scrollbar-thumb {
   @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
+}
+
+/* 120 FPS Performance Boosts */
+* {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.recharts-responsive-container {
+  will-change: transform;
 }

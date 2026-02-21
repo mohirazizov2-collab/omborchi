@@ -51,7 +51,6 @@ export interface UserHookResult {
 
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
-// DOIMIY SUPER ADMIN EMAILI
 const PERMANENT_SUPER_ADMIN = "f2472839@gmail.com";
 
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
@@ -69,51 +68,39 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   useEffect(() => {
     if (!auth) {
-      setUserAuthState({ user: null, role: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
+      setUserAuthState(prev => ({ ...prev, isUserLoading: false }));
       return;
     }
 
     const unsubscribe = onAuthStateChanged(
       auth,
-      async (firebaseUser) => {
+      (firebaseUser) => {
         if (firebaseUser) {
-          try {
-            // 1. Agar email PERMANENT_SUPER_ADMIN bo'lsa, hech qanday tekshiruvsiz Super Admin
-            if (firebaseUser.email === PERMANENT_SUPER_ADMIN) {
-              setUserAuthState({ 
-                user: firebaseUser, 
-                role: "Super Admin", 
-                isUserLoading: false, 
-                userError: null 
-              });
-              return;
-            }
+          // Birinchi navbatda foydalanuvchini o'rnatamiz (Non-blocking)
+          const isPermanentAdmin = firebaseUser.email === PERMANENT_SUPER_ADMIN;
+          
+          setUserAuthState({ 
+            user: firebaseUser, 
+            role: isPermanentAdmin ? "Super Admin" : "Omborchi", 
+            isUserLoading: false, 
+            userError: null 
+          });
 
-            // 2. Oddiy foydalanuvchilar uchun bazadan rolni o'qish
-            let role = "Omborchi";
-            const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
-            if (userDoc.exists()) {
-              role = userDoc.data().role;
-            }
-            
-            // 3. rolesAdmin to'plamidan Super Adminlikni tekshirish (boshqalar uchun)
-            const adminDoc = await getDoc(doc(firestore, "rolesAdmin", firebaseUser.uid));
-            const isSuperAdmin = adminDoc.exists();
-            
-            setUserAuthState({ 
-              user: firebaseUser, 
-              role: isSuperAdmin ? "Super Admin" : role, 
-              isUserLoading: false, 
-              userError: null 
-            });
-          } catch (e) {
-            // Xatolik bo'lsa ham emailni tekshirish (offline yoki baza xatosi bo'lsa)
-            const isHardcodedAdmin = firebaseUser.email === PERMANENT_SUPER_ADMIN;
-            setUserAuthState({ 
-              user: firebaseUser, 
-              role: isHardcodedAdmin ? "Super Admin" : "Omborchi", 
-              isUserLoading: false, 
-              userError: null 
+          // Rolni orqa fonda (background) tekshiramiz
+          if (!isPermanentAdmin) {
+            Promise.all([
+              getDoc(doc(firestore, "users", firebaseUser.uid)),
+              getDoc(doc(firestore, "rolesAdmin", firebaseUser.uid))
+            ]).then(([userDoc, adminDoc]) => {
+              let finalRole = "Omborchi";
+              if (adminDoc.exists()) {
+                finalRole = "Super Admin";
+              } else if (userDoc.exists()) {
+                finalRole = userDoc.data().role;
+              }
+              setUserAuthState(prev => ({ ...prev, role: finalRole }));
+            }).catch(err => {
+              console.error("Role fetching background error", err);
             });
           }
         } else {
