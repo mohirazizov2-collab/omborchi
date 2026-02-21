@@ -143,7 +143,13 @@ export const translations = {
       stockValueTrend: 'Zaxira qiymati tendensiyasi',
       categoryDist: 'Kategoriyalar bo\'yicha taqsimot',
       accuracy: 'Inventarizatsiya aniqligi',
-      aiAnalyze: 'AI Tahlil'
+      aiAnalyze: 'AI Tahlil',
+      profitAnalysis: 'Moliyaviy ko\'rsatkichlar',
+      revenue: 'Sotuv tushumi',
+      expenses: 'Xarajatlar (Maoshlar)',
+      netProfit: 'Sof foyda',
+      weekly: 'Haftalik',
+      monthly: 'Oylik'
     },
     users: {
       title: 'Foydalanuvchilarni boshqarish',
@@ -339,7 +345,13 @@ export const translations = {
       stockValueTrend: 'Тренды стоимости запасов',
       categoryDist: 'Распределение по категориям',
       accuracy: 'Точность инвентаризации',
-      aiAnalyze: 'AI Анализ'
+      aiAnalyze: 'AI Анализ',
+      profitAnalysis: 'Финансовые показатели',
+      revenue: 'Выручка от продаж',
+      expenses: 'Расходы (Зарплаты)',
+      netProfit: 'Чистая прибыль',
+      weekly: 'Недельный',
+      monthly: 'Месячный'
     },
     users: {
       title: 'Управление пользователями',
@@ -535,7 +547,13 @@ export const translations = {
       stockValueTrend: 'Stock Value Trend',
       categoryDist: 'Category Distribution',
       accuracy: 'Inventory Accuracy',
-      aiAnalyze: 'AI Analyze'
+      aiAnalyze: 'AI Analyze',
+      profitAnalysis: 'Financial Performance',
+      revenue: 'Sales Revenue',
+      expenses: 'Expenses (Salaries)',
+      netProfit: 'Net Profit',
+      weekly: 'Weekly',
+      monthly: 'Monthly'
     },
     users: {
       title: 'User Management',
