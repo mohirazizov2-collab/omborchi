@@ -78,7 +78,7 @@ export default function LoginPage() {
               y: [0, -100, 0, 100, 0],
               x: [0, 100, 0, -100, 0],
               rotate: [0, 180, 360],
-              opacity: [0, 0.12, 0.12, 0], // Ikonkalar to'qroq (12% opacity) qilindi
+              opacity: [0, 0.35, 0.35, 0], // Ikonkalar "to'qroq oq" (35% opacity) qilindi
               scale: [0.5, 1.1, 1.1, 0.5]
             }}
             transition={{ 
@@ -87,9 +87,9 @@ export default function LoginPage() {
               delay: item.delay, 
               ease: "linear" 
             }}
-            className="absolute text-primary/40" // Rang biroz ko'proq ajralib turishi uchun primary ishlatildi
+            className="absolute text-white/40" // Oq rang to'qroq ko'rinishi uchun
           >
-            <item.Icon size={item.size} strokeWidth={0.3} />
+            <item.Icon size={item.size} strokeWidth={0.4} />
           </motion.div>
         ))}
 
