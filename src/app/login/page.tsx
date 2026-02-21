@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -36,7 +35,7 @@ export default function LoginPage() {
       top: `${Math.random() * 100}%`,
       left: `${Math.random() * 100}%`,
       size: 40 + Math.random() * 80,
-      duration: 20 + Math.random() * 30,
+      duration: 25 + Math.random() * 35,
       delay: Math.random() * 10,
     }));
     setBgItems(items);
@@ -61,10 +60,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden font-body transition-colors duration-500">
-      {/* Animatsiyali Orqa Fon */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.08]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden font-body transition-colors duration-700">
+      {/* Dynamic Warehouse Background */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+        <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '48px 48px' }} />
         
         {mounted && bgItems.map((item) => (
           <motion.div
@@ -73,14 +72,14 @@ export default function LoginPage() {
               top: item.top, 
               left: item.left, 
               opacity: 0,
-              scale: 0.5
+              scale: 0.6
             }}
             animate={{ 
-              y: [0, -120, 0, 120, 0],
-              x: [0, 80, 0, -80, 0],
+              y: [0, -150, 0, 150, 0],
+              x: [0, 100, 0, -100, 0],
               rotate: [0, 180, 360],
-              opacity: [0, 0.35, 0.35, 0], 
-              scale: [0.5, 1, 1, 0.5]
+              opacity: [0, 0.4, 0.4, 0], 
+              scale: [0.6, 1.1, 1.1, 0.6]
             }}
             transition={{ 
               duration: item.duration, 
@@ -88,96 +87,118 @@ export default function LoginPage() {
               delay: item.delay, 
               ease: "linear" 
             }}
-            className="absolute text-foreground"
+            className="absolute text-foreground/40 dark:text-foreground/60"
           >
-            <item.Icon size={item.size} strokeWidth={0.8} />
+            <item.Icon size={item.size} strokeWidth={0.6} />
           </motion.div>
         ))}
 
-        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-primary/10 dark:bg-primary/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-blue-500/10 dark:bg-blue-500/20 rounded-full blur-[120px]" />
+        <div className="absolute top-[-30%] left-[-20%] w-[80%] h-[80%] bg-primary/10 dark:bg-primary/15 rounded-full blur-[160px]" />
+        <div className="absolute bottom-[-30%] right-[-20%] w-[80%] h-[80%] bg-blue-500/10 dark:bg-blue-500/15 rounded-full blur-[160px]" />
       </div>
       
-      <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+      {/* Floating Controls */}
+      <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 uppercase font-black text-[10px] tracking-widest border-border/40 rounded-xl backdrop-blur-md bg-background/40">
-              <Globe className="w-3 h-3" /> {language}
+            <Button variant="outline" size="sm" className="gap-2 h-10 px-4 uppercase font-black text-[10px] tracking-widest border-border/40 rounded-2xl backdrop-blur-xl bg-background/30 shadow-sm">
+              <Globe className="w-3.5 h-3.5" /> {language}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-xl border-border/40 bg-popover/90 backdrop-blur-xl">
-            <DropdownMenuItem onClick={() => setLanguage('uz')}>🇺🇿 O'zbek</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('ru')}>🇷🇺 Русский</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('en')}>🇺🇸 English</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="rounded-2xl border-border/40 bg-popover/80 backdrop-blur-2xl p-2 min-w-[140px]">
+            <DropdownMenuItem className="rounded-xl cursor-pointer py-2.5" onClick={() => setLanguage('uz')}>🇺🇿 O'zbek</DropdownMenuItem>
+            <DropdownMenuItem className="rounded-xl cursor-pointer py-2.5" onClick={() => setLanguage('ru')}>🇷🇺 Русский</DropdownMenuItem>
+            <DropdownMenuItem className="rounded-xl cursor-pointer py-2.5" onClick={() => setLanguage('en')}>🇺🇸 English</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <div className="w-full max-w-md p-6 z-10">
+      <div className="w-full max-w-md p-6 z-20 relative">
         <div className="flex flex-col items-center mb-10">
           <motion.div 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/20 mb-6"
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", damping: 12 }}
+            className="w-20 h-20 rounded-3xl bg-primary flex items-center justify-center text-primary-foreground shadow-[0_20px_40px_-10px_rgba(var(--primary),0.3)] mb-8"
           >
-            <Warehouse className="w-9 h-9" />
+            <Warehouse className="w-10 h-10" />
           </motion.div>
-          <h1 className="font-headline font-black text-4xl tracking-tighter text-foreground">omborchi.uz</h1>
-          <p className="text-muted-foreground/40 text-[9px] font-black uppercase tracking-[0.3em] mt-2">Enterprise Edition</p>
+          <motion.h1 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="font-headline font-black text-5xl tracking-tighter text-foreground"
+          >
+            omborchi.uz
+          </motion.h1>
+          <p className="text-muted-foreground/50 text-[10px] font-black uppercase tracking-[0.4em] mt-3">Advanced Warehouse Management</p>
         </div>
 
-        <Card className="border-border/40 shadow-2xl bg-card/60 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden">
-          <CardHeader className="space-y-1 pb-2 pt-8">
-            <CardTitle className="text-2xl font-black font-headline text-center text-foreground">
-              {t.auth.loginTitle}
-            </CardTitle>
-            <CardDescription className="text-center text-muted-foreground font-medium px-6">{t.auth.loginDescription}</CardDescription>
-          </CardHeader>
-          
-          <form onSubmit={handleLogin}>
-            <CardContent className="space-y-5 pt-6 px-8">
-              {error && (
-                <div className="p-4 rounded-2xl bg-destructive/10 text-destructive text-[11px] font-bold border border-destructive/20 flex items-center gap-3">
-                  <AlertCircle className="w-4 h-4" /> {error}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card className="border-border/30 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] dark:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
+            <CardHeader className="space-y-2 pb-2 pt-10 text-center">
+              <CardTitle className="text-2xl font-black font-headline tracking-tight text-foreground">
+                {t.auth.loginTitle}
+              </CardTitle>
+              <CardDescription className="text-muted-foreground/70 font-medium px-10 text-sm">{t.auth.loginDescription}</CardDescription>
+            </CardHeader>
+            
+            <form onSubmit={handleLogin}>
+              <CardContent className="space-y-6 pt-8 px-10">
+                {error && (
+                  <motion.div 
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="p-4 rounded-[1.5rem] bg-rose-500/10 text-rose-500 text-[11px] font-bold border border-rose-500/20 flex items-center gap-3"
+                  >
+                    <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+                  </motion.div>
+                )}
+                <div className="space-y-2.5">
+                  <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-2">{t.auth.emailLabel}</Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/30 group-focus-within:text-primary transition-colors" />
+                    <input 
+                      type="email" 
+                      className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-medium"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.emailLabel}</Label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
-                  <input 
-                    type="email" 
-                    className="flex h-12 w-full pl-11 rounded-2xl bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-all"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+                <div className="space-y-2.5">
+                  <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-2">{t.auth.passwordLabel}</Label>
+                  <div className="relative group">
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/30 group-focus-within:text-primary transition-colors" />
+                    <input 
+                      type="password" 
+                      className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-medium"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.passwordLabel}</Label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
-                  <input 
-                    type="password" 
-                    className="flex h-12 w-full pl-11 rounded-2xl bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-all"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="pt-4 pb-10 px-8">
-              <Button type="submit" className="w-full h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest text-primary-foreground shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-95" disabled={loading}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t.auth.loginButton} <ArrowRight className="w-4 h-4 ml-2" /></>}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+              </CardContent>
+              <CardFooter className="pt-6 pb-12 px-10">
+                <Button 
+                  type="submit" 
+                  className="w-full h-14 rounded-[1.5rem] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-2xl shadow-primary/25 bg-primary hover:bg-primary/90 hover:translate-y-[-2px] transition-all active:scale-95 border-none" 
+                  disabled={loading}
+                >
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t.auth.loginButton} <ArrowRight className="w-4 h-4 ml-2" /></>}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </motion.div>
 
-        <p className="text-center mt-10 text-muted-foreground/40 text-[10px] font-black uppercase tracking-[0.4em] select-none">
+        <p className="text-center mt-12 text-muted-foreground/40 text-[11px] font-black uppercase tracking-[0.5em] select-none">
           omborchi.uz by X e M team © 2026
         </p>
       </div>
