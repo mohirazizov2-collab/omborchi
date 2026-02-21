@@ -3,35 +3,44 @@
 
 Bu NextJS, Firebase va Gemini AI yordamida yaratilgan zamonaviy ombor boshqaruvi tizimi.
 
-## 🚀 Loyihani internetga chiqarish (Deploy)
+## 🚀 GitHub-ga yuklash (Qo'llanma)
 
-Agar Firebase Studio-dagi "Publish" tugmasini bosganda xatolik yuz bersa (billing yoki API ruxsati sababli), quyidagi usuldan foydalaning:
+Loyihangizni GitHub-ga joylash uchun terminalga quyidagi buyruqlarni kiriting:
 
-### 1. Netlify orqali (Eng oson va mutlaqo bepul)
-1. Loyihangizni GitHub-ga yuklang (terminal buyruqlari pastda).
-2. [Netlify.com](https://www.netlify.com/)-da ro'yxatdan o'ting.
-3. **"Add new site"** -> **"Import from GitHub"** ni tanlang.
-4. `GOOGLE_GENAI_API_KEY` ni Netlify-dagi "Environment variables" bo'limiga qo'shing.
-5. **Deploy** tugmasini bosing. Loyihangiz 2 daqiqada tayyor bo'ladi!
-
-### 2. Git orqali GitHub-ga yuklash
-Terminalga quyidagilarni kiriting:
 ```bash
+# 1. Git-ni ishga tushirish
 git init
+
+# 2. Fayllarni qo'shish
 git add .
+
+# 3. Birinchi saqlash (Commit)
 git commit -m "Initial commit: ombor.uz ready for launch"
-git branch -M main
+
+# 4. GitHub-dagi yangi ochgan omboringizga (Repo) ulanish
+# ESLATMA: Quyidagi havolani o'zingizniki bilan almashtiring
 git remote add origin https://github.com/FOYDALANUVCHI_NOMI/ombor-uz.git
+
+# 5. Kodlarni yuborish
 git push -u origin main
 ```
 
+## 🌐 Netlify-da bepul ishga tushirish (Deploy)
+
+Agar Firebase Publish-da billing muammosi bo'lsa:
+1. Loyihani GitHub-ga yuklang (tepadagi ko'rsatma).
+2. [Netlify.com](https://www.netlify.com/)-ga kiring va GitHub orqali ro'yxatdan o'ting.
+3. **"Add new site"** -> **"Import from GitHub"** ni tanlang.
+4. `GOOGLE_GENAI_API_KEY` ni "Environment variables" bo'limiga qo'shing.
+5. **Deploy** tugmasini bosing. 2 daqiqada saytingiz tayyor!
+
 ## ✨ Imkoniyatlar:
-- **Dashboard**: Real-vaqt statistikasi va PDF hisobot yuklash.
-- **Shtrix-kod Skaneri**: Kamera orqali mahsulotlarni bir zumda aniqlash.
-- **Inventarizatsiya**: Tizimdagi qoldiqni amaldagi zaxira bilan solishtirish (Faqat Adminlar uchun).
+- **Dashboard**: Real-vaqt statistikasi va PDF hisobot.
+- **Shtrix-kod Skaneri**: Mahsulotlarni kamera orqali aniqlash.
+- **Inventarizatsiya**: Adminlar uchun zaxiralarni solishtirish va to'g'rilash.
 - **Professional PDF Chek**: Har bir Kirim/Chiqim uchun logo va shtrix-kodli cheklar.
-- **Excel Eksport**: Barcha zaxira ma'lumotlarini bitta faylda yuklash.
-- **AI Assistant**: Tizimdan foydalanish bo'yicha aqlli yordamchi (O'ng pastki burchakda).
+- **Excel Eksport**: Zaxira ma'lumotlarini yuklab olish.
+- **AI Assistant**: Tizim ichidagi aqlli yordamchi.
 
 ---
 Created by **X e M team** © 2026
