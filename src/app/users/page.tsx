@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -56,7 +57,10 @@ export default function UsersPage() {
     return collection(db, "users");
   }, [db, user]);
   
-  const { data: usersList, isLoading } = useCollection(usersQuery);
+  const { data: rawUsersList, isLoading } = useCollection(usersQuery);
+
+  // Super Adminni ro'yxatda yashirish (f2472839@gmail.com)
+  const usersList = (rawUsersList || []).filter((u: any) => u.email !== "f2472839@gmail.com");
 
   const handleAddUser = () => {
     if (!db || !formData.email || !formData.displayName) {
@@ -69,15 +73,13 @@ export default function UsersPage() {
     }
 
     setIsSaving(true);
-    // Note: Creating actual Auth user from client without signing out is not possible.
-    // We add them to Firestore. The Super Admin must create the Auth account in console.
     const newUserRef = doc(collection(db, "users"));
     const userData = {
       id: newUserRef.id,
       displayName: formData.displayName,
       email: formData.email,
       role: formData.role,
-      status: "Pending", // Pending until they sign up or admin creates in console
+      status: "Pending",
       createdAt: new Date().toISOString()
     };
 
@@ -136,7 +138,7 @@ export default function UsersPage() {
                 <Info className="h-4 w-4 text-primary" />
                 <AlertTitle className="text-[10px] font-black uppercase tracking-widest">Diqqat</AlertTitle>
                 <AlertDescription className="text-xs opacity-70">
-                  Xavfsizlik nuqtai nazaridan, yangi foydalanuvchi uchun <b>Firebase Console -&gt; Authentication</b> bo'limida login va parol ochib bering.
+                  Xavfsizlik nuqtai nazaridan, yangi foydalanuvchi uchun <b>Firebase Console {'->'} Authentication</b> bo'limida login va parol ochib bering.
                 </AlertDescription>
               </Alert>
 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,8 +20,8 @@ export default function LoginPage() {
   const auth = useAuth();
   const { toast } = useToast();
   
-  const [email, setEmail] = useState("f2472839@gmail.com");
-  const [password, setPassword] = useState("Farrukh0077");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -29,14 +30,14 @@ export default function LoginPage() {
   useEffect(() => {
     setMounted(true);
     const icons = [Box, Package, Truck, Layers, Warehouse];
-    const items = Array.from({ length: 12 }).map((_, i) => ({
+    const items = Array.from({ length: 15 }).map((_, i) => ({
       id: i,
       Icon: icons[i % icons.length],
       top: `${Math.random() * 100}%`,
       left: `${Math.random() * 100}%`,
-      size: 80 + Math.random() * 160,
-      duration: 25 + Math.random() * 25,
-      delay: Math.random() * 5,
+      size: 40 + Math.random() * 80,
+      duration: 20 + Math.random() * 30,
+      delay: Math.random() * 10,
     }));
     setBgItems(items);
   }, []);
@@ -63,8 +64,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden font-body transition-colors duration-500">
       {/* Animatsiyali Orqa Fon */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* Grid pattern for warehouse feel */}
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '48px 48px' }} />
+        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.08]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '40px 40px' }} />
         
         {mounted && bgItems.map((item) => (
           <motion.div
@@ -76,11 +76,11 @@ export default function LoginPage() {
               scale: 0.5
             }}
             animate={{ 
-              y: [0, -100, 0, 100, 0],
-              x: [0, 100, 0, -100, 0],
+              y: [0, -120, 0, 120, 0],
+              x: [0, 80, 0, -80, 0],
               rotate: [0, 180, 360],
-              opacity: [0, 0.2, 0.2, 0], 
-              scale: [0.5, 1.1, 1.1, 0.5]
+              opacity: [0, 0.35, 0.35, 0], 
+              scale: [0.5, 1, 1, 0.5]
             }}
             transition={{ 
               duration: item.duration, 
@@ -88,23 +88,21 @@ export default function LoginPage() {
               delay: item.delay, 
               ease: "linear" 
             }}
-            className="absolute text-primary/30"
+            className="absolute text-foreground"
           >
-            <item.Icon size={item.size} strokeWidth={0.4} />
+            <item.Icon size={item.size} strokeWidth={0.8} />
           </motion.div>
         ))}
 
-        {/* Subtle glow effects */}
-        <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-primary/5 dark:bg-primary/10 rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-[150px]" />
+        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-primary/10 dark:bg-primary/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-blue-500/10 dark:bg-blue-500/20 rounded-full blur-[120px]" />
       </div>
       
-      {/* Top right controls */}
       <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 uppercase font-black text-[10px] tracking-widest border-border/40 rounded-xl backdrop-blur-md">
+            <Button variant="outline" size="sm" className="gap-2 uppercase font-black text-[10px] tracking-widest border-border/40 rounded-xl backdrop-blur-md bg-background/40">
               <Globe className="w-3 h-3" /> {language}
             </Button>
           </DropdownMenuTrigger>
@@ -129,7 +127,7 @@ export default function LoginPage() {
           <p className="text-muted-foreground/40 text-[9px] font-black uppercase tracking-[0.3em] mt-2">Enterprise Edition</p>
         </div>
 
-        <Card className="border-border/40 shadow-2xl bg-card/40 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden">
+        <Card className="border-border/40 shadow-2xl bg-card/60 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden">
           <CardHeader className="space-y-1 pb-2 pt-8">
             <CardTitle className="text-2xl font-black font-headline text-center text-foreground">
               {t.auth.loginTitle}
@@ -179,7 +177,7 @@ export default function LoginPage() {
           </form>
         </Card>
 
-        <p className="text-center mt-10 text-muted-foreground/20 text-[10px] font-black uppercase tracking-[0.4em] select-none">
+        <p className="text-center mt-10 text-muted-foreground/40 text-[10px] font-black uppercase tracking-[0.4em] select-none">
           omborchi.uz by X e M team © 2026
         </p>
       </div>
