@@ -16,7 +16,7 @@ git add .
 git commit -m "Initial commit: ombor.uz full setup"
 git branch -M main
 
-# O'zingiz ochgan repository URL-ni ulaymiz
+# O'zingiz ochgan repository URL-ni ulaymiz 
 # (URL-ni o'zingiznikiga almashtiring)
 git remote add origin https://github.com/FOYDALANUVCHI_NOMI/REPO_NOMI.git
 
