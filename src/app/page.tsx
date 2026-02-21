@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -11,6 +12,9 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, limit, orderBy } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import { 
   TrendingUp, 
   Box, 
@@ -40,6 +44,7 @@ const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: fa
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
+  const { toast } = useToast();
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
 
@@ -118,6 +123,28 @@ export default function DashboardPage() {
     ];
   }, [t, products, productsLoading, warehouses, warehousesLoading, employees, employeesLoading]);
 
+  const handleDownloadReport = () => {
+    if (!products) return;
+    toast({ title: "Hisobot tayyorlanmoqda...", description: "PDF yuklab olinmoqda." });
+    
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.text("ombor.uz - Dashboard Hisoboti", 105, 20, { align: "center" });
+    doc.setFontSize(10);
+    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 35);
+
+    const statsData = stats.map(s => [s.label, s.value]);
+    (doc as any).autoTable({
+      startY: 45,
+      head: [['Ko\'rsatkich', 'Qiymat']],
+      body: statsData,
+      theme: 'striped',
+      headStyles: { fillColor: [46, 104, 184] }
+    });
+
+    doc.save(`Dashboard_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const quickActions = [
     { name: t.nav.stockIn, href: "/stock-in", icon: PlusCircle, color: "bg-emerald-500/10 text-emerald-500" },
     { name: t.nav.stockOut, href: "/stock-out", icon: History, color: "bg-rose-500/10 text-rose-500" },
@@ -154,7 +181,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="rounded-2xl font-bold border-border/50 h-12 px-6 hover:bg-muted/50 transition-all">
+            <Button variant="outline" onClick={handleDownloadReport} className="rounded-2xl font-bold border-border/50 h-12 px-6 hover:bg-muted/50 transition-all">
               <Calendar className="w-4 h-4 mr-2" /> {t.actions.downloadReport}
             </Button>
             <Link href="/stock-in">

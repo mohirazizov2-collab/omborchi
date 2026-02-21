@@ -27,6 +27,7 @@ import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebas
 import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -42,6 +43,7 @@ const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: fa
 export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
+  const { toast } = useToast();
   const db = useFirestore();
   const { user, role, isUserLoading: authLoading } = useUser();
   const router = useRouter();
@@ -149,62 +151,82 @@ export default function ReportsPage() {
       setAiResult(result);
     } catch (error) {
       console.error("AI Analysis error:", error);
+      toast({ variant: "destructive", title: "AI Xatolik", description: "Tahlil qilishda xatolik yuz berdi." });
     } finally {
       setIsAiLoading(false);
     }
-  }, [products, totalValue, warehouses, lowStockCount]);
+  }, [products, totalValue, warehouses, lowStockCount, toast]);
 
   const exportToExcel = () => {
-    if (!products) return;
+    if (!products || products.length === 0) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Eksport qilish uchun mahsulotlar yo'q." });
+      return;
+    }
+    
+    toast({ title: "Excel tayyorlanmoqda...", description: "Iltimos, kuting." });
+    
     const worksheet = XLSX.utils.json_to_sheet(products.map(p => ({
       "Nomi": p.name,
       "SKU": p.sku,
-      "Kategoriya": p.categoryId,
-      "Zaxira": p.stock,
-      "Narx (so'm)": p.salePrice,
-      "Jami Qiymat": p.stock * p.salePrice,
+      "Kategoriya": p.categoryId || "General",
+      "Zaxira": p.stock || 0,
+      "Narx (so'm)": p.salePrice || 0,
+      "Jami Qiymat": (p.stock || 0) * (p.salePrice || 0),
       "Holat": (p.stock || 0) > (p.lowStockThreshold || 10) ? "Active" : "Low Stock"
     })));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Zaxira Hisoboti");
-    XLSX.writeFile(workbook, `ombor_uz_hisobot_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(workbook, `ombor_uz_zaxira_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const exportToPDF = () => {
+    if (!products) return;
+    
+    toast({ title: "PDF tayyorlanmoqda...", description: "Hujjat shakllantirilmoqda." });
+    
     const doc = new jsPDF();
     doc.setFontSize(20);
-    doc.text("ombor.uz - Global Hisobot", 105, 20, { align: "center" });
+    doc.setTextColor(46, 104, 184);
+    doc.text("ombor.uz - Global Inventar Hisoboti", 105, 20, { align: "center" });
+    
     doc.setFontSize(10);
+    doc.setTextColor(100);
     doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 35);
-    doc.text(`Davr: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 15, 42);
+    doc.text(`Hisobot turi: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 15, 42);
 
     const statsData = [
       ["Jami zaxira qiymati", `${totalValue.toLocaleString()} so'm`],
-      ["Sotuv tushumi", `${financials.revenue.toLocaleString()} so'm`],
+      ["Sotuv tushumi (davr uchun)", `${financials.revenue.toLocaleString()} so'm`],
       ["Xarajatlar (Maoshlar)", `${financials.expenses.toLocaleString()} so'm`],
       ["Sof foyda", `${financials.profit.toLocaleString()} so'm`],
       ["Kam qolgan mahsulotlar", `${lowStockCount} ta`]
     ];
 
     (doc as any).autoTable({
-      startY: 55,
+      startY: 50,
       head: [['Ko\'rsatkich', 'Qiymat']],
       body: statsData,
       theme: 'striped',
-      headStyles: { fillColor: [46, 104, 184] }
+      headStyles: { fillColor: [46, 104, 184], fontSize: 11, fontStyle: 'bold' },
+      styles: { fontSize: 10 }
     });
 
-    if (products) {
+    if (products.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text("Mahsulotlar Qoldig'i (Top 20)", 15, (doc as any).lastAutoTable.finalY + 15);
+      
       (doc as any).autoTable({
-        startY: (doc as any).lastAutoTable.finalY + 15,
+        startY: (doc as any).lastAutoTable.finalY + 20,
         head: [['#', 'Mahsulot', 'SKU', 'Zaxira', 'Narx']],
-        body: products.slice(0, 15).map((p, i) => [i + 1, p.name, p.sku, p.stock, `${p.salePrice.toLocaleString()} so'm`]),
+        body: products.slice(0, 20).map((p, i) => [i + 1, p.name, p.sku, p.stock || 0, `${(p.salePrice || 0).toLocaleString()} so'm`]),
         theme: 'grid',
-        headStyles: { fillColor: [100, 100, 100] }
+        headStyles: { fillColor: [80, 80, 80] },
+        styles: { fontSize: 9 }
       });
     }
 
-    doc.save(`Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`ombor_uz_hisobot_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   if (!mounted || authLoading) {
@@ -253,10 +275,10 @@ export default function ReportsPage() {
             </div>
             
             <div className="flex gap-2">
-              <Button variant="outline" onClick={exportToExcel} className="rounded-2xl font-bold h-12 px-5 border-border/50">
+              <Button variant="outline" onClick={exportToExcel} disabled={isLoading || !products?.length} className="rounded-2xl font-bold h-12 px-5 border-border/50 bg-card hover:bg-emerald-500/5 hover:text-emerald-600 transition-colors">
                 <TableIcon className="w-4 h-4 mr-2 text-emerald-500" /> Excel
               </Button>
-              <Button variant="outline" onClick={exportToPDF} className="rounded-2xl font-bold h-12 px-5 border-border/50">
+              <Button variant="outline" onClick={exportToPDF} disabled={isLoading || !products?.length} className="rounded-2xl font-bold h-12 px-5 border-border/50 bg-card hover:bg-rose-500/5 hover:text-rose-600 transition-colors">
                 <FileDown className="w-4 h-4 mr-2 text-rose-500" /> PDF
               </Button>
             </div>
