@@ -30,6 +30,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Firebase Studio Preview uchun optimallashtirish
+  devIndicators: {
+    appIsrStatus: false,
+  }
 };
 
 export default nextConfig;
