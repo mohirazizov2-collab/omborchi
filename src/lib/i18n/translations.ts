@@ -1,3 +1,4 @@
+
 export type Language = 'uz' | 'ru' | 'en';
 
 export const translations = {
@@ -9,6 +10,7 @@ export const translations = {
       stockIn: 'Kirim',
       stockOut: 'Chiqim',
       transfers: 'Transferlar',
+      employees: 'Ishchilar',
       reports: 'Hisobotlar',
       systemGen: 'Tizim Gen',
       userManagement: 'Foydalanuvchilar',
@@ -16,6 +18,20 @@ export const translations = {
       menu: 'Menyu',
       administration: 'Administratsiya',
       profile: 'Profil'
+    },
+    employees: {
+      title: 'Xodimlarni boshqarish',
+      description: 'Ishchilar ro\'yxati, lavozimlar va maoshlarni hisoblash.',
+      addNew: 'Yangi ishchi',
+      fullName: 'F.I.SH',
+      position: 'Lavozimi',
+      baseSalary: 'Asosiy maosh',
+      bonus: 'Bonuslar',
+      deductions: 'Jarimalar',
+      totalSalary: 'Jami maosh',
+      phoneNumber: 'Telefon',
+      hiredAt: 'Ishga olingan sana',
+      salaryCalculated: 'Hisoblangan maosh'
     },
     auth: {
       loginTitle: 'Tizimga kirish',
@@ -177,6 +193,7 @@ export const translations = {
       stockIn: 'Приход',
       stockOut: 'Расход',
       transfers: 'Переводы',
+      employees: 'Сотрудники',
       reports: 'Отчеты',
       systemGen: 'Ген Системы',
       userManagement: 'Пользователи',
@@ -184,6 +201,20 @@ export const translations = {
       menu: 'Меню',
       administration: 'Администрирование',
       profile: 'Профиль'
+    },
+    employees: {
+      title: 'Управление сотрудниками',
+      description: 'Список сотрудников, должности и расчет заработной платы.',
+      addNew: 'Новый сотрудник',
+      fullName: 'Ф.И.О',
+      position: 'Должность',
+      baseSalary: 'Основная зарплата',
+      bonus: 'Бонусы',
+      deductions: 'Штрафы',
+      totalSalary: 'Итоговая зарплата',
+      phoneNumber: 'Телефон',
+      hiredAt: 'Дата найма',
+      salaryCalculated: 'Рассчитанная зарплата'
     },
     auth: {
       loginTitle: 'Вход в систему',
@@ -345,6 +376,7 @@ export const translations = {
       stockIn: 'Stock In',
       stockOut: 'Stock Out',
       transfers: 'Transfers',
+      employees: 'Employees',
       reports: 'Reports',
       systemGen: 'System Gen',
       userManagement: 'Users',
@@ -352,6 +384,20 @@ export const translations = {
       menu: 'Menu',
       administration: 'Administration',
       profile: 'Profile'
+    },
+    employees: {
+      title: 'Employee Management',
+      description: 'Staff list, positions and salary calculations.',
+      addNew: 'New Employee',
+      fullName: 'Full Name',
+      position: 'Position',
+      baseSalary: 'Base Salary',
+      bonus: 'Bonuses',
+      deductions: 'Deductions',
+      totalSalary: 'Total Salary',
+      phoneNumber: 'Phone',
+      hiredAt: 'Hired Date',
+      salaryCalculated: 'Calculated Salary'
     },
     auth: {
       loginTitle: 'Sign In',

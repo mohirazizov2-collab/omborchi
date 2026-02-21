@@ -45,6 +45,22 @@
       },
       "required": ["id", "productId", "warehouseId", "quantityChange", "movementType"]
     },
+    "Employee": {
+      "title": "Employee",
+      "description": "Ishchilar ma'lumotlari va maosh hisobi.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "position": { "type": "string" },
+        "baseSalary": { "type": "number" },
+        "bonus": { "type": "number" },
+        "deductions": { "type": "number" },
+        "phoneNumber": { "type": "string" },
+        "hiredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "fullName", "position", "baseSalary"]
+    },
     "AdminRole": {
       "title": "AdminRole",
       "description": "Super Admin huquqiga ega foydalanuvchilar UID ro'yxati.",
@@ -71,6 +87,10 @@
     "/stockMovements/{movementId}": {
       "schema": "#/entities/StockMovement",
       "description": "Audit Trail: O'chirilishi taqiqlangan harakatlar tarixi."
+    },
+    "/employees/{employeeId}": {
+      "schema": "#/entities/Employee",
+      "description": "Barcha ishchilar va ularning maoshlari ro'yxati."
     },
     "/users/{userId}": {
       "schema": { "type": "object" },

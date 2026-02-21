@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -14,6 +15,7 @@ import {
   Archive,
   Globe,
   ChevronRight,
+  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -44,6 +46,7 @@ export function OmniSidebar() {
     { name: t.nav.stockIn, href: "/stock-in", icon: Archive },
     { name: t.nav.stockOut, href: "/stock-out", icon: Archive },
     { name: t.nav.transfers, href: "/transfers", icon: ArrowRightLeft },
+    { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
     { name: t.nav.systemGen, href: "/system-gen", icon: Database, hide: !isSuperAdmin },
   ];
