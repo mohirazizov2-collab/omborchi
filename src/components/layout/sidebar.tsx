@@ -18,6 +18,7 @@ import {
   ChevronRight,
   UserRound,
   History,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -49,6 +50,7 @@ export function OmniSidebar() {
     { name: t.nav.stockIn, href: "/stock-in", icon: Archive },
     { name: t.nav.stockOut, href: "/stock-out", icon: Archive },
     { name: t.nav.transfers, href: "/transfers", icon: ArrowRightLeft },
+    { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
     { name: t.nav.history, href: "/history", icon: History },
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
