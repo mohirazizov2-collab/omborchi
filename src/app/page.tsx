@@ -100,17 +100,45 @@ export default function DashboardPage() {
     const autoTable = (await import("jspdf-autotable")).default;
     
     const doc = new jsPDFLib();
-    doc.setFontSize(22);
-    doc.text("ombor.uz - Dashboard Hisoboti", 105, 20, { align: "center" });
     
+    // Logo Drawing
+    doc.setFillColor(59, 130, 246);
+    doc.roundedRect(95, 15, 20, 20, 4, 4, 'F');
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.8);
+    doc.line(100, 25, 105, 20); 
+    doc.line(105, 20, 110, 25);
+    doc.line(101, 25, 109, 25);
+    doc.line(102, 25, 102, 30);
+    doc.line(108, 25, 108, 30);
+    doc.line(103, 27, 107, 27);
+    doc.line(103, 29, 107, 29);
+
+    doc.setFontSize(22);
+    doc.setTextColor(40, 40, 40);
+    doc.text("ombor.uz", 105, 45, { align: "center" });
+    
+    doc.setFontSize(14);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Dashboard Umumiy Hisoboti", 105, 55, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.text(`Sana: ${new Date().toLocaleString()}`, 105, 62, { align: "center" });
+
     const statsData = stats.map(s => [s.label, s.value]);
     (doc as any).autoTable({
-      startY: 40,
+      startY: 75,
       head: [['Ko\'rsatkich', 'Qiymat']],
       body: statsData,
       theme: 'striped',
-      headStyles: { fillColor: [46, 104, 184] }
+      headStyles: { fillColor: [59, 130, 246], halign: 'center' },
+      styles: { cellPadding: 5, fontSize: 11 },
+      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } }
     });
+
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text("Bu hisobot ombor.uz tizimi orqali avtomatik shakllantirildi.", 105, 285, { align: "center" });
 
     doc.save(`Dashboard_Report_${new Date().toISOString().split('T')[0]}.pdf`);
   };

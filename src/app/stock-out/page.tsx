@@ -104,17 +104,32 @@ export default function StockOutPage() {
 
   const generatePDF = (data: any) => {
     const doc = new jsPDF();
-    doc.setFontSize(22);
+    
+    // Logo Drawing (Markazda)
+    doc.setFillColor(59, 130, 246);
+    doc.roundedRect(95, 10, 20, 20, 4, 4, 'F');
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.8);
+    doc.line(100, 20, 105, 15); 
+    doc.line(105, 15, 110, 20);
+    doc.line(101, 20, 109, 20);
+    doc.line(102, 20, 102, 25);
+    doc.line(108, 20, 108, 25);
+
+    doc.setFontSize(24);
     doc.setTextColor(40);
-    doc.text("ombor.uz", 105, 20, { align: "center" });
+    doc.text("ombor.uz", 105, 40, { align: "center" });
+    
     doc.setFontSize(14);
-    doc.text("CHIQIM HUJJATI (Goods Issue)", 105, 30, { align: "center" });
+    doc.text("CHIQIM HUJJATI (Goods Issue)", 105, 50, { align: "center" });
+    
     doc.setFontSize(10);
-    doc.text(`Order #: ${data.orderNumber}`, 15, 45);
-    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 52);
-    doc.text(`Qabul qiluvchi: ${data.recipient}`, 15, 59);
-    doc.text(`Ombor: ${data.warehouseName}`, 15, 66);
-    doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 73);
+    doc.setTextColor(80);
+    doc.text(`Order #: ${data.orderNumber}`, 15, 65);
+    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 72);
+    doc.text(`Qabul qiluvchi: ${data.recipient}`, 15, 79);
+    doc.text(`Ombor: ${data.warehouseName}`, 15, 86);
+    doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 93);
 
     const tableData = data.items.map((item: any, idx: number) => [
       idx + 1,
@@ -124,19 +139,22 @@ export default function StockOutPage() {
     ]);
 
     (doc as any).autoTable({
-      startY: 80,
+      startY: 100,
       head: [['#', 'Mahsulot', 'Miqdor', 'SKU']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [220, 38, 38] },
-      styles: { fontSize: 9 }
+      headStyles: { fillColor: [225, 29, 72], halign: 'center' }, // Rose color for output
+      styles: { fontSize: 9, cellPadding: 3 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(11);
-    doc.text("Imzo: ___________________", 15, finalY + 10);
-    doc.text("M.O'.: ___________________", 140, finalY + 10);
+    const finalY = (doc as any).lastAutoTable.finalY + 20;
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.text("Topshirdi (Imzo): ___________________", 15, finalY);
+    doc.text("Qabul qildi (Imzo): ___________________", 140, finalY, { align: "right" });
+    
     doc.setFontSize(8);
+    doc.setTextColor(150);
     doc.text("ombor.uz - Zamonaviy ombor boshqaruvi tizimi.", 105, 285, { align: "center" });
     doc.save(`Chiqim_${data.orderNumber}_${new Date().toISOString().split('T')[0]}.pdf`);
   };

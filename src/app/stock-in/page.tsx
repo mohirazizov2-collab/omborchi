@@ -105,17 +105,32 @@ export default function StockInPage() {
 
   const generatePDF = (data: any) => {
     const doc = new jsPDF();
-    doc.setFontSize(22);
+    
+    // Logo Drawing (Markazda)
+    doc.setFillColor(59, 130, 246);
+    doc.roundedRect(95, 10, 20, 20, 4, 4, 'F');
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.8);
+    doc.line(100, 20, 105, 15); 
+    doc.line(105, 15, 110, 20);
+    doc.line(101, 20, 109, 20);
+    doc.line(102, 20, 102, 25);
+    doc.line(108, 20, 108, 25);
+
+    doc.setFontSize(24);
     doc.setTextColor(40);
-    doc.text("ombor.uz", 105, 20, { align: "center" });
+    doc.text("ombor.uz", 105, 40, { align: "center" });
+    
     doc.setFontSize(14);
-    doc.text("KIRIM NAKLADNOYI (Goods Receipt)", 105, 30, { align: "center" });
+    doc.text("KIRIM NAKLADNOYI (Goods Receipt)", 105, 50, { align: "center" });
+    
     doc.setFontSize(10);
-    doc.text(`Nakladnoy #: ${data.dnNumber}`, 15, 45);
-    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 52);
-    doc.text(`Yetkazib beruvchi: ${data.supplier}`, 15, 59);
-    doc.text(`Ombor: ${data.warehouseName}`, 15, 66);
-    doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 73);
+    doc.setTextColor(80);
+    doc.text(`Nakladnoy #: ${data.dnNumber}`, 15, 65);
+    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 72);
+    doc.text(`Yetkazib beruvchi: ${data.supplier}`, 15, 79);
+    doc.text(`Ombor: ${data.warehouseName}`, 15, 86);
+    doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 93);
 
     const tableData = data.items.map((item: any, idx: number) => [
       idx + 1,
@@ -126,18 +141,25 @@ export default function StockInPage() {
     ]);
 
     (doc as any).autoTable({
-      startY: 80,
+      startY: 100,
       head: [['#', 'Mahsulot', 'Miqdor', 'Narx', 'Jami']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [46, 104, 184] },
-      styles: { fontSize: 9 }
+      headStyles: { fillColor: [59, 130, 246], halign: 'center' },
+      styles: { fontSize: 9, cellPadding: 3 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(12);
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
+    doc.setTextColor(0);
     doc.text(`JAMI QIYMAT: ${data.totalValue.toLocaleString()} so'm`, 195, finalY, { align: "right" });
+    
+    doc.setFontSize(9);
+    doc.text("Qabul qildi: ___________________", 15, finalY + 20);
+    doc.text("Topshirdi: ___________________", 140, finalY + 20);
+
     doc.setFontSize(8);
+    doc.setTextColor(150);
     doc.text("ombor.uz orqali avtomatik shakllantirildi.", 105, 285, { align: "center" });
     doc.save(`Kirim_${data.dnNumber}_${new Date().toISOString().split('T')[0]}.pdf`);
   };

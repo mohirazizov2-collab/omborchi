@@ -86,7 +86,6 @@ export default function ReportsPage() {
   }, [db, user]);
   const { data: movements, isLoading: movementsLoading } = useCollection(movementsQuery);
 
-  // Performance Optimized Calculations O(1) Map Lookup
   const financials = useMemo(() => {
     if (!movements || !products || !employees) return { revenue: 0, expenses: 0, profit: 0 };
 
@@ -175,27 +174,46 @@ export default function ReportsPage() {
     const autoTable = (await import("jspdf-autotable")).default;
     
     const doc = new jsPDFLib();
-    doc.setFontSize(20);
-    doc.text("ombor.uz - Global Inventar Hisoboti", 105, 20, { align: "center" });
+    
+    // Logo Drawing
+    doc.setFillColor(59, 130, 246);
+    doc.roundedRect(95, 15, 20, 20, 4, 4, 'F');
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.8);
+    doc.line(100, 25, 105, 20); 
+    doc.line(105, 20, 110, 25);
+    doc.line(101, 25, 109, 25);
+    doc.line(102, 25, 102, 30);
+    doc.line(108, 25, 108, 30);
+
+    doc.setFontSize(22);
+    doc.setTextColor(40);
+    doc.text("ombor.uz", 105, 45, { align: "center" });
+    
+    doc.setFontSize(14);
+    doc.text("Global Inventar va Moliyaviy Hisobot", 105, 55, { align: "center" });
     
     doc.setFontSize(10);
-    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 35);
+    doc.text(`Hisobot sanasi: ${new Date().toLocaleString()}`, 105, 62, { align: "center" });
 
     const statsData = [
       ["Jami zaxira qiymati", `${totalValue.toLocaleString()} so'm`],
-      ["Sotuv tushumi", `${financials.revenue.toLocaleString()} so'm`],
-      ["Xarajatlar", `${financials.expenses.toLocaleString()} so'm`],
+      ["Sotuv tushumi (tanlangan davr)", `${financials.revenue.toLocaleString()} so'm`],
+      ["Xarajatlar (Maoshlar)", `${financials.expenses.toLocaleString()} so'm`],
       ["Sof foyda", `${financials.profit.toLocaleString()} so'm`]
     ];
 
     (doc as any).autoTable({
-      startY: 45,
+      startY: 75,
       head: [['Ko\'rsatkich', 'Qiymat']],
       body: statsData,
-      theme: 'striped',
-      headStyles: { fillColor: [46, 104, 184] }
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246], halign: 'center' },
+      styles: { fontSize: 10, cellPadding: 4 }
     });
 
+    doc.setFontSize(8);
+    doc.text("ombor.uz - Advanced Inventory Management", 105, 285, { align: "center" });
     doc.save(`Hisobot_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
