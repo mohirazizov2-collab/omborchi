@@ -29,13 +29,13 @@ export default function LoginPage() {
     setMounted(true);
     // Animatsiya elementlarini bir marta generatsiya qilish (Hydration xatosini oldini olish uchun)
     const icons = [Box, Package, Truck, Layers, Warehouse];
-    const items = Array.from({ length: 8 }).map((_, i) => ({
+    const items = Array.from({ length: 12 }).map((_, i) => ({
       id: i,
       Icon: icons[i % icons.length],
       top: `${Math.random() * 100}%`,
       left: `${Math.random() * 100}%`,
-      size: 100 + Math.random() * 150,
-      duration: 20 + Math.random() * 20,
+      size: 80 + Math.random() * 160,
+      duration: 25 + Math.random() * 25,
       delay: Math.random() * 5,
     }));
     setBgItems(items);
@@ -63,7 +63,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#02040a] relative overflow-hidden font-body">
       {/* Animatsiyali Orqa Fon */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden bg-[#02040a]">
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '48px 48px' }} />
+        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '48px 48px' }} />
         
         {mounted && bgItems.map((item) => (
           <motion.div
@@ -75,11 +75,11 @@ export default function LoginPage() {
               scale: 0.5
             }}
             animate={{ 
-              y: [0, -150, 0, 150, 0],
-              x: [0, 150, 0, -150, 0],
+              y: [0, -100, 0, 100, 0],
+              x: [0, 100, 0, -100, 0],
               rotate: [0, 180, 360],
-              opacity: [0, 0.05, 0.05, 0],
-              scale: [0.5, 1.2, 1.2, 0.5]
+              opacity: [0, 0.12, 0.12, 0], // Ikonkalar to'qroq (12% opacity) qilindi
+              scale: [0.5, 1.1, 1.1, 0.5]
             }}
             transition={{ 
               duration: item.duration, 
@@ -87,13 +87,13 @@ export default function LoginPage() {
               delay: item.delay, 
               ease: "linear" 
             }}
-            className="absolute text-white"
+            className="absolute text-primary/40" // Rang biroz ko'proq ajralib turishi uchun primary ishlatildi
           >
-            <item.Icon size={item.size} strokeWidth={0.2} />
+            <item.Icon size={item.size} strokeWidth={0.3} />
           </motion.div>
         ))}
 
-        <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[150px]" />
+        <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-primary/15 rounded-full blur-[150px]" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] bg-blue-500/10 rounded-full blur-[150px]" />
       </div>
       
