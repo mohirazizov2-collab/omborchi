@@ -63,6 +63,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden font-body transition-colors duration-500">
       {/* Animatsiyali Orqa Fon */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {/* Grid pattern for warehouse feel */}
         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '48px 48px' }} />
         
         {mounted && bgItems.map((item) => (
@@ -93,10 +94,12 @@ export default function LoginPage() {
           </motion.div>
         ))}
 
+        {/* Subtle glow effects */}
         <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-primary/5 dark:bg-primary/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-[150px]" />
       </div>
       
+      {/* Top right controls */}
       <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
         <ThemeToggle />
         <DropdownMenu>
