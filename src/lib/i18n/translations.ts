@@ -113,7 +113,9 @@ export const translations = {
       sku: "SKU",
       stock: "Zaxira",
       price: "Narx (so'm)",
-      status: "Holat"
+      status: "Holat",
+      noProducts: "Mahsulotlar topilmadi. Avval katalogga mahsulot qo'shing.",
+      loadingProducts: "Mahsulotlar yuklanmoqda..."
     },
     stockIn: {
       title: "Tovarlar Kirimi (Goods Receipt)",
@@ -328,7 +330,9 @@ export const translations = {
       sku: 'SKU',
       stock: 'Запас',
       price: 'Цена (сум)',
-      status: 'Статус'
+      status: 'Статус',
+      noProducts: 'Товары не найдены. Сначала добавьте товары в каталог.',
+      loadingProducts: 'Загрузка товаров...'
     },
     stockIn: {
       title: 'Приход товара (Stock In)',
@@ -543,7 +547,9 @@ export const translations = {
       sku: 'SKU',
       stock: 'Stock',
       price: 'Price (UZS)',
-      status: 'Status'
+      status: 'Status',
+      noProducts: 'No products found. Please add products to catalog first.',
+      loadingProducts: 'Loading products...'
     },
     stockIn: {
       title: 'Stock In (Goods Receipt)',

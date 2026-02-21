@@ -14,7 +14,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Calendar, FileText, Loader2, Truck, ArrowRight, ScanLine } from "lucide-react";
+import { Plus, Trash2, Calendar, FileText, Loader2, Truck, ArrowRight, ScanLine, AlertCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -26,36 +26,45 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { Html5QrcodeScanner } from "html5-qrcode";
 
+// Unique ID helper
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
 export default function StockInPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([{ id: Date.now(), productId: "", quantity: 1, price: 0 }]);
+  const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1, price: 0 }]);
   const [dnNumber, setDnNumber] = useState("");
   const [supplier, setSupplier] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
-  const productsQuery = useMemoFirebase(() => collection(db, "products"), [db]);
-  const { data: products } = useCollection(productsQuery);
+  const productsQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "products");
+  }, [db]);
+  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
 
-  const warehousesQuery = useMemoFirebase(() => collection(db, "warehouses"), [db]);
+  const warehousesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "warehouses");
+  }, [db]);
   const { data: warehouses } = useCollection(warehousesQuery);
 
   const addItem = () => {
-    setItems([...items, { id: Date.now(), productId: "", quantity: 1, price: 0 }]);
+    setItems([...items, { id: generateId(), productId: "", quantity: 1, price: 0 }]);
   };
 
-  const removeItem = (id: number) => {
+  const removeItem = (id: string) => {
     if (items.length > 1) {
       setItems(items.filter(item => item.id !== id));
     }
   };
 
-  const updateItem = (id: number, field: string, value: any) => {
+  const updateItem = (id: string, field: string, value: any) => {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
@@ -75,14 +84,14 @@ export default function StockInPage() {
           if (product) {
             const existingItem = items.find(i => i.productId === product.id);
             if (existingItem) {
-              updateItem(existingItem.id, "quantity", existingItem.quantity + 1);
+              updateItem(existingItem.id, "quantity", (existingItem.quantity || 0) + 1);
             } else {
               const lastItem = items[items.length - 1];
               if (!lastItem.productId) {
                 updateItem(lastItem.id, "productId", product.id);
-                updateItem(lastItem.id, "price", product.salePrice);
+                updateItem(lastItem.id, "price", product.salePrice || 0);
               } else {
-                setItems([...items, { id: Date.now(), productId: product.id, quantity: 1, price: product.salePrice }]);
+                setItems([...items, { id: generateId(), productId: product.id, quantity: 1, price: product.salePrice || 0 }]);
               }
             }
             toast({ title: "Mahsulot topildi", description: `${product.name} ro'yxatga qo'shildi.` });
@@ -106,7 +115,6 @@ export default function StockInPage() {
   const generatePDF = (data: any) => {
     const doc = new jsPDF();
     
-    // Logo Drawing (Markazda)
     doc.setFillColor(59, 130, 246);
     doc.roundedRect(95, 10, 20, 20, 4, 4, 'F');
     doc.setDrawColor(255, 255, 255);
@@ -136,8 +144,8 @@ export default function StockInPage() {
       idx + 1,
       item.productName,
       item.quantity,
-      `${item.price.toLocaleString()} so'm`,
-      `${(item.quantity * item.price).toLocaleString()} so'm`
+      `${(item.price || 0).toLocaleString()} so'm`,
+      `${((item.quantity || 0) * (item.price || 0)).toLocaleString()} so'm`
     ]);
 
     (doc as any).autoTable({
@@ -180,7 +188,7 @@ export default function StockInPage() {
       dnNumber,
       supplier,
       warehouseName,
-      totalValue: items.reduce((acc, item) => acc + (item.quantity * item.price), 0),
+      totalValue: items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0),
       items: items.map(item => ({
         ...item,
         productName: products?.find(p => p.id === item.productId)?.name || "Mahsulot"
@@ -199,7 +207,7 @@ export default function StockInPage() {
           dnNumber: dnNumber,
           supplier: supplier,
           unitPrice: item.price,
-          totalPrice: item.quantity * item.price,
+          totalPrice: (item.quantity || 0) * (item.price || 0),
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
@@ -207,7 +215,7 @@ export default function StockInPage() {
         if (product) {
           const productRef = doc(db, "products", item.productId);
           updateDocumentNonBlocking(productRef, {
-            stock: (product.stock || 0) + item.quantity,
+            stock: (product.stock || 0) + (item.quantity || 0),
             updatedAt: new Date().toISOString()
           });
         }
@@ -219,18 +227,19 @@ export default function StockInPage() {
       });
 
       generatePDF(receiptData);
-      setItems([{ id: Date.now(), productId: "", quantity: 1, price: 0 }]);
+      setItems([{ id: generateId(), productId: "", quantity: 1, price: 0 }]);
       setDnNumber("");
       setSupplier("");
       setWarehouseId("");
     } catch (err) {
       console.error(err);
+      toast({ variant: "destructive", title: "Tizim xatosi", description: "Saqlashda xatolik yuz berdi." });
     } finally {
       setLoading(false);
     }
   };
 
-  const totalValue = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
+  const totalValue = items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0);
 
   return (
     <div className="flex min-h-screen bg-background font-body">
@@ -337,14 +346,20 @@ export default function StockInPage() {
                           onValueChange={(val) => {
                             const p = products?.find(prod => prod.id === val);
                             updateItem(item.id, "productId", val);
-                            if (p) updateItem(item.id, "price", p.salePrice);
+                            if (p) updateItem(item.id, "price", p.salePrice || 0);
                           }}
                           value={item.productId}
                         >
                           <SelectTrigger className="h-12 rounded-xl bg-background/50 border-none font-bold">
-                            <SelectValue placeholder="Tanlang" />
+                            <SelectValue placeholder={productsLoading ? t.products.loadingProducts : t.common.product + "..."} />
                           </SelectTrigger>
-                          <SelectContent className="rounded-xl">
+                          <SelectContent className="rounded-xl max-h-[300px]">
+                            {products?.length === 0 && (
+                              <div className="p-4 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                {t.products.noProducts}
+                              </div>
+                            )}
                             {products?.map((p) => (
                               <SelectItem key={p.id} value={p.id}>{p.name} ({p.sku})</SelectItem>
                             ))}

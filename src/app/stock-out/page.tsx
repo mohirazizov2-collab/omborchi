@@ -14,7 +14,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Calendar, Truck, User, Loader2, Printer, ArrowRight, ScanLine } from "lucide-react";
+import { Trash2, Plus, Calendar, Truck, User, Loader2, Printer, ArrowRight, ScanLine, AlertCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -26,36 +26,45 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { Html5QrcodeScanner } from "html5-qrcode";
 
+// Unique ID helper
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
 export default function StockOutPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([{ id: Date.now(), productId: "", quantity: 1 }]);
+  const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1 }]);
   const [orderNumber, setOrderNumber] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [recipient, setRecipient] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
-  const productsQuery = useMemoFirebase(() => collection(db, "products"), [db]);
-  const { data: products } = useCollection(productsQuery);
+  const productsQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "products");
+  }, [db]);
+  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
 
-  const warehousesQuery = useMemoFirebase(() => collection(db, "warehouses"), [db]);
+  const warehousesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "warehouses");
+  }, [db]);
   const { data: warehouses } = useCollection(warehousesQuery);
 
   const addItem = () => {
-    setItems([...items, { id: Date.now(), productId: "", quantity: 1 }]);
+    setItems([...items, { id: generateId(), productId: "", quantity: 1 }]);
   };
 
-  const removeItem = (id: number) => {
+  const removeItem = (id: string) => {
     if (items.length > 1) {
       setItems(items.filter(item => item.id !== id));
     }
   };
 
-  const updateItem = (id: number, field: string, value: any) => {
+  const updateItem = (id: string, field: string, value: any) => {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
@@ -75,13 +84,13 @@ export default function StockOutPage() {
           if (product) {
             const existingItem = items.find(i => i.productId === product.id);
             if (existingItem) {
-              updateItem(existingItem.id, "quantity", existingItem.quantity + 1);
+              updateItem(existingItem.id, "quantity", (existingItem.quantity || 0) + 1);
             } else {
               const lastItem = items[items.length - 1];
               if (!lastItem.productId) {
                 updateItem(lastItem.id, "productId", product.id);
               } else {
-                setItems([...items, { id: Date.now(), productId: product.id, quantity: 1 }]);
+                setItems([...items, { id: generateId(), productId: product.id, quantity: 1 }]);
               }
             }
             toast({ title: "Mahsulot topildi", description: `${product.name} ro'yxatga qo'shildi.` });
@@ -105,7 +114,6 @@ export default function StockOutPage() {
   const generatePDF = (data: any) => {
     const doc = new jsPDF();
     
-    // Logo Drawing (Markazda)
     doc.setFillColor(59, 130, 246);
     doc.roundedRect(95, 10, 20, 20, 4, 4, 'F');
     doc.setDrawColor(255, 255, 255);
@@ -143,7 +151,7 @@ export default function StockOutPage() {
       head: [['#', 'Mahsulot', 'Miqdor', 'SKU']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [225, 29, 72], halign: 'center' }, // Rose color for output
+      headStyles: { fillColor: [225, 29, 72], halign: 'center' },
       styles: { fontSize: 9, cellPadding: 3 }
     });
 
@@ -168,7 +176,7 @@ export default function StockOutPage() {
     let insufficient = false;
     items.forEach(item => {
       const product = products?.find(p => p.id === item.productId);
-      if (product && (product.stock || 0) < item.quantity) {
+      if (product && (product.stock || 0) < (item.quantity || 0)) {
         insufficient = true;
       }
     });
@@ -199,7 +207,7 @@ export default function StockOutPage() {
         const movementData = {
           productId: item.productId,
           warehouseId: warehouseId,
-          quantityChange: -item.quantity,
+          quantityChange: -(item.quantity || 0),
           movementType: "StockOut",
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
@@ -212,18 +220,19 @@ export default function StockOutPage() {
         if (product) {
           const productRef = doc(db, "products", item.productId);
           updateDocumentNonBlocking(productRef, {
-            stock: (product.stock || 0) - item.quantity
+            stock: (product.stock || 0) - (item.quantity || 0)
           });
         }
       });
 
       toast({ title: "Muvaffaqiyatli", description: "Tovarlar chiqarildi. Check yuklanmoqda..." });
       generatePDF(receiptData);
-      setItems([{ id: Date.now(), productId: "", quantity: 1 }]);
+      setItems([{ id: generateId(), productId: "", quantity: 1 }]);
       setOrderNumber("");
       setRecipient("");
     } catch (err) {
       console.error(err);
+      toast({ variant: "destructive", title: "Xatolik", description: "Amalni bajarishda xato yuz berdi." });
     } finally {
       setLoading(false);
     }
@@ -335,9 +344,15 @@ export default function StockOutPage() {
                           value={item.productId}
                         >
                           <SelectTrigger className="h-12 rounded-xl bg-background/50 border-none font-bold">
-                            <SelectValue placeholder="Tanlang" />
+                            <SelectValue placeholder={productsLoading ? t.products.loadingProducts : t.common.product + "..."} />
                           </SelectTrigger>
-                          <SelectContent className="rounded-xl">
+                          <SelectContent className="rounded-xl max-h-[300px]">
+                            {products?.length === 0 && (
+                              <div className="p-4 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                {t.products.noProducts}
+                              </div>
+                            )}
                             {products?.map((p) => (
                               <SelectItem key={p.id} value={p.id}>{p.name} ({p.stock} ta bor)</SelectItem>
                             ))}
