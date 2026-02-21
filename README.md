@@ -1,45 +1,51 @@
 
 # 🚀 ombor.uz - GitHub + Netlify To'liq Yo'riqnomasi
 
-Loyihani GitHub-ga yuklash va Netlify-da bir umrga bepul ishga tushirish uchun ushbu qadamlarni aniq bajaring:
+Loyihani Netlify-da mutlaqo bepul ishga tushirish uchun ushbu qadamlarni bajaring:
 
 ---
 
 ## 1-Bosqich: Kodni GitHub-ga yuborish
-Terminalga (pastdagi qora oyna) ushbu buyruqlarni birma-bir yozing:
+Terminalga ushbu buyruqlarni ketma-ket yozing:
 
 ```bash
 git add .
-git commit -m "feat: finalized build config for netlify"
+git commit -m "feat: finalized deployment config"
 git push origin main
 ```
 
 ---
 
-## 2-Bosqich: Netlify-da sozlash (Rasmga asosan)
-1.  [Netlify.com](https://app.netlify.com/) sahifasiga kiring.
-2.  **"Add new site"** -> **"Import an existing project"** tugmasini bosing.
-3.  **GitHub**-ni tanlang va loyihangizni ro'yxatdan toping.
-4.  **Site configuration** oynasida quyidagilarni kiriting:
-    *   **Base directory**: (Bo'sh qoldiring)
+## 2-Bosqich: Netlify-da sozlash (Siz ko'rib turgan oyna)
+Netlify-da loyihani tanlagandan so'ng, quyidagi ma'lumotlarni kiriting:
+
+1.  **Build settings**:
     *   **Build command**: `npm run build`
     *   **Publish directory**: `.next`
-    *   **Functions directory**: `netlify/functions`
-5.  **"Deploy site"** tugmasini bosing.
+2.  **Environment Variables (Siz yuborgan rasm qismi)**:
+    *   **"Contents of .env file"** oynasiga quyidagilarni yozing:
+    ```text
+    GOOGLE_GENAI_API_KEY=Sizning_Google_AI_Kalitingiz
+    ```
+    *(Eslatma: Kalitni `https://aistudio.google.com/` saytidan olishingiz mumkin)*
+
+3.  **Tugmalarni tanlang**:
+    *   **Scopes**: `All scopes` (tanlangan bo'lsin)
+    *   **Deploy contexts**: `All deploy contexts` (tanlangan bo'lsin)
+
+4.  **"Import variables"** tugmasini bosing va pastdagi **"Deploy site"** ni bosing.
 
 ---
 
-## 3-Bosqich: AI ishlashi uchun (MUHIM!)
-Netlify panelida saytingiz qurilayotgan vaqtda:
-1.  **Site configuration** -> **Environment variables** bo'limiga kiring.
-2.  **Add a variable** tugmasini bosing.
-3.  **Key**: `GOOGLE_GENAI_API_KEY`
-4.  **Value**: (Sizning Google AI kalitingiz)
-5.  O'zgarishni saqlang va **Deploys** menyusidan **"Trigger deploy"** -> **"Clear cache and deploy site"**-ni tanlang.
+## 3-Bosqich: AI ishlashi uchun muhim!
+Agar sayt qurilib bo'lgandan keyin AI (chat) ishlamasa:
+1.  Netlify panelida **Site configuration** -> **Environment variables** bo'limiga kiring.
+2.  `GOOGLE_GENAI_API_KEY` borligini tekshiring.
+3.  **Deploys** menyusidan **"Trigger deploy"** -> **"Clear cache and deploy site"** ni tanlang.
 
 ---
 
 ## 🛠️ Muammo bormi?
-Agar Netlify-da "Page not found" yoki "Build failed" xatosi chiqsa, `netlify.toml` fayli borligini va unda `[[plugins]] package = "@netlify/plugin-nextjs"` qatori mavjudligini tekshiring (hozirgi kodda bu tayyor).
+Agar sayt ochilmasa, `netlify.toml` fayli loyiha ildizida borligiga ishonch hosil qiling. Hozirgi kodda bu fayl tayyor holatda.
 
 Created by **X e M team** © 2026
