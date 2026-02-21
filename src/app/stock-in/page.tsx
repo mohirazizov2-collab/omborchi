@@ -14,7 +14,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Trash2, FileText, Loader2, ScanLine, Search, PackageSearch, ArrowRight } from "lucide-react";
+import { Plus, Trash2, FileText, Loader2, ScanLine, Search, PackageSearch, ArrowRight, AlertCircle, ShoppingCart } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -22,8 +22,6 @@ import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -193,15 +191,15 @@ export default function StockInPage() {
             </Link>
             <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2 rounded-2xl h-12 px-6 bg-primary text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
+                <Button className="gap-2 rounded-2xl h-12 px-6 bg-primary text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 premium-button">
                   <ScanLine className="w-4 h-4" /> {t.stockIn.scanBarcode}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md rounded-[2.5rem] bg-card/90 backdrop-blur-3xl">
+              <DialogContent className="max-w-md rounded-[2.5rem] bg-card/90 backdrop-blur-3xl border-white/10 shadow-2xl">
                 <DialogHeader>
-                  <DialogTitle>{t.stockIn.scanBarcode}</DialogTitle>
+                  <DialogTitle className="text-xl font-black tracking-tight">{t.stockIn.scanBarcode}</DialogTitle>
                 </DialogHeader>
-                <div id="reader-in-page" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-primary/20 bg-background/50"></div>
+                <div id="reader-in-page" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-primary/20 bg-background/50 aspect-square"></div>
               </DialogContent>
             </Dialog>
           </div>
@@ -220,7 +218,7 @@ export default function StockInPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.dnNumber}</Label>
                   <Input 
                     placeholder="DN-2026-XXX" 
-                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all" 
+                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 focus:border-primary/40 transition-all" 
                     value={dnNumber}
                     onChange={(e) => setDnNumber(e.target.value)}
                   />
@@ -228,8 +226,8 @@ export default function StockInPage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.supplier}</Label>
                   <Input 
-                    placeholder="Yetkazib beruvchi" 
-                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all" 
+                    placeholder="Yetkazib beruvchi nomi" 
+                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 focus:border-primary/40 transition-all" 
                     value={supplier}
                     onChange={(e) => setSupplier(e.target.value)}
                   />
@@ -240,9 +238,9 @@ export default function StockInPage() {
                     <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all">
                       <SelectValue placeholder="Omborni tanlang" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-2xl">
+                    <SelectContent className="rounded-2xl border-border/40">
                       {warehouses?.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        <SelectItem key={w.id} value={w.id} className="font-bold">{w.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -256,7 +254,9 @@ export default function StockInPage() {
 
             <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
               <CardHeader className="p-8 flex flex-row items-center justify-between">
-                <CardTitle className="font-headline font-black text-xl tracking-tight">{t.stockIn.productItems}</CardTitle>
+                <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
+                  <ShoppingCart className="w-6 h-6 text-primary" /> {t.stockIn.productItems}
+                </CardTitle>
                 <Button variant="outline" size="sm" onClick={addItem} className="gap-2 rounded-xl font-black uppercase text-[9px] tracking-widest h-9 px-4 border-primary/20 text-primary hover:bg-primary/5">
                   <Plus className="w-4 h-4" /> {t.actions.addItem}
                 </Button>
@@ -270,67 +270,79 @@ export default function StockInPage() {
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       className={cn(
-                        "flex flex-col md:flex-row gap-4 p-6 rounded-[2rem] bg-muted/10 border transition-all relative group",
+                        "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border transition-all relative group",
                         !item.productId ? "border-rose-500/20 bg-rose-500/[0.02]" : "border-border/10"
                       )}
                     >
                       <div className="flex-1 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
-                          {t.common.product} {!item.productId && "*"}
+                        <Label className={cn(
+                          "text-[10px] font-black uppercase tracking-widest pl-2",
+                          !item.productId ? "text-rose-500 opacity-100 animate-pulse" : "opacity-40"
+                        )}>
+                          {t.common.product} {!item.productId && " (Tanlang)"}
                         </Label>
                         <Select 
                           onValueChange={(val) => updateItem(item.id, "productId", val)}
                           value={item.productId}
                         >
-                          <SelectTrigger className="h-12 rounded-xl bg-background/50 border-none font-bold shadow-sm">
+                          <SelectTrigger className={cn(
+                            "h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm transition-all",
+                            !item.productId && "ring-2 ring-rose-500/20"
+                          )}>
                             <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Mahsulotni qidiring..."} />
                           </SelectTrigger>
-                          <SelectContent className="rounded-xl max-h-[350px]">
-                            <div className="p-2 border-b border-white/10 sticky top-0 bg-popover z-10">
+                          <SelectContent className="rounded-2xl max-h-[400px] border-border/40 shadow-2xl p-2">
+                            <div className="p-2 border-b border-border/10 sticky top-0 bg-popover z-10 mb-2">
                                <div className="relative">
-                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                   <Input 
-                                    placeholder="Nomi yoki SKU..." 
-                                    className="h-9 pl-9 text-xs rounded-lg bg-background/50"
+                                    placeholder="Nomi yoki SKU bo'yicha qidiruv..." 
+                                    className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none focus:ring-primary/30"
                                     value={item.searchQuery}
                                     onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                </div>
                             </div>
-                            <div className="py-1">
+                            <div className="space-y-1">
                               {products?.filter(p => 
                                 p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) || 
                                 p.sku.toLowerCase().includes(item.searchQuery.toLowerCase())
                               ).map((p) => (
-                                <SelectItem key={p.id} value={p.id} className="py-3 cursor-pointer">
-                                  <div className="flex flex-col">
+                                <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer hover:bg-primary/5">
+                                  <div className="flex flex-col gap-0.5">
                                     <span className="font-bold text-sm">{p.name}</span>
-                                    <span className="text-[9px] opacity-50 uppercase tracking-widest font-black">{p.sku}</span>
+                                    <span className="text-[10px] opacity-50 uppercase tracking-widest font-black text-primary">{p.sku}</span>
                                   </div>
                                 </SelectItem>
                               ))}
                               {(!products || products.length === 0) && (
-                                <div className="p-8 text-center text-xs opacity-50 italic">Mahsulotlar topilmadi.</div>
+                                <div className="p-10 text-center flex flex-col items-center gap-3">
+                                  <AlertCircle className="w-8 h-8 text-muted-foreground opacity-20" />
+                                  <p className="text-xs opacity-50 italic">Mahsulotlar topilmadi. Avval katalogga qo'shing.</p>
+                                  <Link href="/products">
+                                    <Button variant="link" className="text-primary font-black text-[10px] uppercase tracking-widest">Katalogga o'tish</Button>
+                                  </Link>
+                                </div>
                               )}
                             </div>
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="w-full md:w-28 space-y-3">
+                      <div className="w-full md:w-32 space-y-3">
                         <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.quantity}</Label>
                         <Input 
                           type="number" 
-                          className="h-12 rounded-xl bg-background/50 border-none font-black text-center"
+                          className="h-14 rounded-2xl bg-background/50 border-none font-black text-center text-lg"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
                         />
                       </div>
-                      <div className="w-full md:w-36 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.price}</Label>
+                      <div className="w-full md:w-40 space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.price} (so'm)</Label>
                         <Input 
                           type="number" 
-                          className="h-12 rounded-xl bg-background/50 border-none font-black"
+                          className="h-14 rounded-2xl bg-background/50 border-none font-black text-lg"
                           value={item.price}
                           onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
                         />
@@ -338,10 +350,10 @@ export default function StockInPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-12 w-12 rounded-xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors"
+                        className="h-14 w-14 rounded-2xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors shrink-0"
                         onClick={() => removeItem(item.id)}
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-6 h-6" />
                       </Button>
                     </motion.div>
                   ))}
@@ -352,26 +364,29 @@ export default function StockInPage() {
 
           <div className="lg:col-span-4 space-y-8">
             <Card className="border-none glass-card bg-primary text-white rounded-[3rem] shadow-2xl shadow-primary/30 sticky top-8 overflow-hidden">
-              <CardHeader className="p-8 pb-4">
+              <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
+                <ShoppingCart className="w-32 h-32" />
+              </div>
+              <CardHeader className="p-8 pb-4 relative z-10">
                 <CardTitle className="font-headline font-black text-2xl tracking-tight">{t.common.summary}</CardTitle>
               </CardHeader>
-              <CardContent className="p-8 pt-4 space-y-8">
+              <CardContent className="p-8 pt-4 space-y-8 relative z-10">
                 <div className="flex justify-between items-center pb-6 border-b border-white/10">
                   <span className="text-white/60 text-xs font-black uppercase tracking-widest">{t.common.totalItems}</span>
-                  <span className="text-3xl font-black">{items.filter(i => i.productId).length}</span>
+                  <span className="text-4xl font-black">{items.filter(i => i.productId).length}</span>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Umumiy qiymat</p>
-                  <p className="text-4xl font-black font-headline tracking-tighter leading-none">{totalValue.toLocaleString()} <span className="text-lg">so'm</span></p>
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Jami kirim qiymati</p>
+                  <p className="text-4xl font-black font-headline tracking-tighter leading-none">{totalValue.toLocaleString()} <span className="text-lg opacity-60">so'm</span></p>
                 </div>
               </CardContent>
-              <CardFooter className="p-8 pt-0">
+              <CardFooter className="p-8 pt-0 relative z-10">
                 <Button 
-                  className="w-full h-16 rounded-2xl bg-white text-primary hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button" 
+                  className="w-full h-16 rounded-[1.5rem] bg-white text-primary hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button group" 
                   onClick={handleProcess} 
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3" /> {t.stockIn.process}</>}
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3 transition-transform group-hover:translate-x-1" /> {t.stockIn.process}</>}
                 </Button>
               </CardFooter>
             </Card>
