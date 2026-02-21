@@ -35,17 +35,13 @@ Netlify-ga kiring va GitHub-dagi loyihani tanlang. Sozlamalarni quyidagicha to'l
 - **Publish directory:** `.next`
 
 ## 🔑 3-qadam: AI Kalitini kiritish (Muhim!)
-Netlify-da **"Site configuration" -> "Environment variables"** bo'limiga o'ting va quyidagilarni qo'shing:
-
-- **Key:** `GOOGLE_GENAI_API_KEY`
-- **Value:** *(Sizning Gemini AI API kalitingiz)*
-
-## ✨ Tizim imkoniyatlari:
-- **Dashboard:** Real-vaqt statistikasi va PDF professional hisobot.
-- **Inventarizatsiya:** Tizim va haqiqiy qoldiqni solishtirish (Adminlar uchun).
-- **PDF Cheklar:** Kirim va Chiqim operatsiyalari uchun logotipli avtomatik cheklar.
-- **Excel:** Barcha zaxira ma'lumotlarini yuklab olish.
-- **AI Assistant:** Har bir sahifada yordam beruvchi aqlli chatbot.
+Netlify-da **"Site configuration" -> "Environment variables"** bo'limiga o'ting:
+1. **"Add environment variables"** tugmasini bosing.
+2. **"Add key/value pairs"** variantini tanlang.
+3. Quyidagilarni kiriting:
+   - **Key:** `GOOGLE_GENAI_API_KEY`
+   - **Value:** *(Sizning Gemini AI API kalitingiz)*
+4. **"Save"** tugmasini bosing va qaytadan **"Deploy site"** qiling.
 
 ---
 Created by **X e M team** © 2026
