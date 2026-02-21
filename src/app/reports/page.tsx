@@ -28,9 +28,10 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
-import * as XLSX from "xlsx";
+
+// Dynamic Imports for Large Libraries
+const jsPDF = dynamic(() => import("jspdf").then(m => m.default), { ssr: false });
+const XLSX = dynamic(() => import("xlsx").then(m => m), { ssr: false });
 
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
@@ -85,44 +86,35 @@ export default function ReportsPage() {
   }, [db, user]);
   const { data: movements, isLoading: movementsLoading } = useCollection(movementsQuery);
 
+  // Performance Optimized Calculations O(1) Map Lookup
   const financials = useMemo(() => {
     if (!movements || !products || !employees) return { revenue: 0, expenses: 0, profit: 0 };
 
-    const productMap = new Map();
-    for (let i = 0; i < products.length; i++) {
-      productMap.set(products[i].id, products[i].salePrice || 0);
-    }
+    const productMap = new Map<string, number>();
+    products.forEach(p => productMap.set(p.id, p.salePrice || 0));
 
     const now = Date.now();
     const days = reportPeriod === 'weekly' ? 7 : 30;
     const thresholdDate = now - (days * 24 * 60 * 60 * 1000);
 
     let revenue = 0;
-    for (let i = 0; i < movements.length; i++) {
-      const m = movements[i];
+    movements.forEach(m => {
       if (m.movementType === 'StockOut' && new Date(m.movementDate).getTime() >= thresholdDate) {
-        const price = productMap.get(m.productId) || 0;
-        revenue += Math.abs(m.quantityChange) * price;
+        revenue += Math.abs(m.quantityChange || 0) * (productMap.get(m.productId) || 0);
       }
-    }
+    });
 
     let expenses = 0;
-    for (let i = 0; i < employees.length; i++) {
-      const e = employees[i];
+    employees.forEach(e => {
       const monthlyTotal = (e.baseSalary || 0) + (e.bonus || 0) - (e.deductions || 0);
       expenses += (reportPeriod === 'weekly' ? monthlyTotal / 4 : monthlyTotal);
-    }
+    });
 
     return { revenue, expenses, profit: revenue - expenses };
   }, [movements, products, employees, reportPeriod]);
 
   const totalValue = useMemo(() => {
-    if (!products) return 0;
-    let total = 0;
-    for (let i = 0; i < products.length; i++) {
-      total += (products[i].salePrice || 0) * (products[i].stock || 0);
-    }
-    return total;
+    return products?.reduce((acc, p) => acc + ((p.salePrice || 0) * (p.stock || 0)), 0) || 0;
   }, [products]);
 
   const lowStockCount = useMemo(() => 
@@ -150,22 +142,18 @@ export default function ReportsPage() {
       });
       setAiResult(result);
     } catch (error) {
-      console.error("AI Analysis error:", error);
       toast({ variant: "destructive", title: "AI Xatolik", description: "Tahlil qilishda xatolik yuz berdi." });
     } finally {
       setIsAiLoading(false);
     }
   }, [products, totalValue, warehouses, lowStockCount, toast]);
 
-  const exportToExcel = () => {
-    if (!products || products.length === 0) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Eksport qilish uchun mahsulotlar yo'q." });
-      return;
-    }
+  const exportToExcel = async () => {
+    if (!products || products.length === 0) return;
+    toast({ title: "Excel tayyorlanmoqda..." });
     
-    toast({ title: "Excel tayyorlanmoqda...", description: "Iltimos, kuting." });
-    
-    const worksheet = XLSX.utils.json_to_sheet(products.map(p => ({
+    const XLSXLib = await import("xlsx");
+    const worksheet = XLSXLib.utils.json_to_sheet(products.map(p => ({
       "Nomi": p.name,
       "SKU": p.sku,
       "Kategoriya": p.categoryId || "General",
@@ -174,59 +162,41 @@ export default function ReportsPage() {
       "Jami Qiymat": (p.stock || 0) * (p.salePrice || 0),
       "Holat": (p.stock || 0) > (p.lowStockThreshold || 10) ? "Active" : "Low Stock"
     })));
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Zaxira Hisoboti");
-    XLSX.writeFile(workbook, `ombor_uz_zaxira_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const workbook = XLSXLib.utils.book_new();
+    XLSXLib.utils.book_append_sheet(workbook, worksheet, "Zaxira");
+    XLSXLib.writeFile(workbook, `Zaxira_Hisoboti_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (!products) return;
+    toast({ title: "PDF tayyorlanmoqda..." });
     
-    toast({ title: "PDF tayyorlanmoqda...", description: "Hujjat shakllantirilmoqda." });
+    const jsPDFLib = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
     
-    const doc = new jsPDF();
+    const doc = new jsPDFLib();
     doc.setFontSize(20);
-    doc.setTextColor(46, 104, 184);
     doc.text("ombor.uz - Global Inventar Hisoboti", 105, 20, { align: "center" });
     
     doc.setFontSize(10);
-    doc.setTextColor(100);
     doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 35);
-    doc.text(`Hisobot turi: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 15, 42);
 
     const statsData = [
       ["Jami zaxira qiymati", `${totalValue.toLocaleString()} so'm`],
-      ["Sotuv tushumi (davr uchun)", `${financials.revenue.toLocaleString()} so'm`],
-      ["Xarajatlar (Maoshlar)", `${financials.expenses.toLocaleString()} so'm`],
-      ["Sof foyda", `${financials.profit.toLocaleString()} so'm`],
-      ["Kam qolgan mahsulotlar", `${lowStockCount} ta`]
+      ["Sotuv tushumi", `${financials.revenue.toLocaleString()} so'm`],
+      ["Xarajatlar", `${financials.expenses.toLocaleString()} so'm`],
+      ["Sof foyda", `${financials.profit.toLocaleString()} so'm`]
     ];
 
     (doc as any).autoTable({
-      startY: 50,
+      startY: 45,
       head: [['Ko\'rsatkich', 'Qiymat']],
       body: statsData,
       theme: 'striped',
-      headStyles: { fillColor: [46, 104, 184], fontSize: 11, fontStyle: 'bold' },
-      styles: { fontSize: 10 }
+      headStyles: { fillColor: [46, 104, 184] }
     });
 
-    if (products.length > 0) {
-      doc.setFontSize(14);
-      doc.setTextColor(0);
-      doc.text("Mahsulotlar Qoldig'i (Top 20)", 15, (doc as any).lastAutoTable.finalY + 15);
-      
-      (doc as any).autoTable({
-        startY: (doc as any).lastAutoTable.finalY + 20,
-        head: [['#', 'Mahsulot', 'SKU', 'Zaxira', 'Narx']],
-        body: products.slice(0, 20).map((p, i) => [i + 1, p.name, p.sku, p.stock || 0, `${(p.salePrice || 0).toLocaleString()} so'm`]),
-        theme: 'grid',
-        headStyles: { fillColor: [80, 80, 80] },
-        styles: { fontSize: 9 }
-      });
-    }
-
-    doc.save(`ombor_uz_hisobot_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`Hisobot_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   if (!mounted || authLoading) {
@@ -253,10 +223,7 @@ export default function ReportsPage() {
               <Button 
                 variant={reportPeriod === 'weekly' ? 'secondary' : 'ghost'} 
                 size="sm" 
-                className={cn(
-                  "rounded-xl text-[10px] font-black uppercase h-10 px-4 transition-all",
-                  reportPeriod === 'weekly' && "bg-background shadow-sm"
-                )}
+                className={cn("rounded-xl text-[10px] font-black uppercase h-10 px-4", reportPeriod === 'weekly' && "bg-background shadow-sm")}
                 onClick={() => setReportPeriod('weekly')}
               >
                 {t.reports.weekly}
@@ -264,10 +231,7 @@ export default function ReportsPage() {
               <Button 
                 variant={reportPeriod === 'monthly' ? 'secondary' : 'ghost'} 
                 size="sm" 
-                className={cn(
-                  "rounded-xl text-[10px] font-black uppercase h-10 px-4 transition-all",
-                  reportPeriod === 'monthly' && "bg-background shadow-sm"
-                )}
+                className={cn("rounded-xl text-[10px] font-black uppercase h-10 px-4", reportPeriod === 'monthly' && "bg-background shadow-sm")}
                 onClick={() => setReportPeriod('monthly')}
               >
                 {t.reports.monthly}
@@ -275,19 +239,15 @@ export default function ReportsPage() {
             </div>
             
             <div className="flex gap-2">
-              <Button variant="outline" onClick={exportToExcel} disabled={isLoading || !products?.length} className="rounded-2xl font-bold h-12 px-5 border-border/50 bg-card hover:bg-emerald-500/5 hover:text-emerald-600 transition-colors">
+              <Button variant="outline" onClick={exportToExcel} disabled={isLoading || !products?.length} className="rounded-2xl font-bold h-12 px-5 border-border/50">
                 <TableIcon className="w-4 h-4 mr-2 text-emerald-500" /> Excel
               </Button>
-              <Button variant="outline" onClick={exportToPDF} disabled={isLoading || !products?.length} className="rounded-2xl font-bold h-12 px-5 border-border/50 bg-card hover:bg-rose-500/5 hover:text-rose-600 transition-colors">
+              <Button variant="outline" onClick={exportToPDF} disabled={isLoading || !products?.length} className="rounded-2xl font-bold h-12 px-5 border-border/50">
                 <FileDown className="w-4 h-4 mr-2 text-rose-500" /> PDF
               </Button>
             </div>
 
-            <Button 
-              onClick={handleAiAnalyze} 
-              disabled={isAiLoading || isLoading || !products?.length}
-              className="rounded-2xl font-black uppercase tracking-widest text-[10px] text-white shadow-2xl shadow-primary/20 bg-primary premium-button h-12 px-8"
-            >
+            <Button onClick={handleAiAnalyze} disabled={isAiLoading || isLoading || !products?.length} className="rounded-2xl font-black uppercase tracking-widest text-[10px] text-white shadow-2xl shadow-primary/20 bg-primary premium-button h-12 px-8">
               {isAiLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Wand2 className="w-4 h-4 mr-2" />}
               {t.reports.aiAnalyze}
             </Button>
@@ -302,52 +262,33 @@ export default function ReportsPage() {
             <h2 className="text-xl font-black font-headline tracking-tight">{t.reports.profitAnalysis}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group rounded-[2rem]">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
               <CardContent className="pt-8">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">{t.reports.revenue}</p>
                 <p className="text-3xl font-black font-headline tracking-tighter text-emerald-500">{financials.revenue.toLocaleString()} so'm</p>
-                <div className="mt-4 flex items-center gap-2 text-emerald-500 font-bold text-[11px]">
-                  <TrendingUp className="w-3.5 h-3.5" /> 
-                  <span>{reportPeriod === 'weekly' ? 'Haftalik sotuv' : 'Oylik sotuv'}</span>
-                </div>
               </CardContent>
             </Card>
-
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group rounded-[2rem]">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
               <CardContent className="pt-8">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">{t.reports.expenses}</p>
                 <p className="text-3xl font-black font-headline tracking-tighter text-rose-500">{financials.expenses.toLocaleString()} so'm</p>
-                <div className="mt-4 flex items-center gap-2 text-rose-500 font-bold text-[11px]">
-                  <Wallet className="w-3.5 h-3.5" /> 
-                  <span>{reportPeriod === 'weekly' ? 'Taxminiy haftalik xarajat' : 'Oylik ish haqi fondi'}</span>
-                </div>
               </CardContent>
             </Card>
-
-            <Card className="border-none glass-card bg-primary text-white relative overflow-hidden group shadow-2xl shadow-primary/20 rounded-[2rem]">
+            <Card className="border-none glass-card bg-primary text-white shadow-2xl shadow-primary/20 rounded-[2rem]">
               <CardContent className="pt-8">
                 <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em] mb-2">{t.reports.netProfit}</p>
                 <p className="text-3xl font-black font-headline tracking-tighter">
                   {financials.profit > 0 ? '+' : ''}{financials.profit.toLocaleString()} so'm
                 </p>
-                <div className="mt-4 flex items-center gap-2 text-white/80 font-bold text-[11px]">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> 
-                  <span>Balans: {financials.profit > 0 ? 'Ijobiy' : 'Salbiy'}</span>
-                </div>
               </CardContent>
             </Card>
           </div>
         </section>
 
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           {aiResult && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="mb-12"
-            >
-              <Card className="border-none glass-card bg-primary/5 border border-primary/20 overflow-hidden relative rounded-[2.5rem]">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12">
+              <Card className="border-none glass-card bg-primary/5 border border-primary/20 rounded-[2.5rem]">
                 <CardHeader className="pt-8 px-8">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkles className="w-4 h-4 text-primary" />
@@ -356,23 +297,19 @@ export default function ReportsPage() {
                   <CardTitle className="font-headline font-black text-3xl tracking-tight">AI Xulosasi</CardTitle>
                 </CardHeader>
                 <CardContent className="px-8 pb-8 space-y-8">
-                  <div className="p-6 rounded-[2rem] bg-background/40 backdrop-blur-xl border border-white/5 italic font-medium leading-relaxed shadow-sm">
+                  <div className="p-6 rounded-[2rem] bg-background/40 backdrop-blur-xl italic font-medium shadow-sm">
                     "{aiResult.summary}"
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    <div className="space-y-4">
-                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
-                        <Activity className="w-4 h-4" /> Trendlar
-                      </h4>
-                      <p className="text-sm text-muted-foreground font-medium leading-relaxed whitespace-pre-wrap">{aiResult.analysis}</p>
+                    <div>
+                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Trendlar</h4>
+                      <p className="text-sm text-muted-foreground font-medium leading-relaxed">{aiResult.analysis}</p>
                     </div>
-                    <div className="space-y-4">
-                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" /> Strategik Tavsiyalar
-                      </h4>
+                    <div>
+                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Strategik Tavsiyalar</h4>
                       <div className="space-y-3">
                         {aiResult.recommendations.map((rec, i) => (
-                          <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-primary/10 border border-primary/10">
+                          <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-primary/10">
                             <div className="w-6 h-6 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 text-[10px] font-black">{i + 1}</div>
                             <span className="text-sm font-bold">{rec}</span>
                           </div>
@@ -385,50 +322,6 @@ export default function ReportsPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {isLoading ? (
-          <div className="flex h-[200px] items-center justify-center opacity-20">
-            <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
-              <CardContent className="pt-8">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500">
-                    <TrendingUp className="w-7 h-7" />
-                  </div>
-                </div>
-                <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{t.dashboard.totalStockValue}</h3>
-                <p className="text-3xl font-black font-headline tracking-tighter mt-2">{totalValue.toLocaleString()} so'm</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
-              <CardContent className="pt-8">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="p-4 rounded-2xl bg-primary/10 text-primary">
-                    <Package className="w-7 h-7" />
-                  </div>
-                </div>
-                <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{t.nav.products}</h3>
-                <p className="text-3xl font-black font-headline tracking-tighter mt-2">{products?.length || 0} Skus</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
-              <CardContent className="pt-8">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="p-4 rounded-2xl bg-purple-500/10 text-purple-500">
-                    <Warehouse className="w-7 h-7" />
-                  </div>
-                </div>
-                <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{t.dashboard.activeWarehouses}</h3>
-                <p className="text-3xl font-black font-headline tracking-tighter mt-2">{warehouses?.length || 0} ta Hub</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </main>
     </div>
   );

@@ -82,6 +82,12 @@
   }
 }
 
+/* 120 FPS Performance Optimizations */
+.recharts-responsive-container {
+  will-change: transform;
+  contain: layout;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -90,12 +96,6 @@
 }
 ::-webkit-scrollbar-thumb {
   @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
-}
-
-/* 120 FPS Performance Optimizations */
-.recharts-responsive-container {
-  will-change: transform;
-  contain: layout;
 }
 
 a, button {
