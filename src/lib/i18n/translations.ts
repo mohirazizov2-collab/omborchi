@@ -11,6 +11,7 @@ export const translations = {
       stockOut: 'Chiqim',
       transfers: 'Transferlar',
       employees: 'Ishchilar',
+      history: 'Harakatlar tarixi',
       reports: 'Hisobotlar',
       systemGen: 'Tizim Gen',
       userManagement: 'Foydalanuvchilar',
@@ -18,6 +19,15 @@ export const translations = {
       menu: 'Menyu',
       administration: 'Administratsiya',
       profile: 'Profil'
+    },
+    history: {
+      title: 'Harakatlar tarixi',
+      description: 'Ombordagi barcha kirim, chiqim va transfer operatsiyalarining batafsil jurnali.',
+      search: 'ID yoki mahsulot bo\'yicha qidirish...',
+      filterType: 'Operatsiya turi',
+      all: 'Barcha amallar',
+      details: 'Batafsil ma\'lumot',
+      empty: 'Hozircha harakatlar qayd etilmagan.'
     },
     employees: {
       title: 'Xodimlarni boshqarish',
@@ -195,6 +205,7 @@ export const translations = {
       stockOut: 'Расход',
       transfers: 'Переводы',
       employees: 'Сотрудники',
+      history: 'История операций',
       reports: 'Отчеты',
       systemGen: 'Ген Системы',
       userManagement: 'Пользователи',
@@ -202,6 +213,15 @@ export const translations = {
       menu: 'Меню',
       administration: 'Администрирование',
       profile: 'Профиль'
+    },
+    history: {
+      title: 'История операций',
+      description: 'Подробный журнал всех приходов, расходов и перемещений на складах.',
+      search: 'Поиск по ID или продукту...',
+      filterType: 'Тип операции',
+      all: 'Все операции',
+      details: 'Подробности',
+      empty: 'Движений пока не зафиксировано.'
     },
     employees: {
       title: 'Управление сотрудниками',
@@ -379,6 +399,7 @@ export const translations = {
       stockOut: 'Stock Out',
       transfers: 'Transfers',
       employees: 'Employees',
+      history: 'Movement History',
       reports: 'Reports',
       systemGen: 'System Gen',
       userManagement: 'Users',
@@ -386,6 +407,15 @@ export const translations = {
       menu: 'Menu',
       administration: 'Administration',
       profile: 'Profile'
+    },
+    history: {
+      title: 'Movement History',
+      description: 'Detailed log of all stock in, stock out, and transfer operations.',
+      search: 'Search by ID or product...',
+      filterType: 'Operation Type',
+      all: 'All Operations',
+      details: 'Details',
+      empty: 'No movements recorded yet.'
     },
     employees: {
       title: 'Employee Management',
@@ -422,7 +452,7 @@ export const translations = {
       stockMovements: 'Stock Movements',
       lowStockAlerts: 'Low Stock Alerts',
       recentMovements: 'Recent Movements',
-      viewAll: 'View All Alerts',
+      viewAll: 'View All History',
       totalSalaryExpense: 'Total Salary Expense'
     },
     profile: {

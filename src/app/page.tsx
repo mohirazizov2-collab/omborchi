@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -323,9 +324,9 @@ export default function DashboardPage() {
                 {t.dashboard.recentMovements}
               </CardTitle>
             </div>
-            <Link href="/products">
+            <Link href="/history">
               <Button variant="ghost" size="sm" className="text-[11px] font-black uppercase tracking-widest opacity-50 hover:opacity-100 hover:bg-muted/50 rounded-xl px-4">
-                View All <ArrowUpRight className="w-3 h-3 ml-2" />
+                {t.dashboard.viewAll} <ArrowUpRight className="w-3 h-3 ml-2" />
               </Button>
             </Link>
           </CardHeader>
@@ -357,7 +358,9 @@ export default function DashboardPage() {
                         <td className="px-6 py-6">
                           <Badge variant="outline" className={cn(
                             "rounded-xl font-black text-[9px] uppercase px-3 py-1 border-none shadow-sm",
-                            m.movementType === 'StockIn' ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                            m.movementType === 'StockIn' ? "bg-emerald-500/10 text-emerald-500" : 
+                            m.movementType === 'StockOut' ? "bg-rose-500/10 text-rose-500" : 
+                            "bg-blue-500/10 text-blue-500"
                           )}>
                             {m.movementType}
                           </Badge>
