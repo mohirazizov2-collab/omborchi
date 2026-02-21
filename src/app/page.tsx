@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -11,13 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, limit, orderBy, where } from "firebase/firestore";
+import { collection, query, limit, orderBy } from "firebase/firestore";
 import { 
   TrendingUp, 
   Box, 
   Warehouse as WarehouseIcon, 
   ArrowUpRight, 
-  ArrowDownRight, 
   AlertTriangle,
   Loader2,
   Calendar,
@@ -26,12 +24,10 @@ import {
   PlusCircle,
   History,
   ArrowRightLeft,
-  Search,
   Wallet,
   Users
 } from "lucide-react";
 import Link from "next/link";
-import { ChatAssistant } from "@/components/ai/chat-assistant";
 
 // Charts dynamic import for performance
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
@@ -121,7 +117,7 @@ export default function DashboardPage() {
         color: lowStock > 0 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"
       }
     ];
-  }, [t, products, productsLoading, warehouses, warehousesLoading, movements, employees, employeesLoading]);
+  }, [t, products, productsLoading, warehouses, warehousesLoading, employees, employeesLoading]);
 
   const quickActions = [
     { name: t.nav.stockIn, href: "/stock-in", icon: PlusCircle, color: "bg-emerald-500/10 text-emerald-500" },
@@ -394,7 +390,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </main>
-      <ChatAssistant />
     </div>
   );
 }
