@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus, Calendar, Truck, User, Loader2 } from "lucide-react";
+import { Trash2, Plus, Calendar, Truck, User, Loader2, Printer, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { motion, AnimatePresence } from "framer-motion";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 export default function StockOutPage() {
   const { t } = useLanguage();
@@ -46,6 +49,53 @@ export default function StockOutPage() {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
+  const generatePDF = (data: any) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(40);
+    doc.text("omborchi.uz", 105, 20, { align: "center" });
+    doc.setFontSize(14);
+    doc.text("CHIQIM HUJJATI (Goods Issue)", 105, 30, { align: "center" });
+    
+    // Details
+    doc.setFontSize(10);
+    doc.text(`Order #: ${data.orderNumber}`, 15, 45);
+    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 52);
+    doc.text(`Qabul qiluvchi: ${data.recipient}`, 15, 59);
+    doc.text(`Ombor: ${data.warehouseName}`, 15, 66);
+    doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 73);
+
+    // Table
+    const tableData = data.items.map((item: any, idx: number) => [
+      idx + 1,
+      item.productName,
+      item.quantity,
+      item.sku
+    ]);
+
+    (doc as any).autoTable({
+      startY: 80,
+      head: [['#', 'Mahsulot', 'Miqdor', 'SKU']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [220, 38, 38] },
+      styles: { fontSize: 9 }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.text("Imzo: ___________________", 15, finalY + 10);
+    doc.text("M.O'.: ___________________", 140, finalY + 10);
+
+    // Footer
+    doc.setFontSize(8);
+    doc.text("omborchi.uz - Zamonaviy ombor boshqaruvi tizimi.", 105, 285, { align: "center" });
+
+    doc.save(`Chiqim_${data.orderNumber}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const handleDispatch = () => {
     if (!orderNumber || !warehouseId || items.some(i => !i.productId)) {
       toast({
@@ -56,7 +106,6 @@ export default function StockOutPage() {
       return;
     }
 
-    // Check stock availability
     let insufficient = false;
     items.forEach(item => {
       const product = products?.find(p => p.id === item.productId);
@@ -76,9 +125,23 @@ export default function StockOutPage() {
 
     setLoading(true);
 
+    const warehouseName = warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum";
+    const receiptData = {
+      orderNumber,
+      recipient,
+      warehouseName,
+      items: items.map(item => {
+        const prod = products?.find(p => p.id === item.productId);
+        return {
+          ...item,
+          productName: prod?.name || "Mahsulot",
+          sku: prod?.sku || "N/A"
+        };
+      })
+    };
+
     try {
       items.forEach((item) => {
-        // 1. Record the movement
         const movementData = {
           productId: item.productId,
           warehouseId: warehouseId,
@@ -91,7 +154,6 @@ export default function StockOutPage() {
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
-        // 2. Update product total stock
         const product = products?.find(p => p.id === item.productId);
         if (product) {
           const productRef = doc(db, "products", item.productId);
@@ -103,8 +165,11 @@ export default function StockOutPage() {
 
       toast({
         title: "Muvaffaqiyatli",
-        description: "Tovarlar muvaffaqiyatli chiqarildi.",
+        description: "Tovarlar chiqarildi. Chek yuklanmoqda...",
       });
+
+      // Generate PDF
+      generatePDF(receiptData);
       
       setItems([{ id: Date.now(), productId: "", quantity: 1 }]);
       setOrderNumber("");
@@ -117,62 +182,65 @@ export default function StockOutPage() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
-      <main className="flex-1 p-8 overflow-y-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold font-headline tracking-tight text-primary">{t.stockOut.title}</h1>
-          <p className="text-muted-foreground mt-1">{t.stockOut.description}</p>
+      <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
+        <header className="mb-10">
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+            <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.stockOut.title}</h1>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">{t.stockOut.description}</p>
+          </motion.div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="border-none shadow-sm">
-              <CardHeader>
-                <CardTitle className="font-headline">{t.stockOut.issueDetails}</CardTitle>
+          <div className="lg:col-span-2 space-y-8">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
+              <CardHeader className="p-8">
+                <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
+                  <Truck className="w-6 h-6 text-primary" />
+                  {t.stockOut.issueDetails}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="order_number">{t.stockOut.refNumber}</Label>
-                  <div className="relative">
-                    <Truck className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <CardContent className="p-8 pt-0 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.refNumber}</Label>
+                  <div className="relative group">
+                    <Truck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input 
-                      id="order_number" 
                       placeholder="ORD-998877" 
-                      className="pl-10"
+                      className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:ring-primary/40 font-bold"
                       value={orderNumber}
                       onChange={(e) => setOrderNumber(e.target.value)}
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date">{t.stockOut.issueDate}</Label>
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.issueDate}</Label>
                   <div className="relative">
-                    <Calendar className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    <Input id="date" type="date" className="pl-10" defaultValue={new Date().toISOString().split('T')[0]} />
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input type="date" className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 font-bold" defaultValue={new Date().toISOString().split('T')[0]} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="source_warehouse">{t.stockOut.sourceWarehouse}</Label>
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.sourceWarehouse}</Label>
                   <Select onValueChange={setWarehouseId} value={warehouseId}>
-                    <SelectTrigger id="source_warehouse">
-                      <SelectValue placeholder={t.stockOut.sourceWarehouse} />
+                    <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold">
+                      <SelectValue placeholder="Omborni tanlang" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-2xl">
                       {warehouses?.map((w) => (
                         <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customer">{t.stockOut.recipient}</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.recipient}</Label>
+                  <div className="relative group">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input 
-                      id="customer" 
                       placeholder="Mijoz nomi" 
-                      className="pl-10" 
+                      className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:ring-primary/40 font-bold"
                       value={recipient}
                       onChange={(e) => setRecipient(e.target.value)}
                     />
@@ -181,73 +249,105 @@ export default function StockOutPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="font-headline">{t.stockOut.title}</CardTitle>
-                </div>
-                <Button variant="outline" size="sm" onClick={addItem} className="gap-2">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
+              <CardHeader className="p-8 flex flex-row items-center justify-between">
+                <CardTitle className="font-headline font-black text-xl tracking-tight">{t.stockOut.title}</CardTitle>
+                <Button variant="outline" size="sm" onClick={addItem} className="gap-2 rounded-xl font-black uppercase text-[9px] tracking-widest border-border/40 h-9 px-4">
                   <Plus className="w-4 h-4" /> {t.actions.addItem}
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {items.map((item) => (
-                  <div key={item.id} className="flex gap-4 items-end p-4 rounded-lg bg-accent/20 border">
-                    <div className="flex-1 space-y-2">
-                      <Label className="text-xs">{t.common.product}</Label>
-                      <Select 
-                        onValueChange={(val) => updateItem(item.id, "productId", val)}
-                        value={item.productId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={t.common.product} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products?.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>{p.name} ({p.stock} ta bor)</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="w-32 space-y-2">
-                      <Label className="text-xs">{t.common.quantity}</Label>
-                      <Input 
-                        type="number" 
-                        placeholder="0" 
-                        value={item.quantity}
-                        onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value))}
-                      />
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => removeItem(item.id)}
+              <CardContent className="p-8 pt-0 space-y-4">
+                <AnimatePresence mode="popLayout">
+                  {items.map((item) => (
+                    <motion.div 
+                      key={item.id} 
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="flex flex-col md:flex-row gap-4 p-6 rounded-[2rem] bg-muted/10 border border-border/10 group relative"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex-1 space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.product}</Label>
+                        <Select 
+                          onValueChange={(val) => updateItem(item.id, "productId", val)}
+                          value={item.productId}
+                        >
+                          <SelectTrigger className="h-12 rounded-xl bg-background/50 border-none font-bold">
+                            <SelectValue placeholder="Tanlang" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {products?.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>{p.name} ({p.stock} ta bor)</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-full md:w-32 space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.quantity}</Label>
+                        <Input 
+                          type="number" 
+                          className="h-12 rounded-xl bg-background/50 border-none font-black"
+                          placeholder="0" 
+                          value={item.quantity}
+                          onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value))}
+                        />
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-12 w-12 rounded-xl hover:bg-rose-500/10 text-rose-500 self-end md:self-auto"
+                        onClick={() => removeItem(item.id)}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </Button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </CardContent>
             </Card>
           </div>
 
-          <div className="space-y-6">
-            <Card className="border-none shadow-sm h-fit sticky top-8">
-              <CardHeader>
-                <CardTitle className="font-headline">{t.common.summary}</CardTitle>
+          <div className="space-y-8">
+            <Card className="border-none glass-card bg-rose-600 text-white rounded-[3rem] shadow-2xl shadow-rose-600/20 sticky top-8 overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Truck className="w-32 h-32 -rotate-12" />
+              </div>
+              <CardHeader className="p-8 pb-4">
+                <CardTitle className="font-headline font-black text-2xl tracking-tight">{t.common.summary}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t.common.totalItems}</span>
-                  <span className="font-semibold">{items.length}</span>
+              <CardContent className="p-8 pt-4 space-y-6">
+                <div className="flex justify-between items-center pb-6 border-b border-white/10">
+                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">{t.common.totalItems}</span>
+                  <span className="text-2xl font-black">{items.length}</span>
+                </div>
+                <div className="space-y-4">
+                   <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                         <User className="w-4 h-4" />
+                      </div>
+                      <p className="font-bold text-sm truncate">{recipient || '---'}</p>
+                   </div>
+                   <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                         <Truck className="w-4 h-4" />
+                      </div>
+                      <p className="font-bold text-sm truncate">{orderNumber || '---'}</p>
+                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col gap-3">
-                <Button className="w-full h-11 text-lg bg-orange-600 hover:bg-orange-700" onClick={handleDispatch} disabled={loading}>
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : t.stockOut.dispatch}
+              <CardFooter className="p-8 pt-0 flex flex-col gap-4">
+                <Button 
+                  className="w-full h-16 rounded-2xl bg-white text-rose-600 hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-xl border-none premium-button" 
+                  onClick={handleDispatch} 
+                  disabled={loading}
+                >
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3" /> {t.stockOut.dispatch}</>}
                 </Button>
-                <Button variant="outline" className="w-full" onClick={() => toast({ title: "Chop etilmoqda", description: "Terish varaqasi tayyorlanmoqda." })}>
+                <Button 
+                  variant="ghost" 
+                  className="w-full text-white/60 hover:text-white hover:bg-white/10 text-[10px] font-black uppercase tracking-widest"
+                  onClick={() => toast({ title: "Tayyorlanmoqda", description: "Terish varaqasi tayyor." })}
+                >
                   {t.stockOut.pickingList}
                 </Button>
               </CardFooter>

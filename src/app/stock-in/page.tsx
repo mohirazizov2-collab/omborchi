@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Calendar, FileText, Loader2, Truck, User, ArrowRight } from "lucide-react";
+import { Plus, Trash2, Calendar, FileText, Loader2, Truck, User, ArrowRight, Printer } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -15,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 export default function StockInPage() {
   const { t } = useLanguage();
@@ -47,6 +50,53 @@ export default function StockInPage() {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
+  const generatePDF = (data: any) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(40);
+    doc.text("omborchi.uz", 105, 20, { align: "center" });
+    doc.setFontSize(14);
+    doc.text("KIRIM NAKLADNOYI (Goods Receipt)", 105, 30, { align: "center" });
+    
+    // Details
+    doc.setFontSize(10);
+    doc.text(`Nakladnoy #: ${data.dnNumber}`, 15, 45);
+    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 52);
+    doc.text(`Yetkazib beruvchi: ${data.supplier}`, 15, 59);
+    doc.text(`Ombor: ${data.warehouseName}`, 15, 66);
+    doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 73);
+
+    // Table
+    const tableData = data.items.map((item: any, idx: number) => [
+      idx + 1,
+      item.productName,
+      item.quantity,
+      `$${item.price.toFixed(2)}`,
+      `$${(item.quantity * item.price).toFixed(2)}`
+    ]);
+
+    (doc as any).autoTable({
+      startY: 80,
+      head: [['#', 'Mahsulot', 'Miqdor', 'Narx', 'Jami']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [46, 104, 184] },
+      styles: { fontSize: 9 }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.text(`JAMI QIYMAT: $${data.totalValue.toFixed(2)}`, 195, finalY, { align: "right" });
+
+    // Footer
+    doc.setFontSize(8);
+    doc.text("Hujjat tizim orqali avtomatik shakllantirildi.", 105, 285, { align: "center" });
+
+    doc.save(`Kirim_${data.dnNumber}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const handleProcess = () => {
     if (!dnNumber || !supplier || !warehouseId || items.some(i => !i.productId)) {
       toast({
@@ -59,9 +109,20 @@ export default function StockInPage() {
 
     setLoading(true);
 
+    const warehouseName = warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum";
+    const receiptData = {
+      dnNumber,
+      supplier,
+      warehouseName,
+      totalValue: items.reduce((acc, item) => acc + (item.quantity * item.price), 0),
+      items: items.map(item => ({
+        ...item,
+        productName: products?.find(p => p.id === item.productId)?.name || "Mahsulot"
+      }))
+    };
+
     try {
       items.forEach((item) => {
-        // 1. Record the movement as a formal entry
         const movementData = {
           productId: item.productId,
           warehouseId: warehouseId,
@@ -76,7 +137,6 @@ export default function StockInPage() {
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
-        // 2. Update product total stock
         const product = products?.find(p => p.id === item.productId);
         if (product) {
           const productRef = doc(db, "products", item.productId);
@@ -89,8 +149,11 @@ export default function StockInPage() {
 
       toast({
         title: "Muvaffaqiyatli",
-        description: "Nakladnoy saqlandi va zaxira yangilandi.",
+        description: "Nakladnoy saqlandi. Chek yuklanmoqda...",
       });
+
+      // Generate PDF
+      generatePDF(receiptData);
       
       // Reset form
       setItems([{ id: Date.now(), productId: "", quantity: 1, price: 0 }]);
