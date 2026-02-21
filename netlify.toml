@@ -9,4 +9,3 @@
 [build.environment]
   NEXT_USE_NETLIFY_EDGE = "false"
   NODE_VERSION = "20"
-  # AI kalitini Netlify UI orqali qo'shish tavsiya etiladi
