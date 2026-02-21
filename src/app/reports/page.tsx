@@ -79,7 +79,6 @@ export default function ReportsPage() {
   }, [db, user]);
   const { data: movements, isLoading: movementsLoading } = useCollection(movementsQuery);
 
-  // Optimizatsiya qilingan hisob-kitoblar (Map kesh yordamida)
   const financials = useMemo(() => {
     if (!movements || !products || !employees) return { revenue: 0, expenses: 0, profit: 0 };
 
