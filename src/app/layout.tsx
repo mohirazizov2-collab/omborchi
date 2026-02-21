@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'omborchi.uz - Advanced Inventory Management',
+  title: 'ombor.uz - Advanced Inventory Management',
   description: 'AI-powered inventory and warehouse management system for modern enterprises.',
 };
 

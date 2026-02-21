@@ -1,4 +1,4 @@
-# omborchi.uz - Advanced Inventory Management
+# ombor.uz - Advanced Inventory Management
 
 Bu NextJS va Firebase yordamida yaratilgan zamonaviy ombor boshqaruvi tizimi.
 

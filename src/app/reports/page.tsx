@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -135,7 +134,7 @@ export default function ReportsPage() {
       XLSX.utils.book_append_sheet(wb, wsProducts, "Mahsulotlar");
       XLSX.utils.book_append_sheet(wb, wsWarehouses, "Omborlar");
 
-      const fileName = `omborchi_hisobot_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const fileName = `ombor_hisobot_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
     } catch (error) {
       console.error("Excel export error:", error);

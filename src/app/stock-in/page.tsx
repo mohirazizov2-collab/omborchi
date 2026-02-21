@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -55,7 +54,7 @@ export default function StockInPage() {
     // Header
     doc.setFontSize(22);
     doc.setTextColor(40);
-    doc.text("omborchi.uz", 105, 20, { align: "center" });
+    doc.text("ombor.uz", 105, 20, { align: "center" });
     doc.setFontSize(14);
     doc.text("KIRIM NAKLADNOYI (Goods Receipt)", 105, 30, { align: "center" });
     
@@ -91,7 +90,7 @@ export default function StockInPage() {
 
     // Footer
     doc.setFontSize(8);
-    doc.text("Hujjat tizim orqali avtomatik shakllantirildi.", 105, 285, { align: "center" });
+    doc.text("ombor.uz orqali avtomatik shakllantirildi.", 105, 285, { align: "center" });
 
     doc.save(`Kirim_${data.dnNumber}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -191,9 +190,9 @@ export default function StockInPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.dnNumber}</Label>
                   <div className="relative group">
                     <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input 
+                    <input 
                       placeholder="DN-2026-001" 
-                      className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:ring-primary/40 font-bold" 
+                      className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-bold" 
                       value={dnNumber}
                       onChange={(e) => setDnNumber(e.target.value)}
                     />
@@ -203,9 +202,9 @@ export default function StockInPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.supplier}</Label>
                   <div className="relative group">
                     <Truck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input 
+                    <input 
                       placeholder="Yetkazib beruvchi nomi" 
-                      className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:ring-primary/40 font-bold" 
+                      className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-bold" 
                       value={supplier}
                       onChange={(e) => setSupplier(e.target.value)}
                     />

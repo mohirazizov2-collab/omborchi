@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -55,7 +54,7 @@ export default function StockOutPage() {
     // Header
     doc.setFontSize(22);
     doc.setTextColor(40);
-    doc.text("omborchi.uz", 105, 20, { align: "center" });
+    doc.text("ombor.uz", 105, 20, { align: "center" });
     doc.setFontSize(14);
     doc.text("CHIQIM HUJJATI (Goods Issue)", 105, 30, { align: "center" });
     
@@ -91,7 +90,7 @@ export default function StockOutPage() {
 
     // Footer
     doc.setFontSize(8);
-    doc.text("omborchi.uz - Zamonaviy ombor boshqaruvi tizimi.", 105, 285, { align: "center" });
+    doc.text("ombor.uz - Zamonaviy ombor boshqaruvi tizimi.", 105, 285, { align: "center" });
 
     doc.save(`Chiqim_${data.orderNumber}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -206,9 +205,9 @@ export default function StockOutPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.refNumber}</Label>
                   <div className="relative group">
                     <Truck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input 
+                    <input 
                       placeholder="ORD-998877" 
-                      className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:ring-primary/40 font-bold"
+                      className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-bold"
                       value={orderNumber}
                       onChange={(e) => setOrderNumber(e.target.value)}
                     />
@@ -238,9 +237,9 @@ export default function StockOutPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.recipient}</Label>
                   <div className="relative group">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input 
+                    <input 
                       placeholder="Mijoz nomi" 
-                      className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:ring-primary/40 font-bold"
+                      className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-bold"
                       value={recipient}
                       onChange={(e) => setRecipient(e.target.value)}
                     />

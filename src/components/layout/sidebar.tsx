@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -71,7 +70,7 @@ export function OmniSidebar() {
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
             <Warehouse className="w-5 h-5" />
           </div>
-          <span className="font-headline font-black text-xl tracking-tighter">omborchi.uz</span>
+          <span className="font-headline font-black text-xl tracking-tighter">ombor.uz</span>
         </Link>
       </div>
 
