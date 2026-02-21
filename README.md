@@ -3,33 +3,35 @@
 
 Bu NextJS, Firebase va Gemini AI yordamida yaratilgan zamonaviy ombor boshqaruvi tizimi.
 
-## 🚀 Loyihani ishga tushirish (Deploy)
+## 🚀 Loyihani internetga chiqarish (Deploy)
 
-Ushbu loyihani internetga chiqarish uchun 2 xil yo'l bor:
+Agar "Publish" tugmasini bosganda xatolik yuz bersa, Netlify orqali bepul va tez deploy qiling:
 
-### 1. "Publish" tugmasi orqali (Eng osoni)
-Studio tepasidagi **Publish** tugmasini bosing. Bu loyihani avtomatik quradi va sizga tayyor link beradi.
+### 1. Netlify orqali (Tavsiya etiladi)
+1. Loyihangizni GitHub-ga yuklang (pastdagi Git buyruqlari yordamida).
+2. [Netlify.com](https://www.netlify.com/)-da ro'yxatdan o'ting.
+3. "Add new site" -> "Import from GitHub" ni tanlang.
+4. `GOOGLE_GENAI_API_KEY` ni "Environment variables" bo'limiga qo'shing.
+5. Deploy tugmasini bosing.
 
-### 2. GitHub va Netlify orqali (Professional yo'l)
-1. [GitHub](https://github.com/new)-da yangi repository yarating.
-2. Terminalda quyidagi buyruqlarni kiriting:
+### 2. Git buyruqlari (GitHub-ga yuklash uchun)
+Terminalga quyidagilarni ketma-ket kiriting:
 ```bash
 git init
 git add .
-git commit -m "Initial commit: ombor.uz fully optimized"
+git commit -m "Initial commit: ombor.uz ready"
 git branch -M main
 git remote add origin https://github.com/FOYDALANUVCHI_NOMI/REPO_NOMI.git
 git push -u origin main
 ```
-3. Netlify-ga ulab, `GOOGLE_GENAI_API_KEY`ni o'rnating.
 
 ## ✨ Imkoniyatlar:
-- **Dashboard**: 120 FPS tezlikda ishlovchi real-vaqt statistikasi.
-- **Shtrix-kod Skaneri**: Kamera orqali mahsulotlarni tanib olish (Kirim/Chiqim/Audit).
-- **Inventarizatsiya**: Tizimdagi zaxirani haqiqiy qoldiq bilan solishtirish modul.
-- **Eksport**: Har bir amaliyot uchun PDF Check va umumiy hisobotlar uchun Excel yuklash.
-- **AI Assistant**: Tizimning har bir sahifasida mavjud bo'lgan aqlli yordamchi.
-- **Moliyaviy Tahlil**: Haftalik va oylik sof foyda hisob-kitobi.
+- **Dashboard**: Real-vaqt statistikasi va PDF hisobot yuklash.
+- **Shtrix-kod Skaneri**: Kamera orqali mahsulotlarni tanib olish.
+- **Inventarizatsiya**: Tizimdagi zaxirani haqiqiy qoldiq bilan solishtirish (Faqat Adminlar uchun).
+- **PDF Check**: Har bir Kirim/Chiqim amaliyoti uchun professional logo va ma'lumotlar bilan chek.
+- **Excel Eksport**: Barcha zaxira ma'lumotlarini bir zumda yuklash.
+- **AI Assistant**: Tizimdan foydalanish bo'yicha aqlli yordamchi.
 
 ---
 Created by **X e M team** © 2026
