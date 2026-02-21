@@ -19,7 +19,7 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { UserPlus, MoreHorizontal, ShieldCheck, Loader2, UserX, Mail, User, AlertCircle, Info } from "lucide-react";
+import { UserPlus, MoreHorizontal, ShieldCheck, Loader2, UserX, Mail, User, AlertCircle, Info, Lock, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -27,6 +27,9 @@ import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { initializeApp, getApp, getApps } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { firebaseConfig } from "@/firebase/config";
 
 export default function UsersPage() {
   const { t } = useLanguage();
@@ -37,15 +40,16 @@ export default function UsersPage() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     displayName: "",
     email: "",
+    password: "",
     role: "Omborchi"
   });
 
   const isSuperAdmin = role === "Super Admin";
 
-  // Role Guard
   useEffect(() => {
     if (!authLoading && !isSuperAdmin) {
       router.push("/");
@@ -58,12 +62,10 @@ export default function UsersPage() {
   }, [db, user]);
   
   const { data: rawUsersList, isLoading } = useCollection(usersQuery);
-
-  // Super Adminni ro'yxatda yashirish (f2472839@gmail.com)
   const usersList = (rawUsersList || []).filter((u: any) => u.email !== "f2472839@gmail.com");
 
-  const handleAddUser = () => {
-    if (!db || !formData.email || !formData.displayName) {
+  const handleAddUser = async () => {
+    if (!db || !formData.email || !formData.displayName || !formData.password) {
       toast({
         variant: "destructive",
         title: "Xatolik",
@@ -72,34 +74,67 @@ export default function UsersPage() {
       return;
     }
 
-    setIsSaving(true);
-    const newUserRef = doc(collection(db, "users"));
-    const userData = {
-      id: newUserRef.id,
-      displayName: formData.displayName,
-      email: formData.email,
-      role: formData.role,
-      status: "Pending",
-      createdAt: new Date().toISOString()
-    };
+    if (formData.password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Xatolik",
+        description: "Parol kamida 6 ta belgidan iborat bo'lishi kerak.",
+      });
+      return;
+    }
 
-    setDoc(newUserRef, userData)
-      .then(() => {
-        toast({
-          title: "Muvaffaqiyatli",
-          description: "Foydalanuvchi profili yaratildi. Endi X e M team orqali Auth akkauntini oching.",
-        });
-        setIsDialogOpen(false);
-        setFormData({ displayName: "", email: "", role: "Omborchi" });
-      })
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: newUserRef.path,
-          operation: 'create',
-          requestResourceData: userData
-        }));
-      })
-      .finally(() => setIsSaving(false));
+    setIsSaving(true);
+    
+    try {
+      // Admin sessiyasini saqlab qolish uchun vaqtinchalik Firebase App instance yaratamiz
+      const secondaryAppName = `SecondaryApp_${Date.now()}`;
+      const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+      const secondaryAuth = getAuth(secondaryApp);
+
+      // 1. Authentication akkauntini ochish
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth, 
+        formData.email, 
+        formData.password
+      );
+      
+      const newUid = userCredential.user.uid;
+
+      // 2. Firestore-da profil yaratish
+      const userData = {
+        id: newUid,
+        displayName: formData.displayName,
+        email: formData.email,
+        role: formData.role,
+        status: "Active",
+        createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, "users", newUid), userData);
+
+      // 3. Vaqtinchalik sessiyadan chiqish
+      await signOut(secondaryAuth);
+
+      toast({
+        title: "Muvaffaqiyatli",
+        description: `${formData.displayName} uchun kirish ruxsati yaratildi.`,
+      });
+      
+      setIsDialogOpen(false);
+      setFormData({ displayName: "", email: "", password: "", role: "Omborchi" });
+    } catch (error: any) {
+      console.error("User creation error:", error);
+      let message = "Foydalanuvchini yaratishda xatolik yuz berdi.";
+      if (error.code === 'auth/email-already-in-use') message = "Ushbu email bilan allaqachon ro'yxatdan o'tilgan.";
+      
+      toast({
+        variant: "destructive",
+        title: "Xatolik",
+        description: message,
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (authLoading || !isSuperAdmin) {
@@ -122,73 +157,87 @@ export default function UsersPage() {
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-11 rounded-xl">
+              <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-11 rounded-xl bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95">
                 <UserPlus className="w-4 h-4" /> {t.users.invite}
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-[2rem] border-white/5 bg-black/90 backdrop-blur-2xl text-white">
+            <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black tracking-tight">Yangi foydalanuvchi qo'shish</DialogTitle>
-                <CardDescription className="text-white/50">
-                  Foydalanuvchini tizimga biriktirish. Login va parolni X e M team-da yaratish kerak.
+                <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+                  <UserPlus className="text-primary w-6 h-6" /> {t.users.invite}
+                </DialogTitle>
+                <CardDescription className="font-medium pt-2">
+                  Yangi foydalanuvchi uchun kirish ma'lumotlarini yarating.
                 </CardDescription>
               </DialogHeader>
               
-              <Alert variant="default" className="bg-primary/10 border-primary/20 text-white">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertTitle className="text-[10px] font-black uppercase tracking-widest">Diqqat</AlertTitle>
-                <AlertDescription className="text-xs opacity-70">
-                  Xavfsizlik nuqtai nazaridan, yangi foydalanuvchi uchun <b>X e M team {'->'} Authentication</b> bo'limida login va parol ochib bering.
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-4 py-4">
+              <div className="space-y-5 py-6">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">To'liq ism</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 w-4 h-4 text-white/30" />
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">To'liq ism</Label>
+                  <div className="relative group">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input 
-                      className="pl-10 h-12 rounded-2xl bg-white/5 border-white/10"
+                      className="pl-11 h-12 rounded-2xl bg-background/50 border-border/40 font-bold"
                       value={formData.displayName} 
                       onChange={(e) => setFormData({...formData, displayName: e.target.value})}
-                      placeholder="Masalan: Azizbek Karimov" 
+                      placeholder="Azizbek Karimov" 
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Elektron pochta</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 w-4 h-4 text-white/30" />
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Elektron pochta</Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input 
-                      className="pl-10 h-12 rounded-2xl bg-white/5 border-white/10"
+                      className="pl-11 h-12 rounded-2xl bg-background/50 border-border/40 font-bold"
                       type="email"
                       value={formData.email} 
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      placeholder="email@example.com" 
+                      placeholder="email@ombor.uz" 
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Rol</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Parol (Kirish uchun)</Label>
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input 
+                      className="pl-11 pr-11 h-12 rounded-2xl bg-background/50 border-border/40 font-bold"
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password} 
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                      placeholder="••••••" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Rol</Label>
                   <Select 
                     onValueChange={(val) => setFormData({...formData, role: val})}
                     value={formData.role}
                   >
-                    <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10">
+                    <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
                       <SelectValue placeholder="Rolni tanlang" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl border-white/10 bg-black/90 text-white">
-                      <SelectItem value="Super Admin">Super Admin</SelectItem>
-                      <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Omborchi">Omborchi</SelectItem>
+                    <SelectContent className="rounded-2xl border-border/40">
+                      <SelectItem value="Admin" className="font-bold">Admin</SelectItem>
+                      <SelectItem value="Omborchi" className="font-bold">Omborchi</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="ghost" className="rounded-xl h-11" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
-                <Button onClick={handleAddUser} disabled={isSaving} className="rounded-xl h-11 px-8 font-black uppercase tracking-widest text-[10px] bg-primary text-white">
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Qo'shish"}
+              <DialogFooter className="gap-3">
+                <Button variant="ghost" className="rounded-2xl h-12 font-bold px-6" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
+                <Button onClick={handleAddUser} disabled={isSaving} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] bg-primary text-white border-none shadow-xl shadow-primary/20">
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  {isSaving ? "Yaratilmoqda..." : "Tasdiqlash"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -196,62 +245,67 @@ export default function UsersPage() {
         </header>
 
         {isLoading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="flex justify-center py-32 opacity-20">
+            <Loader2 className="w-12 h-12 animate-spin text-primary" />
           </div>
         ) : (
-          <Card className="border-none glass-card overflow-hidden">
+          <Card className="border-none glass-card overflow-hidden bg-card/40 backdrop-blur-2xl rounded-[3rem]">
             <CardContent className="p-0">
               <div className="relative overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-widest">
+                  <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.2em]">
                     <tr>
-                      <th className="px-8 py-5">Foydalanuvchi</th>
-                      <th className="px-6 py-5">{t.users.role}</th>
-                      <th className="px-6 py-5">Holat</th>
-                      <th className="px-6 py-5"></th>
+                      <th className="px-10 py-6">Foydalanuvchi</th>
+                      <th className="px-6 py-6">{t.users.role}</th>
+                      <th className="px-6 py-6">Holat</th>
+                      <th className="px-10 py-6 text-right">Amallar</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-border/10">
                     {usersList && usersList.map((u: any) => (
                       <tr key={u.id} className="hover:bg-primary/[0.02] transition-colors group">
-                        <td className="px-8 py-5">
+                        <td className="px-10 py-6">
                           <div className="flex items-center gap-4">
-                            <Avatar className="h-10 w-10 border border-white/5">
-                              <AvatarFallback className="bg-primary/10 text-primary font-black text-xs">
+                            <Avatar className="h-12 w-12 border border-white/5 shadow-sm">
+                              <AvatarFallback className="bg-primary/10 text-primary font-black text-sm">
                                 {u.displayName ? u.displayName.split(' ').map((n: string) => n[0]).join('') : (u.email ? u.email[0].toUpperCase() : 'U')}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                              <span className="font-black text-foreground tracking-tight">{u.displayName || 'Noma\'lum foydalanuvchi'}</span>
-                              <span className="text-[10px] text-muted-foreground font-bold">{u.email}</span>
+                              <span className="font-black text-foreground tracking-tight text-base">{u.displayName || 'Noma\'lum'}</span>
+                              <span className="text-[11px] text-muted-foreground font-bold opacity-60">{u.email}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-5">
+                        <td className="px-6 py-6">
                           <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-primary" />
-                            <span className="text-xs font-black uppercase tracking-wider">{u.role || 'Xodim'}</span>
+                            <div className={cn(
+                              "p-1.5 rounded-lg",
+                              u.role === "Admin" ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
+                            )}>
+                              <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-wider">{u.role || 'Omborchi'}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-5">
-                          <Badge variant={u.status === "Active" ? "default" : "outline"} className="rounded-lg font-black text-[8px] uppercase px-2 py-0.5">
+                        <td className="px-6 py-6">
+                          <Badge variant="outline" className="rounded-xl font-black text-[9px] uppercase px-3 py-1 bg-emerald-500/10 text-emerald-500 border-none shadow-sm">
                             {u.status || 'Active'}
                           </Badge>
                         </td>
-                        <td className="px-6 py-5 text-right">
-                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
-                            <MoreHorizontal className="w-4 h-4" />
+                        <td className="px-10 py-6 text-right">
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-muted/50">
+                            <MoreHorizontal className="w-5 h-5" />
                           </Button>
                         </td>
                       </tr>
                     ))}
                     {(!usersList || usersList.length === 0) && (
                       <tr>
-                        <td colSpan={4} className="px-6 py-32 text-center">
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <UserX className="w-12 h-12 opacity-10" />
-                            <p className="text-[10px] font-black uppercase tracking-widest">Hozircha foydalanuvchilar yo'q.</p>
+                        <td colSpan={4} className="px-6 py-40 text-center">
+                          <div className="flex flex-col items-center gap-4 text-muted-foreground opacity-10">
+                            <UserX className="w-20 h-20" />
+                            <p className="text-[12px] font-black uppercase tracking-[0.4em]">Hozircha foydalanuvchilar yo'q</p>
                           </div>
                         </td>
                       </tr>
