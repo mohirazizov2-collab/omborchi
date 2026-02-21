@@ -112,7 +112,8 @@ export const translations = {
       targetWarehouse: 'Maqsadli ombor',
       productItems: 'Mahsulotlar ro\'yxati',
       process: 'Kirimni yakunlash',
-      saveDraft: 'Qoralama sifatida saqlash'
+      saveDraft: 'Qoralama sifatida saqlash',
+      scanBarcode: 'Shtrix-kodni skanerlash'
     },
     stockOut: {
       title: 'Tovarlar Chiqimi (Goods Issue)',
@@ -123,7 +124,8 @@ export const translations = {
       sourceWarehouse: 'Chiqaruvchi ombor',
       recipient: 'Mijoz / Qabul qiluvchi',
       dispatch: 'Chiqimni jo\'natish',
-      pickingList: 'Terish varaqasini chop etish'
+      pickingList: 'Terish varaqasini chop etish',
+      scanBarcode: 'Shtrix-kodni skanerlash'
     },
     transfers: {
       title: 'Omborlararo Transferlar',
@@ -306,7 +308,8 @@ export const translations = {
       targetWarehouse: 'Целевой склад',
       productItems: 'Список товаров',
       process: 'Завершить приход',
-      saveDraft: 'Сохранить черновик'
+      saveDraft: 'Сохранить черновик',
+      scanBarcode: 'Сканировать штрих-код'
     },
     stockOut: {
       title: 'Расход товара (Stock Out)',
@@ -317,7 +320,8 @@ export const translations = {
       sourceWarehouse: 'Склад отгрузки',
       recipient: 'Клиент / Получатель',
       dispatch: 'Отправить товар',
-      pickingList: 'Печать листа сборки'
+      pickingList: 'Печать листа сборки',
+      scanBarcode: 'Сканировать штрих-код'
     },
     transfers: {
       title: 'Складские Переводы',
@@ -500,7 +504,8 @@ export const translations = {
       targetWarehouse: 'Target Warehouse',
       productItems: 'Product Items',
       process: 'Process Receipt',
-      saveDraft: 'Save Draft'
+      saveDraft: 'Save Draft',
+      scanBarcode: 'Scan Barcode'
     },
     stockOut: {
       title: 'Stock Out (Goods Issue)',
@@ -511,7 +516,8 @@ export const translations = {
       sourceWarehouse: 'Source Warehouse',
       recipient: 'Client / Recipient',
       dispatch: 'Dispatch Order',
-      pickingList: 'Print Picking List'
+      pickingList: 'Print Picking List',
+      scanBarcode: 'Scan Barcode'
     },
     transfers: {
       title: 'Stock Transfers',

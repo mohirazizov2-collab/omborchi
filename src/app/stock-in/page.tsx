@@ -7,8 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Calendar, FileText, Loader2, Truck, ArrowRight } from "lucide-react";
-import { useState } from "react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { Plus, Trash2, Calendar, FileText, Loader2, Truck, ArrowRight, ScanLine } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
@@ -17,6 +24,7 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/no
 import { motion, AnimatePresence } from "framer-motion";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 export default function StockInPage() {
   const { t } = useLanguage();
@@ -28,6 +36,8 @@ export default function StockInPage() {
   const [dnNumber, setDnNumber] = useState("");
   const [supplier, setSupplier] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   const productsQuery = useMemoFirebase(() => collection(db, "products"), [db]);
   const { data: products } = useCollection(productsQuery);
@@ -49,17 +59,62 @@ export default function StockInPage() {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
+  // Barcode Scanning logic
+  useEffect(() => {
+    if (isScannerOpen) {
+      const scanner = new Html5QrcodeScanner(
+        "reader",
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        /* verbose= */ false
+      );
+      scannerRef.current = scanner;
+
+      scanner.render(
+        (decodedText) => {
+          // Find product by SKU
+          const product = products?.find(p => p.sku === decodedText);
+          if (product) {
+            // Check if product already in items
+            const existingItem = items.find(i => i.productId === product.id);
+            if (existingItem) {
+              updateItem(existingItem.id, "quantity", existingItem.quantity + 1);
+            } else {
+              // Replace empty last item or add new
+              const lastItem = items[items.length - 1];
+              if (!lastItem.productId) {
+                updateItem(lastItem.id, "productId", product.id);
+                updateItem(lastItem.id, "price", product.salePrice);
+              } else {
+                setItems([...items, { id: Date.now(), productId: product.id, quantity: 1, price: product.salePrice }]);
+              }
+            }
+            toast({ title: "Mahsulot topildi", description: `${product.name} ro'yxatga qo'shildi.` });
+            scanner.clear();
+            setIsScannerOpen(false);
+          } else {
+            toast({ variant: "destructive", title: "Xatolik", description: "Mahsulot topilmadi (SKU: " + decodedText + ")" });
+          }
+        },
+        (error) => {
+          // ignore scan errors
+        }
+      );
+    }
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(e => console.error("Scanner clear error", e));
+      }
+    };
+  }, [isScannerOpen, products]);
+
   const generatePDF = (data: any) => {
     const doc = new jsPDF();
-    
-    // Header
     doc.setFontSize(22);
     doc.setTextColor(40);
     doc.text("ombor.uz", 105, 20, { align: "center" });
     doc.setFontSize(14);
     doc.text("KIRIM NAKLADNOYI (Goods Receipt)", 105, 30, { align: "center" });
-    
-    // Details
     doc.setFontSize(10);
     doc.text(`Nakladnoy #: ${data.dnNumber}`, 15, 45);
     doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 52);
@@ -67,7 +122,6 @@ export default function StockInPage() {
     doc.text(`Ombor: ${data.warehouseName}`, 15, 66);
     doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 73);
 
-    // Table
     const tableData = data.items.map((item: any, idx: number) => [
       idx + 1,
       item.productName,
@@ -88,11 +142,8 @@ export default function StockInPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.text(`JAMI QIYMAT: ${data.totalValue.toLocaleString()} so'm`, 195, finalY, { align: "right" });
-
-    // Footer
     doc.setFontSize(8);
     doc.text("ombor.uz orqali avtomatik shakllantirildi.", 105, 285, { align: "center" });
-
     doc.save(`Kirim_${data.dnNumber}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
@@ -107,7 +158,6 @@ export default function StockInPage() {
     }
 
     setLoading(true);
-
     const warehouseName = warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum";
     const receiptData = {
       dnNumber,
@@ -152,7 +202,6 @@ export default function StockInPage() {
       });
 
       generatePDF(receiptData);
-      
       setItems([{ id: Date.now(), productId: "", quantity: 1, price: 0 }]);
       setDnNumber("");
       setSupplier("");
@@ -170,11 +219,25 @@ export default function StockInPage() {
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
       <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
-        <header className="mb-10">
+        <header className="flex justify-between items-center mb-10">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.stockIn.title}</h1>
             <p className="text-muted-foreground mt-1 font-medium text-sm">{t.stockIn.description}</p>
           </motion.div>
+          
+          <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2 rounded-2xl h-12 px-6 border-primary/20 bg-primary/5 text-primary font-black uppercase tracking-widest text-[10px]">
+                <ScanLine className="w-4 h-4" /> {t.stockIn.scanBarcode}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md rounded-[2rem]">
+              <DialogHeader>
+                <DialogTitle>{t.stockIn.scanBarcode}</DialogTitle>
+              </DialogHeader>
+              <div id="reader" className="w-full overflow-hidden rounded-xl"></div>
+            </DialogContent>
+          </Dialog>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -254,7 +317,11 @@ export default function StockInPage() {
                       <div className="flex-1 space-y-3">
                         <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.product}</Label>
                         <Select 
-                          onValueChange={(val) => updateItem(item.id, "productId", val)}
+                          onValueChange={(val) => {
+                            const p = products?.find(prod => prod.id === val);
+                            updateItem(item.id, "productId", val);
+                            if (p) updateItem(item.id, "price", p.salePrice);
+                          }}
                           value={item.productId}
                         >
                           <SelectTrigger className="h-12 rounded-xl bg-background/50 border-none font-bold">
@@ -274,7 +341,7 @@ export default function StockInPage() {
                           className="h-12 rounded-xl bg-background/50 border-none font-black"
                           placeholder="0" 
                           value={item.quantity}
-                          onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value))}
+                          onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
                         />
                       </div>
                       <div className="w-full md:w-32 space-y-3">
@@ -284,7 +351,7 @@ export default function StockInPage() {
                           className="h-12 rounded-xl bg-background/50 border-none font-black"
                           placeholder="0.00" 
                           value={item.price}
-                          onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value))}
+                          onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
                         />
                       </div>
                       <Button 
