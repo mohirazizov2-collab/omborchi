@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Calendar, FileText, Loader2, Truck, User, ArrowRight, Printer } from "lucide-react";
+import { Plus, Trash2, Calendar, FileText, Loader2, Truck, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -15,7 +15,6 @@ import { collection, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -102,7 +101,7 @@ export default function StockInPage() {
       toast({
         variant: "destructive",
         title: "Xatolik",
-        description: "Barcha majburiy maydonlarni (Yuk xati, Yetkazib beruvchi, Ombor) to'ldiring.",
+        description: "Barcha majburiy maydonlarni to'ldiring.",
       });
       return;
     }
@@ -152,10 +151,8 @@ export default function StockInPage() {
         description: "Nakladnoy saqlandi. Chek yuklanmoqda...",
       });
 
-      // Generate PDF
       generatePDF(receiptData);
       
-      // Reset form
       setItems([{ id: Date.now(), productId: "", quantity: 1, price: 0 }]);
       setDnNumber("");
       setSupplier("");
@@ -246,7 +243,7 @@ export default function StockInPage() {
               </CardHeader>
               <CardContent className="p-8 pt-0 space-y-4">
                 <AnimatePresence mode="popLayout">
-                  {items.map((item, idx) => (
+                  {items.map((item) => (
                     <motion.div 
                       key={item.id} 
                       initial={{ opacity: 0, x: 20 }}
@@ -345,9 +342,6 @@ export default function StockInPage() {
                   disabled={loading}
                 >
                   {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3" /> {t.stockIn.process}</>}
-                </Button>
-                <Button variant="ghost" className="w-full text-white/60 hover:text-white hover:bg-white/10 text-[10px] font-black uppercase tracking-widest">
-                  {t.stockIn.saveDraft}
                 </Button>
               </CardFooter>
             </Card>

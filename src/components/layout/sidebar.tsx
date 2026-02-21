@@ -67,10 +67,12 @@ export function OmniSidebar() {
   return (
     <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
       <div className="flex items-center px-6 h-16 border-b">
-        <div className="flex items-center gap-2">
-          <Warehouse className="w-6 h-6 text-primary" />
-          <span className="font-headline font-black text-lg tracking-tighter">omborchi.uz</span>
-        </div>
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
+            <Warehouse className="w-5 h-5" />
+          </div>
+          <span className="font-headline font-black text-xl tracking-tighter">omborchi.uz</span>
+        </Link>
       </div>
 
       <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
