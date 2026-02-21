@@ -1,52 +1,51 @@
 
-# ombor.uz - Advanced Inventory Management
+# 🚀 ombor.uz - Yakuniy ishga tushirish yo'riqnomasi
 
-Bu NextJS, Firebase va Gemini AI yordamida yaratilgan zamonaviy ombor boshqaruvi tizimi.
+Ushbu loyiha NextJS, Firebase va Gemini AI yordamida yaratilgan zamonaviy ombor boshqaruvi tizimidir.
 
-## 🚀 GitHub-ga yuklash (Terminal buyruqlari)
+## 🛠 1-qadam: Loyihani GitHub-ga joylash
+Terminalga (pastki qismdagi qora oyna) quyidagi buyruqlarni ketma-ket kiriting:
 
-Loyihangizni GitHub-ga joylash uchun terminalga quyidagi buyruqlarni ketma-ket kiriting:
+1. **Git-ni ishga tushirish:**
+   ```bash
+   git init
+   ```
+2. **Fayllarni tayyorlash:**
+   ```bash
+   git add .
+   ```
+3. **Saqlash:**
+   ```bash
+   git commit -m "Initial commit: ombor.uz ready"
+   ```
+4. **GitHub-ga ulanish:**
+   *(ESLATMA: Quyidagi havolani o'zingiz ochgan GitHub repo havolasi bilan almashtiring)*
+   ```bash
+   git remote add origin https://github.com/FOYDALANUVCHI_NOMI/ombor-uz.git
+   ```
+5. **Yuborish:**
+   ```bash
+   git push -u origin main
+   ```
 
-1.  **Git-ni ishga tushirish:**
-    ```bash
-    git init
-    ```
-2.  **Fayllarni tayyorlash:**
-    ```bash
-    git add .
-    ```
-3.  **Saqlash (Commit):**
-    ```bash
-    git commit -m "Initial commit: ombor.uz ready for launch"
-    ```
-4.  **GitHub repo ulanishi:**
-    *(ESLATMA: Havolani o'zingiz ochgan GitHub repo havolasi bilan almashtiring)*
-    ```bash
-    git remote add origin https://github.com/FOYDALANUVCHI_NOMI/ombor-uz.git
-    ```
-5.  **Kodlarni yuborish:**
-    ```bash
-    git push -u origin main
-    ```
+## 🌐 2-qadam: Netlify-da Deploy qilish
+Netlify-ga kiring va GitHub-dagi loyihani tanlang. Sozlamalarni quyidagicha to'ldiring:
 
-## 🌐 Netlify-da sozlash (Deploy)
+- **Build command:** `npm run build`
+- **Publish directory:** `.next`
 
-Netlify-da **"Site configuration" -> "Environment variables"** bo'limiga o'ting va quyidagi o'zgaruvchini qo'shing:
+## 🔑 3-qadam: AI Kalitini kiritish (Muhim!)
+Netlify-da **"Site configuration" -> "Environment variables"** bo'limiga o'ting va quyidagilarni qo'shing:
 
-- **Key**: `GOOGLE_GENAI_API_KEY`
-- **Value**: *(Sizning Gemini AI API kalitingiz)*
+- **Key:** `GOOGLE_GENAI_API_KEY`
+- **Value:** *(Sizning Gemini AI API kalitingiz)*
 
-**Build Settings** (Qurish sozlamalari):
-- **Build command**: `npm run build`
-- **Publish directory**: `.next`
-
-## ✨ Imkoniyatlar:
-- **Dashboard**: Real-vaqt statistikasi va PDF hisobot.
-- **Shtrix-kod Skaneri**: Mahsulotlarni kamera orqali aniqlash (Kirim/Chiqim/Audit).
-- **Inventarizatsiya**: Zaxiralarni solishtirish va to'g'rilash (Adminlar uchun).
-- **Professional PDF Chek**: Logo va shtrix-kodli avtomatik cheklar.
-- **Excel Eksport**: Zaxira ma'lumotlarini yuklab olish.
-- **AI Assistant**: Tizim ichidagi aqlli yordamchi (Har bir sahifada).
+## ✨ Tizim imkoniyatlari:
+- **Dashboard:** Real-vaqt statistikasi va PDF professional hisobot.
+- **Inventarizatsiya:** Tizim va haqiqiy qoldiqni solishtirish (Adminlar uchun).
+- **PDF Cheklar:** Kirim va Chiqim operatsiyalari uchun logotipli avtomatik cheklar.
+- **Excel:** Barcha zaxira ma'lumotlarini yuklab olish.
+- **AI Assistant:** Har bir sahifada yordam beruvchi aqlli chatbot.
 
 ---
 Created by **X e M team** © 2026
