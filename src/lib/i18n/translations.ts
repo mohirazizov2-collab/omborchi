@@ -54,7 +54,8 @@ export const translations = {
       stockMovements: 'Zaxira harakati',
       lowStockAlerts: 'Kam qolgan mahsulotlar',
       recentMovements: 'Oxirgi harakatlar',
-      viewAll: 'Hammasini ko\'rish'
+      viewAll: 'Hammasini ko\'rish',
+      totalSalaryExpense: 'Jami oylik xarajatlari'
     },
     profile: {
       title: 'Foydalanuvchi profili',
@@ -237,7 +238,8 @@ export const translations = {
       stockMovements: 'Движение запасов',
       lowStockAlerts: 'Низкий уровень запасов',
       recentMovements: 'Последние движения',
-      viewAll: 'Посмотреть все'
+      viewAll: 'Посмотреть все',
+      totalSalaryExpense: 'Общие расходы на зарплату'
     },
     profile: {
       title: 'Профиль пользователя',
@@ -420,7 +422,8 @@ export const translations = {
       stockMovements: 'Stock Movements',
       lowStockAlerts: 'Low Stock Alerts',
       recentMovements: 'Recent Movements',
-      viewAll: 'View All Alerts'
+      viewAll: 'View All Alerts',
+      totalSalaryExpense: 'Total Salary Expense'
     },
     profile: {
       title: 'User Profile',

@@ -26,7 +26,9 @@ import {
   PlusCircle,
   History,
   ArrowRightLeft,
-  Search
+  Search,
+  Wallet,
+  Users
 } from "lucide-react";
 import Link from "next/link";
 import { ChatAssistant } from "@/components/ai/chat-assistant";
@@ -63,6 +65,12 @@ export default function DashboardPage() {
   }, [mounted, db, user]);
   const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
 
+  const employeesQuery = useMemoFirebase(() => {
+    if (!mounted || !db || !user) return null;
+    return collection(db, "employees");
+  }, [mounted, db, user]);
+  const { data: employees, isLoading: employeesLoading } = useCollection(employeesQuery);
+
   const recentMovementsQuery = useMemoFirebase(() => {
     if (!mounted || !db || !user) return null;
     return query(collection(db, "stockMovements"), orderBy("movementDate", "desc"), limit(6));
@@ -73,6 +81,7 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const totalVal = (products || []).reduce((acc, p) => acc + ((p.salePrice || 0) * (p.stock || 0)), 0);
     const lowStock = (products || []).filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length;
+    const totalSalary = (employees || []).reduce((acc, e) => acc + ((e.baseSalary || 0) + (e.bonus || 0) - (e.deductions || 0)), 0);
     
     return [
       { 
@@ -94,6 +103,15 @@ export default function DashboardPage() {
         color: "bg-purple-500/10 text-purple-500"
       },
       { 
+        label: t.dashboard.totalSalaryExpense, 
+        value: employeesLoading ? "..." : `${totalSalary.toLocaleString()} so'm`, 
+        trend: `${employees?.length || 0} xodim`, 
+        trendIcon: Users,
+        trendColor: "text-blue-500",
+        icon: Wallet,
+        color: "bg-emerald-500/10 text-emerald-500"
+      },
+      { 
         label: t.dashboard.lowStockAlerts, 
         value: productsLoading ? "..." : lowStock.toString(), 
         trend: lowStock > 0 ? "Action Req" : "Safe", 
@@ -101,18 +119,9 @@ export default function DashboardPage() {
         trendColor: lowStock > 0 ? "text-rose-500" : "text-emerald-500",
         icon: AlertTriangle,
         color: lowStock > 0 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"
-      },
-      { 
-        label: "Recent Operations", 
-        value: movements?.length.toString() || "0", 
-        trend: "Live", 
-        trendIcon: History,
-        trendColor: "text-blue-500",
-        icon: History,
-        color: "bg-blue-500/10 text-blue-500"
-      },
+      }
     ];
-  }, [t, products, productsLoading, warehouses, warehousesLoading, movements]);
+  }, [t, products, productsLoading, warehouses, warehousesLoading, movements, employees, employeesLoading]);
 
   const quickActions = [
     { name: t.nav.stockIn, href: "/stock-in", icon: PlusCircle, color: "bg-emerald-500/10 text-emerald-500" },
