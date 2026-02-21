@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -137,7 +136,7 @@ export default function UsersPage() {
                 <Info className="h-4 w-4 text-primary" />
                 <AlertTitle className="text-[10px] font-black uppercase tracking-widest">Diqqat</AlertTitle>
                 <AlertDescription className="text-xs opacity-70">
-                  Xavfsizlik nuqtai nazaridan, yangi foydalanuvchi uchun <b>Firebase Console -> Authentication</b> bo'limida login va parol ochib bering.
+                  Xavfsizlik nuqtai nazaridan, yangi foydalanuvchi uchun <b>Firebase Console -&gt; Authentication</b> bo'limida login va parol ochib bering.
                 </AlertDescription>
               </Alert>
 
