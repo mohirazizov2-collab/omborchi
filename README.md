@@ -1,10 +1,17 @@
 
 # 🚀 ombor.uz - Boshqaruv va Deploy Qo'llanmasi
 
-Ushbu loyihani internetga chiqarish (Hosting) uchun quyidagi qadamlarni bajaring:
+Ushbu loyihani internetga chiqarish uchun barcha kerakli manzillar va qadamlar:
 
-## 1️⃣ Kodni GitHub-ga yuklash (Shart!)
-Firebase App Hosting GitHub bilan ishlaydi. Terminalga ushbu buyruqlarni yozing:
+## 🔗 Muhim Havolalar
+1. **Firebase Console (Asosiy):** [https://console.firebase.google.com/project/studio-4209846898-d5885](https://console.firebase.google.com/project/studio-4209846898-d5885)
+2. **App Hosting (Deploy qilish joyi):** [https://console.firebase.google.com/project/studio-4209846898-d5885/apphosting](https://console.firebase.google.com/project/studio-4209846898-d5885/apphosting)
+3. **Firestore Database (Ma'lumotlar):** [https://console.firebase.google.com/project/studio-4209846898-d5885/firestore](https://console.firebase.google.com/project/studio-4209846898-d5885/firestore)
+
+---
+
+## 1️⃣ Kodni GitHub-ga yuklash
+Terminalga (pastdagi qora oyna) ushbu buyruqlarni ketma-ket yozing:
 ```bash
 git init
 git add .
@@ -13,26 +20,19 @@ git remote add origin https://github.com/FOYDALANUVCHI_NOMI/REPOS_NOMI.git
 git push -u origin main
 ```
 
-## 2️⃣ Firebase Hosting-ni yoqish (2 xil usul)
+## 2️⃣ Firebase Hosting-ni yoqish
+1. [App Hosting](https://console.firebase.google.com/project/studio-4209846898-d5885/apphosting) sahifasiga kiring.
+2. **"Get Started"** tugmasini bosing.
+3. GitHub hisobingizni ulang va loyihangizni (repository) tanlang.
+4. Deploy tugmasini bosing. 
 
-### A) Firebase App Hosting (Tavsiya etiladi - Next.js uchun maxsus)
-1. **Firebase Console**-ga kiring: [https://console.firebase.google.com/](https://console.firebase.google.com/)
-2. Chap menyudan **"Build"** -> **"App Hosting"** bo'limini tanlang.
-3. **"Get Started"** tugmasini bosing.
-4. GitHub repozitoriyangizni ulang va loyihani tanlang.
-5. Sozlamalarda hech narsani o'zgartirmang (avtomatik `apphosting.yaml` dan oladi).
-6. **Deploy** tugmasini bosing.
-
-### B) Netlify orqali (Agar Firebase-da Billing/Karta so'rasa)
-Firebase ba'zan karta talab qilishi mumkin. Netlify esa mutlaqo bepul:
-1. [Netlify.com](https://www.netlify.com/) ga kiring.
-2. GitHub orqali ro'yxatdan o'ting.
-3. **"Add new site"** -> **"Import an existing project"** ni tanlang.
-4. GitHub-dagi loyihangizni tanlang.
-5. **Build command:** `npm run build`, **Publish directory:** `.next` deb yozing.
-6. **Environment variables** bo'limiga `GOOGLE_GENAI_API_KEY` ni o'z kalitingiz bilan qo'shing.
+## 3️⃣ AI Kalitini Sozlash (Muhim!)
+Deploy tugallangandan so'ng, Firebase Console-da:
+1. **App Hosting** -> **Settings** -> **Environment Variables** bo'limiga kiring.
+2. **Key**: `GOOGLE_GENAI_API_KEY`
+3. **Value**: Sizning Google AI Studio kalitingiz.
 
 ---
-**Eslatma:** Siz yuborgan rasmdagi "AI Cloud Free Trial" bu Google Cloud-ning reklamasidir. Sizga faqat Firebase Console kerak.
+**Eslatma:** Agar Firebase-da billing (karta) bilan muammo bo'lsa, mutlaqo bepul bo'lgan [Netlify.com](https://www.netlify.com/) orqali GitHub-ni ulab ishlatishingiz mumkin.
 
 Created by **X e M team** © 2026
