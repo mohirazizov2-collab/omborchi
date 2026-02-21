@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Hisobotlarni tahlil qilish uchun Genkit flow.
@@ -41,17 +40,17 @@ const analyzePrompt = ai.definePrompt({
   input: { schema: AnalyzeReportsInputSchema },
   output: { schema: AnalyzeReportsOutputSchema },
   prompt: `Siz professional ombor boshqaruvi va logistika bo'yicha AI konsultantisiz.
-Sizga omborchi.uz tizimidan olingan quyidagi ma'lumotlar taqdim etiladi:
+Sizga ombor.uz tizimidan olingan quyidagi ma'lumotlar taqdim etiladi:
 
 Ma'lumotlar:
-- Jami zaxira qiymati: ${{stats.totalValue}}
+- Jami zaxira qiymati: {{stats.totalValue}} so'm
 - Omborlar soni: {{stats.warehouseCount}} ta
 - Mahsulot turlari: {{stats.productCount}} ta
 - Kam qolgan mahsulotlar soni: {{stats.lowStockCount}} ta
 
 Asosiy mahsulotlar ro'yxati:
 {{#each topProducts}}
-- {{name}}: {{stock}} ta (Narxi: ${{price}})
+- {{name}}: {{stock}} ta (Narxi: {{price}} so'm)
 {{/each}}
 
 Vazifangiz:

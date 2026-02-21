@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -96,7 +95,6 @@ export default function ReportsPage() {
     setIsExporting(true);
 
     try {
-      // 1. Products Sheet
       const productsData = products.map(p => ({
         "Nomi": p.name,
         "SKU": p.sku,
@@ -107,7 +105,6 @@ export default function ReportsPage() {
         "Zaxira chegarasi": p.lowStockThreshold || 10
       }));
 
-      // 2. Warehouses Sheet
       const warehousesData = warehouses.map(w => ({
         "Ombor nomi": w.name,
         "Manzil": w.address,
@@ -116,7 +113,6 @@ export default function ReportsPage() {
         "Yaratilgan sana": w.createdAt ? new Date(w.createdAt).toLocaleDateString() : 'N/A'
       }));
 
-      // 3. Summary Sheet
       const summaryData = [
         { "Ko'rsatkich": "Jami zaxira qiymati", "Qiymat": `${totalValue.toLocaleString()} so'm` },
         { "Ko'rsatkich": "Omborlar soni", "Qiymat": warehouses.length },
@@ -126,7 +122,6 @@ export default function ReportsPage() {
       ];
 
       const wb = XLSX.utils.book_new();
-      
       const wsSummary = XLSX.utils.json_to_sheet(summaryData);
       const wsProducts = XLSX.utils.json_to_sheet(productsData);
       const wsWarehouses = XLSX.utils.json_to_sheet(warehousesData);
@@ -218,7 +213,7 @@ export default function ReportsPage() {
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/70">Intelligent Insights</span>
                   </div>
-                  <CardTitle className="font-headline font-black text-3xl tracking-tight">AI Report Summary</CardTitle>
+                  <CardTitle className="font-headline font-black text-3xl tracking-tight">AI Tahlili Xulosasi</CardTitle>
                 </CardHeader>
                 <CardContent className="px-8 pb-8 space-y-8 relative z-10">
                   <div className="p-6 rounded-[2rem] bg-background/40 backdrop-blur-xl border border-white/5 italic font-medium leading-relaxed text-foreground/90 shadow-sm">
@@ -228,13 +223,13 @@ export default function ReportsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     <div className="space-y-4">
                       <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
-                        <Activity className="w-4 h-4" /> Deep Analysis
+                        <Activity className="w-4 h-4" /> Chuqur Tahlil
                       </h4>
                       <p className="text-sm text-muted-foreground font-medium leading-relaxed whitespace-pre-wrap">{aiResult.analysis}</p>
                     </div>
                     <div className="space-y-4">
                       <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" /> Actionable Recommendations
+                        <CheckCircle2 className="w-4 h-4" /> Tavsiyalar
                       </h4>
                       <div className="space-y-3">
                         {aiResult.recommendations.map((rec, i) => (
@@ -289,7 +284,7 @@ export default function ReportsPage() {
                       <div className="p-4 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
                         <Package className="w-7 h-7" />
                       </div>
-                      <Badge className="bg-primary/10 text-primary border-none">Active</Badge>
+                      <Badge className="bg-primary/10 text-primary border-none">Faol</Badge>
                     </div>
                     <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{t.nav.products}</h3>
                     <p className="text-3xl font-black font-headline tracking-tighter mt-2">{products?.length || 0} Skus</p>
@@ -304,10 +299,10 @@ export default function ReportsPage() {
                       <div className="p-4 rounded-2xl bg-purple-500/10 text-purple-500 group-hover:scale-110 transition-transform">
                         <Warehouse className="w-7 h-7" />
                       </div>
-                      <Badge className="bg-purple-500/10 text-purple-500 border-none">Stable</Badge>
+                      <Badge className="bg-purple-500/10 text-purple-500 border-none">Stabil</Badge>
                     </div>
                     <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{t.dashboard.activeWarehouses}</h3>
-                    <p className="text-3xl font-black font-headline tracking-tighter mt-2">{warehouses?.length || 0} Hubs</p>
+                    <p className="text-3xl font-black font-headline tracking-tighter mt-2">{warehouses?.length || 0} ta Hub</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -319,7 +314,7 @@ export default function ReportsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="font-headline font-black text-xl tracking-tight">{t.reports.stockValueTrend}</CardTitle>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1 opacity-50">7-Day Value performance</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1 opacity-50">7 kunlik qiymat dinamikasi</p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-muted/50">
                       <FileBarChart className="w-5 h-5 text-primary" />
@@ -347,7 +342,6 @@ export default function ReportsPage() {
                           border: 'none', 
                           backgroundColor: 'rgba(0,0,0,0.85)',
                           backdropFilter: 'blur(20px)',
-                          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
                           padding: '20px',
                           color: 'white'
                         }} 
@@ -370,7 +364,7 @@ export default function ReportsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="font-headline font-black text-xl tracking-tight">{t.reports.categoryDist}</CardTitle>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1 opacity-50">Stock share by Category</p>
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1 opacity-50">Kategoriyalar ulushi</p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-muted/50">
                       <PieIcon className="w-5 h-5 text-primary" />
@@ -410,7 +404,7 @@ export default function ReportsPage() {
                   ) : (
                     <div className="flex h-full items-center justify-center flex-col gap-4 opacity-10">
                       <Package className="w-16 h-16" />
-                      <p className="text-[11px] font-black uppercase tracking-[0.4em]">Inventory data unavailable</p>
+                      <p className="text-[11px] font-black uppercase tracking-[0.4em]">Zaxira ma'lumotlari mavjud emas</p>
                     </div>
                   )}
                 </CardContent>
