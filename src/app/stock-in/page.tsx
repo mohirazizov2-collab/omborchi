@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -71,8 +72,8 @@ export default function StockInPage() {
       idx + 1,
       item.productName,
       item.quantity,
-      `$${item.price.toFixed(2)}`,
-      `$${(item.quantity * item.price).toFixed(2)}`
+      `${item.price.toLocaleString()} so'm`,
+      `${(item.quantity * item.price).toLocaleString()} so'm`
     ]);
 
     (doc as any).autoTable({
@@ -86,7 +87,7 @@ export default function StockInPage() {
 
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
-    doc.text(`JAMI QIYMAT: $${data.totalValue.toFixed(2)}`, 195, finalY, { align: "right" });
+    doc.text(`JAMI QIYMAT: ${data.totalValue.toLocaleString()} so'm`, 195, finalY, { align: "right" });
 
     // Footer
     doc.setFontSize(8);
@@ -317,7 +318,7 @@ export default function StockInPage() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-white/60 text-xs font-black uppercase tracking-widest">{t.common.totalValue}</p>
-                  <p className="text-4xl font-black font-headline tracking-tighter">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-4xl font-black font-headline tracking-tighter">{totalValue.toLocaleString()} so'm</p>
                 </div>
                 <div className="pt-4 space-y-3">
                    <div className="flex items-center gap-3">

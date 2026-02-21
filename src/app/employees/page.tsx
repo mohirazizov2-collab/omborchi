@@ -192,7 +192,7 @@ export default function EmployeesPage() {
                   </div>
                   <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex justify-between items-center">
                     <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">Jami hisoblangan:</span>
-                    <span className="text-xl font-black text-primary">${calculateTotal(formData.baseSalary, formData.bonus, formData.deductions).toLocaleString()}</span>
+                    <span className="text-xl font-black text-primary">{calculateTotal(formData.baseSalary, formData.bonus, formData.deductions).toLocaleString()} so'm</span>
                   </div>
                 </div>
                 <DialogFooter className="mt-10 gap-2">
@@ -273,7 +273,7 @@ export default function EmployeesPage() {
                             <Wallet className="w-3 h-3" /> {t.employees.totalSalary}
                           </p>
                           <p className="text-sm font-black text-emerald-500">
-                            ${(emp.baseSalary + emp.bonus - emp.deductions).toLocaleString()}
+                            {(emp.baseSalary + emp.bonus - emp.deductions).toLocaleString()} so'm
                           </p>
                         </div>
                       </div>

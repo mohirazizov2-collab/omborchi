@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -171,7 +172,7 @@ export default function ProductsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Base Price ($)</Label>
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Base Price (so'm)</Label>
                       <Input 
                         type="number"
                         className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
@@ -279,7 +280,7 @@ export default function ProductsPage() {
                         </td>
                         <td className="px-6 py-5 font-code text-[11px] font-black text-primary/60">{p.sku}</td>
                         <td className="px-6 py-5 font-black text-sm">{p.stock || 0}</td>
-                        <td className="px-6 py-5 font-black text-sm">${p.salePrice.toLocaleString()}</td>
+                        <td className="px-6 py-5 font-black text-sm">{p.salePrice.toLocaleString()} so'm</td>
                         <td className="px-6 py-5">
                           <Badge 
                             variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}

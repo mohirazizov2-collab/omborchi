@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -76,7 +77,7 @@ export default function DashboardPage() {
     return [
       { 
         label: t.dashboard.totalStockValue, 
-        value: productsLoading ? "..." : `$${totalVal.toLocaleString()}`, 
+        value: productsLoading ? "..." : `${totalVal.toLocaleString()} so'm`, 
         trend: "+3.2%", 
         trendIcon: TrendingUp,
         trendColor: "text-emerald-500",

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -101,8 +102,8 @@ export default function ReportsPage() {
         "SKU": p.sku,
         "Kategoriya": p.categoryId || "General",
         "Zaxira miqdori": p.stock || 0,
-        "Sotuv narxi ($)": p.salePrice || 0,
-        "Umumiy qiymat ($)": (p.stock || 0) * (p.salePrice || 0),
+        "Sotuv narxi (so'm)": p.salePrice || 0,
+        "Umumiy qiymat (so'm)": (p.stock || 0) * (p.salePrice || 0),
         "Zaxira chegarasi": p.lowStockThreshold || 10
       }));
 
@@ -117,7 +118,7 @@ export default function ReportsPage() {
 
       // 3. Summary Sheet
       const summaryData = [
-        { "Ko'rsatkich": "Jami zaxira qiymati", "Qiymat": `$${totalValue.toLocaleString()}` },
+        { "Ko'rsatkich": "Jami zaxira qiymati", "Qiymat": `${totalValue.toLocaleString()} so'm` },
         { "Ko'rsatkich": "Omborlar soni", "Qiymat": warehouses.length },
         { "Ko'rsatkich": "Jami mahsulot turlari", "Qiymat": products.length },
         { "Ko'rsatkich": "Kam qolgan mahsulotlar", "Qiymat": lowStockCount },
@@ -240,7 +241,7 @@ export default function ReportsPage() {
                           <motion.div 
                             key={i} 
                             initial={{ opacity: 0, x: 10 }}
-                            animate={{ opacity: 1, x: 0 }}
+                            animate={{ opacity: 1, scale: 1, x: 0 }}
                             transition={{ delay: i * 0.1 }}
                             className="flex items-start gap-4 p-4 rounded-2xl bg-primary/10 border border-primary/10 group hover:bg-primary/15 transition-colors"
                           >
@@ -276,7 +277,7 @@ export default function ReportsPage() {
                       <Badge className="bg-emerald-500/10 text-emerald-500 border-none">+12.4%</Badge>
                     </div>
                     <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">{t.dashboard.totalStockValue}</h3>
-                    <p className="text-3xl font-black font-headline tracking-tighter mt-2">${totalValue.toLocaleString()}</p>
+                    <p className="text-3xl font-black font-headline tracking-tighter mt-2">{totalValue.toLocaleString()} so'm</p>
                   </CardContent>
                 </Card>
               </motion.div>

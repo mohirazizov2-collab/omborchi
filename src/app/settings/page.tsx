@@ -46,11 +46,11 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label>{t.settings.companyName}</Label>
-                  <Input defaultValue="omborchi.uz Logistics" />
+                  <Input defaultValue="ombor.uz Logistics" />
                 </div>
                 <div className="space-y-2">
                   <Label>{t.settings.currency}</Label>
-                  <Input defaultValue="USD ($)" />
+                  <Input defaultValue="so'm (UZS)" />
                 </div>
               </div>
             </CardContent>
