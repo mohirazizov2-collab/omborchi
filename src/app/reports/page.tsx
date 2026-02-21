@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,12 +8,13 @@ import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
-import { Download, Filter, Loader2, TrendingUp, Package, Warehouse, Wand2, Sparkles, CheckCircle2, ChevronRight, FileBarChart, PieChart as PieIcon, Activity } from "lucide-react";
+import { FileDown, Filter, Loader2, TrendingUp, Package, Warehouse, Wand2, Sparkles, CheckCircle2, ChevronRight, FileBarChart, PieChart as PieIcon, Activity } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
@@ -34,6 +36,7 @@ export default function ReportsPage() {
   const { user, role, isUserLoading: authLoading } = useUser();
   const router = useRouter();
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [aiResult, setAiResult] = useState<AnalyzeReportsOutput | null>(null);
 
   useEffect(() => {
@@ -57,14 +60,6 @@ export default function ReportsPage() {
     return collection(db, "warehouses");
   }, [db, user]);
   const { data: warehouses, isLoading: warehousesLoading } = useCollection(warehousesQuery);
-
-  if (!mounted || authLoading || role === "Omborchi") {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   const totalValue = (products || []).reduce((acc, p) => acc + (p.salePrice * (p.stock || 0)), 0);
   const lowStockCount = (products || []).filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length;
@@ -95,6 +90,67 @@ export default function ReportsPage() {
       setIsAiLoading(false);
     }
   };
+
+  const handleExportExcel = () => {
+    if (!products || !warehouses) return;
+    setIsExporting(true);
+
+    try {
+      // 1. Products Sheet
+      const productsData = products.map(p => ({
+        "Nomi": p.name,
+        "SKU": p.sku,
+        "Kategoriya": p.categoryId || "General",
+        "Zaxira miqdori": p.stock || 0,
+        "Sotuv narxi ($)": p.salePrice || 0,
+        "Umumiy qiymat ($)": (p.stock || 0) * (p.salePrice || 0),
+        "Zaxira chegarasi": p.lowStockThreshold || 10
+      }));
+
+      // 2. Warehouses Sheet
+      const warehousesData = warehouses.map(w => ({
+        "Ombor nomi": w.name,
+        "Manzil": w.address,
+        "Telefon": w.phoneNumber,
+        "Mas'ul ID": w.responsibleUserId,
+        "Yaratilgan sana": w.createdAt ? new Date(w.createdAt).toLocaleDateString() : 'N/A'
+      }));
+
+      // 3. Summary Sheet
+      const summaryData = [
+        { "Ko'rsatkich": "Jami zaxira qiymati", "Qiymat": `$${totalValue.toLocaleString()}` },
+        { "Ko'rsatkich": "Omborlar soni", "Qiymat": warehouses.length },
+        { "Ko'rsatkich": "Jami mahsulot turlari", "Qiymat": products.length },
+        { "Ko'rsatkich": "Kam qolgan mahsulotlar", "Qiymat": lowStockCount },
+        { "Ko'rsatkich": "Hisobot sanasi", "Qiymat": new Date().toLocaleString() }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      const wsProducts = XLSX.utils.json_to_sheet(productsData);
+      const wsWarehouses = XLSX.utils.json_to_sheet(warehousesData);
+
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Umumiy Xulosa");
+      XLSX.utils.book_append_sheet(wb, wsProducts, "Mahsulotlar");
+      XLSX.utils.book_append_sheet(wb, wsWarehouses, "Omborlar");
+
+      const fileName = `omborchi_hisobot_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error("Excel export error:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  if (!mounted || authLoading || role === "Omborchi") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const categoriesMap: Record<string, number> = {};
   (products || []).forEach(p => {
@@ -131,8 +187,14 @@ export default function ReportsPage() {
               {isAiLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Wand2 className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform" />}
               {t.reports.aiAnalyze || 'AI Tahlil'}
             </Button>
-            <Button variant="outline" className="rounded-2xl font-bold bg-card/50 backdrop-blur-md border-border/50 shadow-sm hover:shadow-xl transition-all h-12 px-6">
-              <Download className="w-4 h-4 mr-2" /> {t.reports.export}
+            <Button 
+              onClick={handleExportExcel}
+              disabled={isExporting || isLoading || !products?.length}
+              variant="outline" 
+              className="rounded-2xl font-bold bg-card/50 backdrop-blur-md border-border/50 shadow-sm hover:shadow-xl transition-all h-12 px-6"
+            >
+              {isExporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileDown className="w-4 h-4 mr-2" />}
+              Excel (XLSX)
             </Button>
           </div>
         </header>
