@@ -34,8 +34,8 @@ export const translations = {
       description: 'omborchi.uz inventar va ombor operatsiyalari umumiy ko\'rinishi.',
       totalStockValue: 'Jami zaxira qiymati',
       activeWarehouses: 'Faol omborlar',
-      monthlyStockIn: 'Oylik kirim',
-      monthlyStockOut: 'Oylik chiqim',
+      monthlyStockIn: 'Oylik Kirim',
+      monthlyStockOut: 'Oylik Chiqim',
       stockMovements: 'Zaxira harakati',
       lowStockAlerts: 'Kam qolgan mahsulotlar',
       recentMovements: 'Oxirgi harakatlar',
@@ -77,7 +77,7 @@ export const translations = {
       status: 'Holat'
     },
     stockIn: {
-      title: 'Tovarlar kirimi (Goods Receipt)',
+      title: 'Tovarlar Kirimi (Goods Receipt)',
       description: 'Yetkazib beruvchilardan kelgan tovarlarni qayd etish.',
       dnDetails: 'Yuk xati tafsilotlari',
       dnNumber: 'Yuk xati raqami (DN)',
@@ -85,26 +85,26 @@ export const translations = {
       supplier: 'Yetkazib beruvchi',
       targetWarehouse: 'Maqsadli ombor',
       productItems: 'Mahsulotlar ro\'yxati',
-      process: 'Qabul qilishni yakunlash',
+      process: 'Kirimni yakunlash',
       saveDraft: 'Qoralama sifatida saqlash'
     },
     stockOut: {
-      title: 'Tovarlar chiqimi (Goods Issue)',
+      title: 'Tovarlar Chiqimi (Goods Issue)',
       description: 'Ombordan tovarlarni chiqarish (mijozlarga yoki loyihalarga).',
       issueDetails: 'Chiqim tafsilotlari',
       refNumber: 'Buyurtma / Referans raqami',
       issueDate: 'Chiqarilgan sana',
       sourceWarehouse: 'Chiqaruvchi ombor',
       recipient: 'Mijoz / Qabul qiluvchi',
-      dispatch: 'Tovarni jo\'natish',
+      dispatch: 'Chiqimni jo\'natish',
       pickingList: 'Terish varaqasini chop etish'
     },
     transfers: {
-      title: 'Omborlararo transferlar',
-      description: 'Zaxiralarni bir ombordan ikkinchisiga o\'tkazish.',
+      title: 'Omborlararo Transferlar',
+      description: 'Zaxiralarni bir ombordan ikkinchisiga o\'tkazish (ichki harakat).',
       routeDetails: 'Yo\'nalish tafsilotlari',
-      fromWarehouse: 'Qaysi ombordan',
-      toWarehouse: 'Qaysi omborga',
+      fromWarehouse: 'Qaysi ombordan (Manba)',
+      toWarehouse: 'Qaysi omborga (Maqsad)',
       scheduleDate: 'Rejalashtirilgan sana',
       initiate: 'Transferni boshlash'
     },
@@ -137,7 +137,7 @@ export const translations = {
     },
     systemGen: {
       title: 'Tizim generatsiya vositasi',
-      description: 'AI yordamida arxitektura artefaktlarini yaratish.',
+      description: 'AI yordamica arxitektura artefaktlarini yaratish.',
       inputReqs: 'Talablarni kiritish',
       generate: 'Arxitekturani yaratish',
       database: 'Ma\'lumotlar bazasi',
@@ -202,8 +202,8 @@ export const translations = {
       description: 'Обзор инвентаря и складских операций omborchi.uz.',
       totalStockValue: 'Общая стоимость запасов',
       activeWarehouses: 'Активные склады',
-      monthlyStockIn: 'Месячный приход',
-      monthlyStockOut: 'Месячный расход',
+      monthlyStockIn: 'Месячный Приход',
+      monthlyStockOut: 'Месячный Расход',
       stockMovements: 'Движение запасов',
       lowStockAlerts: 'Низкий уровень запасов',
       recentMovements: 'Последние движения',
@@ -245,7 +245,7 @@ export const translations = {
       status: 'Статус'
     },
     stockIn: {
-      title: 'Приход товара (Goods Receipt)',
+      title: 'Приход товара (Stock In)',
       description: 'Регистрация входящих товаров по накладным.',
       dnDetails: 'Детали накладной',
       dnNumber: 'Номер накладной (DN)',
@@ -253,11 +253,11 @@ export const translations = {
       supplier: 'Поставщик',
       targetWarehouse: 'Целевой склад',
       productItems: 'Список товаров',
-      process: 'Завершить прием',
+      process: 'Завершить приход',
       saveDraft: 'Сохранить черновик'
     },
     stockOut: {
-      title: 'Расход товара (Goods Issue)',
+      title: 'Расход товара (Stock Out)',
       description: 'Выдача товаров со склада (клиентам или на проекты).',
       issueDetails: 'Детали выдачи',
       refNumber: 'Номер заказа / Референс',
@@ -268,11 +268,11 @@ export const translations = {
       pickingList: 'Печать листа сборки'
     },
     transfers: {
-      title: 'Межскладские переводы',
-      description: 'Перемещение запасов между вашими складами.',
+      title: 'Складские Переводы',
+      description: 'Перемещение запасов между вашими складами (внутреннее движение).',
       routeDetails: 'Детали маршрута',
-      fromWarehouse: 'Со склада',
-      toWarehouse: 'На склад',
+      fromWarehouse: 'Со склада (Источник)',
+      toWarehouse: 'На склад (Цель)',
       scheduleDate: 'Плановая дата',
       initiate: 'Начать перевод'
     },
@@ -436,11 +436,11 @@ export const translations = {
       pickingList: 'Print Picking List'
     },
     transfers: {
-      title: 'Inter-Warehouse Transfers',
-      description: 'Move stock between your distribution centers and hubs.',
+      title: 'Stock Transfers',
+      description: 'Move stock between your distribution centers (internal movement).',
       routeDetails: 'Route Details',
-      fromWarehouse: 'Source Warehouse',
-      toWarehouse: 'Destination Warehouse',
+      fromWarehouse: 'From Warehouse (Source)',
+      toWarehouse: 'To Warehouse (Target)',
       scheduleDate: 'Scheduled Date',
       initiate: 'Initiate Transfer'
     },
