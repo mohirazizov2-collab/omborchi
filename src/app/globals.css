@@ -59,6 +59,7 @@
     background-color: hsl(var(--background));
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
 }
 
@@ -77,6 +78,7 @@
   .page-transition {
     @apply animate-in fade-in duration-200 ease-out;
     will-change: opacity, transform;
+    contain: paint;
   }
 }
 
@@ -90,12 +92,12 @@
   @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
 }
 
-/* 120 FPS Performance Boosts */
-* {
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-}
-
+/* 120 FPS Performance Optimizations */
 .recharts-responsive-container {
   will-change: transform;
+  contain: layout;
+}
+
+a, button {
+  touch-action: manipulation;
 }
