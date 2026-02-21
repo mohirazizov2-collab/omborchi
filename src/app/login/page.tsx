@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -120,14 +121,19 @@ export default function LoginPage() {
             initial={{ scale: 0, rotate: -20 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", damping: 12 }}
-            className="w-20 h-20 rounded-3xl bg-primary flex items-center justify-center text-primary-foreground shadow-[0_20px_40px_-10px_rgba(var(--primary),0.3)] mb-8"
+            className="w-24 h-24 rounded-[2rem] bg-[#3b82f6] flex items-center justify-center text-white shadow-[0_20px_40px_-10px_rgba(59,130,246,0.5)] mb-8"
           >
-            <Warehouse className="w-10 h-10" />
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10L12 4L21 10V20H3V10Z" />
+              <path d="M8 12H16" />
+              <path d="M8 15H16" />
+              <path d="M8 18H16" />
+            </svg>
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="font-headline font-black text-5xl tracking-tighter text-foreground"
+            className="font-headline font-black text-6xl tracking-tighter text-foreground"
           >
             ombor.uz
           </motion.h1>

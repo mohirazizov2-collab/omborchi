@@ -42,7 +42,6 @@ export function OmniSidebar() {
   const isAdmin = role === "Admin" || isSuperAdmin;
   const isOmborchi = role === "Omborchi";
 
-  // Navigation memoization to prevent lag during navigation
   const navigation = useMemo(() => [
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
     { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
@@ -70,10 +69,15 @@ export function OmniSidebar() {
     <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
       <div className="flex items-center px-6 h-16 border-b shrink-0">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
-            <Warehouse className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-[0.8rem] bg-[#3b82f6] flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10L12 4L21 10V20H3V10Z" />
+              <path d="M8 12H16" />
+              <path d="M8 15H16" />
+              <path d="M8 18H16" />
+            </svg>
           </div>
-          <span className="font-headline font-black text-xl tracking-tighter">ombor.uz</span>
+          <span className="font-headline font-black text-[22px] tracking-tighter text-foreground">ombor.uz</span>
         </Link>
       </div>
 
