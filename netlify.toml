@@ -7,5 +7,5 @@
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
-  NEXT_USE_NETLIFY_EDGE = "false"
   NODE_VERSION = "20"
+  NEXT_USE_NETLIFY_EDGE = "false"
