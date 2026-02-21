@@ -1,7 +1,14 @@
+
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
+  # O'rtacha yuklama uchun 1 ta instance yetarli (Spark/Blaze uchun mos)
   maxInstances: 1
+  minInstances: 0
+  memoryPerInstance: 512Mi
+
+# Atrof-muhit o'zgaruvchilari (AI kalitini shu yerga ham qo'shish mumkin)
+# env:
+#   - name: GOOGLE_GENAI_API_KEY
+#     value: "YOUR_API_KEY_HERE"
