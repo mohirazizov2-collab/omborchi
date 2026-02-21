@@ -17,9 +17,11 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   const router = useRouter();
   const [isInitialized, setIsInitialized] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Faqat bir marta auth holatini tinglaymiz
+  // Komponent brauzerda yuklanganini tekshiramiz (Hydration xatosini oldini olish uchun)
   useEffect(() => {
+    setMounted(true);
     const { auth } = firebaseServices;
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -28,18 +30,27 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     return () => unsubscribe();
   }, [firebaseServices]);
 
-  // Redirektsiya mantiqini navigatsiyadan ajratamiz
+  // Redirektsiya mantiqi
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || !mounted) return;
 
     if (!user && pathname !== '/login') {
       router.push('/login');
     } else if (user && pathname === '/login') {
       router.push('/');
     }
-  }, [user, isInitialized, pathname, router]);
+  }, [user, isInitialized, mounted, pathname, router]);
 
-  // Yuklanish vaqtidagi bloklovchi spinnerni minimallashtiramiz
+  // Server-side render vaqtida va birinchi renderda bir xil natija qaytarish
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-[3px] border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Auth holati yuklanayotgan vaqtda spinner ko'rsatish
   if (!isInitialized && pathname !== '/login') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
