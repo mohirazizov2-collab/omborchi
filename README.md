@@ -1,49 +1,39 @@
 
-# 🚀 ombor.uz - Yakuniy ishga tushirish yo'riqnomasi (Netlify uchun)
+# 🚀 ombor.uz - Netlify-da ishga tushirish (Yakuniy qo'llanma)
 
-Agar Firebase App Hosting-da xatolik yuz bersa, quyidagi mutlaqo bepul va oson yo'ldan foydalaning:
+Agar Firebase Studio-dagi "Publish" tugmasi billing (to'lov) so'rasa, quyidagi mutlaqo bepul yo'ldan foydalaning:
 
-## 🛠 1-qadam: Loyihani GitHub-ga joylash
-Firebase Studio-dagi terminalga (pastki qismdagi qora oyna) quyidagi buyruqlarni ketma-ket nusxalab kiriting:
+## 🛠 1-qadam: Kodni GitHub-ga yuklash
+Pastdagi terminalga (qora oyna) ushbu buyruqlarni ketma-ket kiriting:
 
-1. **Git-ni ishga tushirish:**
+1. **Git-ni sozlash:**
    ```bash
    git init
-   ```
-2. **Fayllarni tayyorlash:**
-   ```bash
    git add .
+   git commit -m "ombor.uz: Ready for Netlify"
    ```
-3. **Saqlash:**
-   ```bash
-   git commit -m "Initial commit: ombor.uz ready for Netlify"
-   ```
-4. **GitHub-ga ulanish:**
-   *(GitHub-da yangi repo oching va uning havolasini pastdagisiga almashtiring)*
+2. **GitHub-ga ulanish:**
+   *(GitHub-da yangi bo'sh repo oching va uning linkini pastdagisiga almashtiring)*
    ```bash
    git remote add origin https://github.com/FOYDALANUVCHI_NOMI/ombor-uz.git
-   ```
-5. **Yuborish:**
-   ```bash
    git push -u origin main
    ```
 
-## 🌐 2-qadam: Netlify-da bepul Deploy qilish
-1. [Netlify](https://app.netlify.com/) saytiga kiring.
+## 🌐 2-qadam: Netlify-da Deploy qilish
+1. [Netlify.com](https://app.netlify.com/) ga kiring va GitHub orqali ro'yxatdan o'ting.
 2. **"Add new site"** -> **"Import an existing project"** tugmasini bosing.
 3. GitHub-dagi `ombor-uz` loyihangizni tanlang.
-4. **Sozlamalar (avtomatik chiqishi kerak):**
+4. **Sozlamalar:**
    - **Build command:** `npm run build`
    - **Publish directory:** `.next`
 
 ## 🔑 3-qadam: AI Kalitini kiritish (Muhim!)
-AI funksiyalari ishlashi uchun Netlify panelida:
+AI funksiyalari ishlashi uchun Netlify-da:
 1. **Site configuration** -> **Environment variables** bo'limiga o'ting.
-2. **"Add key/value pairs"** tugmasini bosing.
-3. Quyidagilarni kiriting:
+2. **"Add a variable"** tugmasini bosing:
    - **Key:** `GOOGLE_GENAI_API_KEY`
-   - **Value:** [Google AI Studio](https://aistudio.google.com/app/apikey) dan olgan kalitingiz.
-4. Saqlab bo'lgach, **"Deploy site"** qiling.
+   - **Value:** [Google AI Studio](https://aistudio.google.com/app/apikey) dan olgan kalitingizni qo'ying.
+3. Saqlab bo'lgach, **"Deploy site"** tugmasini bosing.
 
 ---
 Created by **X e M team** © 2026
