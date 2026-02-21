@@ -100,9 +100,10 @@ export default function ReportsPage() {
 
     const now = new Date();
     const days = reportPeriod === 'weekly' ? 7 : 30;
-    const startDate = new Date(now.setDate(now.getDate() - days));
+    const startDate = new Date();
+    startDate.setDate(now.getDate() - days);
 
-    // Revenue from StockOut
+    // Revenue from StockOut (Chiqim)
     const revenue = movements
       .filter(m => m.movementType === 'StockOut' && new Date(m.movementDate) >= startDate)
       .reduce((acc, m) => {
@@ -114,6 +115,7 @@ export default function ReportsPage() {
     // Expenses (Total Salaries)
     const expenses = employees.reduce((acc, e) => {
       const monthlyTotal = (e.baseSalary || 0) + (e.bonus || 0) - (e.deductions || 0);
+      // Agar haftalik bo'lsa, oylik xarajatni 4 ga bo'lamiz (taxminiy)
       return acc + (reportPeriod === 'weekly' ? monthlyTotal / 4 : monthlyTotal);
     }, 0);
 
@@ -154,32 +156,6 @@ export default function ReportsPage() {
     }
   };
 
-  const handleExportExcel = () => {
-    if (!products || !warehouses) return;
-    setIsExporting(true);
-
-    try {
-      const productsData = products.map(p => ({
-        "Nomi": p.name,
-        "SKU": p.sku,
-        "Kategoriya": p.categoryId || "General",
-        "Zaxira miqdori": p.stock || 0,
-        "Sotuv narxi (so'm)": p.salePrice || 0,
-        "Umumiy qiymat (so'm)": (p.stock || 0) * (p.salePrice || 0),
-        "Zaxira chegarasi": p.lowStockThreshold || 10
-      }));
-
-      const wb = XLSX.utils.book_new();
-      const wsProducts = XLSX.utils.json_to_sheet(productsData);
-      XLSX.utils.book_append_sheet(wb, wsProducts, "Mahsulotlar");
-      XLSX.writeFile(wb, `ombor_hisobot_${new Date().toISOString().split('T')[0]}.xlsx`);
-    } catch (error) {
-      console.error("Excel export error:", error);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   if (!mounted || authLoading || role === "Omborchi") {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -199,12 +175,15 @@ export default function ReportsPage() {
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.reports.title}</h1>
             <p className="text-muted-foreground font-medium text-sm mt-1">{t.reports.description}</p>
           </div>
-          <div className="flex gap-3">
-            <div className="bg-muted/30 p-1 rounded-2xl flex gap-1 mr-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-muted/30 p-1.5 rounded-2xl flex gap-1 mr-4 border border-border/40">
               <Button 
                 variant={reportPeriod === 'weekly' ? 'secondary' : 'ghost'} 
                 size="sm" 
-                className="rounded-xl text-[10px] font-black uppercase h-10"
+                className={cn(
+                  "rounded-xl text-[10px] font-black uppercase h-10 px-4",
+                  reportPeriod === 'weekly' && "bg-background shadow-sm"
+                )}
                 onClick={() => setReportPeriod('weekly')}
               >
                 {t.reports.weekly}
@@ -212,7 +191,10 @@ export default function ReportsPage() {
               <Button 
                 variant={reportPeriod === 'monthly' ? 'secondary' : 'ghost'} 
                 size="sm" 
-                className="rounded-xl text-[10px] font-black uppercase h-10"
+                className={cn(
+                  "rounded-xl text-[10px] font-black uppercase h-10 px-4",
+                  reportPeriod === 'monthly' && "bg-background shadow-sm"
+                )}
                 onClick={() => setReportPeriod('monthly')}
               >
                 {t.reports.monthly}
@@ -238,7 +220,7 @@ export default function ReportsPage() {
             <h2 className="text-xl font-black font-headline tracking-tight">{t.reports.profitAnalysis}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group rounded-[2rem]">
               <div className="absolute right-[-10px] top-[-10px] opacity-[0.03] group-hover:scale-110 transition-transform duration-500">
                 <ArrowUpRight className="w-32 h-32 text-emerald-500" />
               </div>
@@ -247,12 +229,12 @@ export default function ReportsPage() {
                 <p className="text-3xl font-black font-headline tracking-tighter text-emerald-500">{financials.revenue.toLocaleString()} so'm</p>
                 <div className="mt-4 flex items-center gap-2 text-emerald-500 font-bold text-[11px]">
                   <TrendingUp className="w-3.5 h-3.5" /> 
-                  <span>{reportPeriod === 'weekly' ? 'Bu haftalik sotuv' : 'Bu oylik sotuv'}</span>
+                  <span>{reportPeriod === 'weekly' ? 'Haftalik sotuv' : 'Oylik sotuv'}</span>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group rounded-[2rem]">
               <div className="absolute right-[-10px] top-[-10px] opacity-[0.03] group-hover:scale-110 transition-transform duration-500">
                 <ArrowDownRight className="w-32 h-32 text-rose-500" />
               </div>
@@ -266,7 +248,7 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none glass-card bg-primary text-white relative overflow-hidden group shadow-2xl shadow-primary/20">
+            <Card className="border-none glass-card bg-primary text-white relative overflow-hidden group shadow-2xl shadow-primary/20 rounded-[2rem]">
               <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover:scale-110 transition-transform duration-500">
                 <Sparkles className="w-32 h-32" />
               </div>
@@ -337,7 +319,7 @@ export default function ReportsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
               <CardContent className="pt-8">
                 <div className="flex justify-between items-start mb-8">
                   <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500">
@@ -349,7 +331,7 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
               <CardContent className="pt-8">
                 <div className="flex justify-between items-start mb-8">
                   <div className="p-4 rounded-2xl bg-primary/10 text-primary">
@@ -361,7 +343,7 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2rem]">
               <CardContent className="pt-8">
                 <div className="flex justify-between items-start mb-8">
                   <div className="p-4 rounded-2xl bg-purple-500/10 text-purple-500">
