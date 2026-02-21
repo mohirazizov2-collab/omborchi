@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 import { useLanguage } from "@/lib/i18n/context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck, Copy, CheckCircle2, Database, Key, Warehouse, ArrowRight, Box, Package, Truck, Layers } from "lucide-react";
+import { Loader2, Lock, Mail, Globe, AlertCircle, ShieldCheck, Copy, CheckCircle2, Database, Key, Warehouse, ArrowRight, Box, Package, Truck, Layers, Wand2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -17,12 +18,14 @@ import { motion } from "framer-motion";
 export default function LoginPage() {
   const { t, language, setLanguage } = useLanguage();
   const auth = useAuth();
+  const db = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
   
   const [email, setEmail] = useState("f2472839@gmail.com");
   const [password, setPassword] = useState("Farrukh0077");
   const [loading, setLoading] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [error, setError] = useState("");
   const [userUid, setUserUid] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -42,17 +45,40 @@ export default function LoginPage() {
       setUserUid(result.user.uid);
       toast({
         title: "Tizimga kirildi",
-        description: "Endi quyidagi UID orqali Super Adminni faollashtiring.",
+        description: "Super Admin huquqini faollashtirishingiz mumkin.",
       });
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError("Email yoki parol noto'g'ri. Firebase Console-da user yaratganingizga ishonch hosil qiling.");
-      } else {
-        setError("Xatolik: " + err.message);
-      }
+      setError("Email yoki parol noto'g'ri. Iltimos, qaytadan urinib ko'ring.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const activateSuperAdmin = async () => {
+    if (!userUid || !db) return;
+    setActivating(true);
+    try {
+      await setDoc(doc(db, "rolesAdmin", userUid), {
+        uid: userUid,
+        email: email,
+        assignedAt: new Date().toISOString()
+      });
+      toast({
+        title: "Tabriklaymiz!",
+        description: "Siz endi Super Adminsiz. Tizim qayta yuklanmoqda...",
+      });
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 1500);
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Xatolik",
+        description: "Huquqni faollashtirib bo'lmadi: " + err.message,
+      });
+    } finally {
+      setActivating(false);
     }
   };
 
@@ -64,117 +90,86 @@ export default function LoginPage() {
     });
   };
 
-  // Pre-defined background elements to ensure full screen coverage and avoid hydration clustering
   const bgElements = [
-    { Icon: Box, size: 140, top: "10%", left: "5%", duration: 25, delay: 0 },
-    { Icon: Package, size: 180, top: "40%", left: "85%", duration: 35, delay: 2 },
-    { Icon: Truck, size: 220, top: "70%", left: "15%", duration: 30, delay: 5 },
-    { Icon: Layers, size: 160, top: "20%", left: "65%", duration: 40, delay: 1 },
-    { Icon: Warehouse, size: 200, top: "85%", left: "80%", duration: 32, delay: 3 },
-    { Icon: Box, size: 120, top: "5%", left: "45%", duration: 28, delay: 4 },
-    { Icon: Package, size: 150, top: "55%", left: "5%", duration: 38, delay: 6 },
-    { Icon: Truck, size: 190, top: "15%", left: "90%", duration: 42, delay: 2 },
-    { Icon: Box, size: 130, top: "45%", left: "40%", duration: 26, delay: 7 },
+    { Icon: Box, top: "15%", left: "10%", duration: 25, delay: 0 },
+    { Icon: Package, top: "45%", left: "80%", duration: 35, delay: 2 },
+    { Icon: Truck, top: "75%", left: "20%", duration: 30, delay: 5 },
+    { Icon: Layers, top: "25%", left: "70%", duration: 40, delay: 1 },
+    { Icon: Warehouse, top: "85%", left: "75%", duration: 32, delay: 3 },
   ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#02040a] relative overflow-hidden font-body">
-      {/* Sklad mavzusidagi animatsion orqa fon */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden bg-[#02040a]">
-        {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '48px 48px' }} />
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '48px 48px' }} />
         
-        {/* Floating Warehouse Icons - Spread across screen */}
         {mounted && bgElements.map((el, idx) => (
           <motion.div
             key={idx}
-            initial={{ 
-              top: el.top, 
-              left: el.left,
-              opacity: 0,
-              scale: 0.8,
-              rotate: 0 
-            }}
+            initial={{ top: el.top, left: el.left, opacity: 0 }}
             animate={{ 
               y: [0, -40, 0, 40, 0],
               x: [0, 30, 0, -30, 0],
-              opacity: [0, 0.07, 0.07, 0],
-              rotate: [0, 90, 180, 270, 360],
-              scale: [0.8, 1, 1, 0.8]
+              opacity: [0, 0.05, 0.05, 0],
             }}
-            transition={{ 
-              duration: el.duration, 
-              repeat: Infinity, 
-              delay: el.delay,
-              ease: "linear" 
-            }}
+            transition={{ duration: el.duration, repeat: Infinity, delay: el.delay, ease: "linear" }}
             className="absolute text-white"
           >
-            <el.Icon size={el.size} strokeWidth={0.3} />
+            <el.Icon size={180} strokeWidth={0.2} />
           </motion.div>
         ))}
 
-        {/* Cinematic Blur gradients */}
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[140px] animate-pulse" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-500/10 rounded-full blur-[140px] animate-pulse delay-1000" />
-        <div className="absolute top-[40%] left-[30%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] bg-blue-500/5 rounded-full blur-[120px]" />
       </div>
       
       <div className="absolute top-6 right-6 z-20">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2 uppercase font-black text-[10px] tracking-widest text-white/70 hover:text-white hover:bg-white/10 transition-all rounded-xl border border-white/10">
+            <Button variant="ghost" size="sm" className="gap-2 uppercase font-black text-[10px] tracking-widest text-white/50 hover:text-white border border-white/5 rounded-xl">
               <Globe className="w-3 h-3" /> {language}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-xl border-white/10 bg-black/80 backdrop-blur-xl text-white">
-            <DropdownMenuItem onClick={() => setLanguage('uz')} className="cursor-pointer py-2">🇺🇿 O'zbek</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('ru')} className="cursor-pointer py-2">🇷🇺 Русский</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('en')} className="cursor-pointer py-2">🇺🇸 English</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="rounded-xl border-white/10 bg-black/90 text-white">
+            <DropdownMenuItem onClick={() => setLanguage('uz')}>🇺🇿 O'zbek</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('ru')}>🇷🇺 Русский</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('en')}>🇺🇸 English</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <div className="w-full max-w-md p-6 z-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+      <div className="w-full max-w-md p-6 z-10 animate-in fade-in zoom-in-95 duration-700">
         <div className="flex flex-col items-center mb-10">
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-white shadow-2xl shadow-primary/30 mb-6 transition-transform"
-          >
+          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-white shadow-2xl shadow-primary/20 mb-6">
             <Warehouse className="w-9 h-9" />
-          </motion.div>
-          <h1 className="font-headline font-black text-4xl tracking-tighter text-white">omborchi.uz</h1>
-          <div className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mt-2">
-            <p className="text-white/40 text-[9px] font-black uppercase tracking-[0.3em]">Enterprise Edition</p>
           </div>
+          <h1 className="font-headline font-black text-4xl tracking-tighter text-white">omborchi.uz</h1>
+          <p className="text-white/30 text-[9px] font-black uppercase tracking-[0.3em] mt-2">Enterprise Edition</p>
         </div>
 
-        <Card className="border-white/5 shadow-2xl bg-white/[0.03] backdrop-blur-3xl rounded-[2.5rem] overflow-hidden">
+        <Card className="border-white/5 shadow-2xl bg-white/[0.02] backdrop-blur-2xl rounded-[2.5rem] overflow-hidden">
           <CardHeader className="space-y-1 pb-2 pt-8">
             <CardTitle className="text-2xl font-black font-headline text-center text-white">
               {t.auth.loginTitle}
             </CardTitle>
-            <CardDescription className="text-center text-white/50 font-medium px-6">{t.auth.loginDescription}</CardDescription>
+            <CardDescription className="text-center text-white/40 font-medium px-6">{t.auth.loginDescription}</CardDescription>
           </CardHeader>
           
           {!userUid ? (
             <form onSubmit={handleLogin}>
               <CardContent className="space-y-5 pt-6 px-8">
                 {error && (
-                  <div className="p-4 rounded-2xl bg-destructive/10 text-destructive text-[11px] font-bold border border-destructive/20 flex items-center gap-3 animate-in zoom-in-95 duration-300">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {error}
+                  <div className="p-4 rounded-2xl bg-destructive/10 text-destructive text-[11px] font-bold border border-destructive/20 flex items-center gap-3">
+                    <AlertCircle className="w-4 h-4" /> {error}
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-white/40 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.emailLabel}</Label>
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-primary transition-colors" />
+                  <Label className="text-white/30 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.emailLabel}</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                     <Input 
-                      id="email" 
                       type="email" 
-                      className="h-12 pl-11 rounded-2xl bg-white/[0.04] border-white/10 text-white placeholder:text-white/10 focus:ring-primary/40 focus:bg-white/[0.07] transition-all"
+                      className="h-12 pl-11 rounded-2xl bg-white/[0.03] border-white/5 text-white placeholder:text-white/10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -182,13 +177,12 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-white/40 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.passwordLabel}</Label>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-primary transition-colors" />
+                  <Label className="text-white/30 text-[10px] font-black uppercase tracking-widest pl-1">{t.auth.passwordLabel}</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                     <Input 
-                      id="password" 
                       type="password" 
-                      className="h-12 pl-11 rounded-2xl bg-white/[0.04] border-white/10 text-white placeholder:text-white/10 focus:ring-primary/40 focus:bg-white/[0.07] transition-all"
+                      className="h-12 pl-11 rounded-2xl bg-white/[0.03] border-white/5 text-white placeholder:text-white/10"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -197,69 +191,49 @@ export default function LoginPage() {
                 </div>
               </CardContent>
               <CardFooter className="pt-4 pb-10 px-8">
-                <Button type="submit" className="w-full h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all duration-300 bg-primary" disabled={loading}>
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <>{t.auth.loginButton} <ArrowRight className="w-4 h-4 ml-2" /></>}
+                <Button type="submit" className="w-full h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white shadow-xl shadow-primary/10 bg-primary hover:bg-primary/90" disabled={loading}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t.auth.loginButton} <ArrowRight className="w-4 h-4 ml-2" /></>}
                 </Button>
               </CardFooter>
             </form>
           ) : (
             <CardContent className="space-y-6 pt-6 pb-12 px-8">
-              <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-[1.8rem] space-y-4">
+              <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-[1.8rem] space-y-4">
                 <div className="flex items-center gap-3 text-emerald-400 font-black text-xs uppercase tracking-wider">
                   <CheckCircle2 className="w-5 h-5" /> Autentifikatsiya muvaffaqiyatli!
                 </div>
-                <p className="text-[11px] text-white/60 font-medium leading-relaxed">
-                  Hisobingiz tayyor, lekin siz hali <b>rolesAdmin</b> ro'yxatida yo'qsiz. UID-ni nusxalab Firestore-da sozlang:
+                <p className="text-[11px] text-white/50 font-medium leading-relaxed">
+                  Hisobingiz tayyor. Super Admin huquqini bir bosish bilan faollashtirishingiz mumkin:
                 </p>
-                <div className="flex items-center gap-3 bg-black/60 p-3.5 rounded-xl border border-white/10 font-code text-[10px] shadow-inner">
-                  <span className="flex-1 truncate font-black text-primary tracking-tight">{userUid}</span>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/20 text-white/70 hover:text-white" onClick={copyUid}>
-                    <Copy className="w-4 h-4" />
+                
+                <Button 
+                  onClick={activateSuperAdmin} 
+                  disabled={activating}
+                  className="w-full h-11 rounded-xl bg-primary text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 gap-2"
+                >
+                  {activating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Wand2 className="w-4 h-4" /> Super Admin huquqini faollashtirish</>}
+                </Button>
+
+                <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/5 font-code text-[9px]">
+                  <span className="flex-1 truncate font-black text-primary/60">{userUid}</span>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-white/40 hover:text-white" onClick={copyUid}>
+                    <Copy className="w-3 h-3" />
                   </Button>
                 </div>
               </div>
 
-              <div className="space-y-4 text-sm">
-                <div className="flex gap-4">
-                  <div className="flex-none w-8 h-8 rounded-xl bg-white/5 text-white/70 flex items-center justify-center text-[10px] font-black">1</div>
-                  <div>
-                    <p className="font-black text-white/90 text-[10px] uppercase tracking-wider flex items-center gap-2">
-                      <Database className="w-4 h-4 text-primary" /> Firestore-ga kiring
-                    </p>
-                    <p className="text-white/40 text-[10px] font-medium mt-1">
-                      Firebase Console-da <b>rolesAdmin</b> kolleksiyasini oching.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-none w-8 h-8 rounded-xl bg-white/5 text-white/70 flex items-center justify-center text-[10px] font-black">2</div>
-                  <div>
-                    <p className="font-black text-white/90 text-[10px] uppercase tracking-wider flex items-center gap-2">
-                      <Key className="w-4 h-4 text-primary" /> Hujjat yarating
-                    </p>
-                    <p className="text-white/40 text-[10px] font-medium mt-1">
-                      <b>Document ID</b> joyiga yuqoridagi <b>UID</b>-ni qo'ying.
-                    </p>
-                  </div>
-                </div>
-                
-                <Button variant="outline" className="w-full mt-6 h-11 rounded-2xl border-white/10 text-white/70 hover:text-white hover:bg-white/5 font-bold text-xs" onClick={() => window.location.reload()}>
-                  Bajarib bo'ldim, qayta yuklash
+              <div className="text-center">
+                <Button variant="ghost" className="text-[10px] text-white/30 font-black uppercase tracking-widest hover:text-white" onClick={() => window.location.href = "/"}>
+                  Hozircha davom etish <ArrowRight className="w-3 h-3 ml-2" />
                 </Button>
               </div>
             </CardContent>
           )}
         </Card>
 
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="text-center mt-10 text-white/20 text-[10px] font-black uppercase tracking-[0.4em] select-none"
-        >
+        <p className="text-center mt-10 text-white/10 text-[10px] font-black uppercase tracking-[0.4em] select-none">
           omborchi.uz by X e M team © 2026
-        </motion.p>
+        </p>
       </div>
     </div>
   );

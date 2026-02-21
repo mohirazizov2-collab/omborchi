@@ -75,18 +75,33 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       auth,
       async (firebaseUser) => {
         if (firebaseUser) {
-          // Fetch user role from Firestore
           try {
-            const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
-            const role = userDoc.exists() ? userDoc.data().role : "Omborchi";
+            // Default role is Omborchi
+            let role = "Omborchi";
             
-            // Also check rolesAdmin collection for Super Admin override
+            // Check users collection
+            const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
+            if (userDoc.exists()) {
+              role = userDoc.data().role;
+            }
+            
+            // Check rolesAdmin collection
             const adminDoc = await getDoc(doc(firestore, "rolesAdmin", firebaseUser.uid));
-            const finalRole = adminDoc.exists() ? "Super Admin" : role;
+            
+            // SUPER ADMIN OVERRIDE: Check by email or rolesAdmin doc
+            const isSuperAdmin = adminDoc.exists() || firebaseUser.email === "f2472839@gmail.com";
+            const finalRole = isSuperAdmin ? "Super Admin" : role;
 
             setUserAuthState({ user: firebaseUser, role: finalRole, isUserLoading: false, userError: null });
           } catch (e) {
-            setUserAuthState({ user: firebaseUser, role: "Omborchi", isUserLoading: false, userError: null });
+            // Fallback for safety
+            const isHardcodedAdmin = firebaseUser.email === "f2472839@gmail.com";
+            setUserAuthState({ 
+              user: firebaseUser, 
+              role: isHardcodedAdmin ? "Super Admin" : "Omborchi", 
+              isUserLoading: false, 
+              userError: null 
+            });
           }
         } else {
           setUserAuthState({ user: null, role: null, isUserLoading: false, userError: null });
