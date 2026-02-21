@@ -87,7 +87,7 @@ export default function UsersPage() {
       .then(() => {
         toast({
           title: "Muvaffaqiyatli",
-          description: "Foydalanuvchi profili yaratildi. Endi Firebase Console orqali Auth akkauntini oching.",
+          description: "Foydalanuvchi profili yaratildi. Endi X e M team orqali Auth akkauntini oching.",
         });
         setIsDialogOpen(false);
         setFormData({ displayName: "", email: "", role: "Omborchi" });
@@ -130,7 +130,7 @@ export default function UsersPage() {
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black tracking-tight">Yangi foydalanuvchi qo'shish</DialogTitle>
                 <CardDescription className="text-white/50">
-                  Foydalanuvchini tizimga biriktirish. Login va parolni Firebase Console-da yaratish kerak.
+                  Foydalanuvchini tizimga biriktirish. Login va parolni X e M team-da yaratish kerak.
                 </CardDescription>
               </DialogHeader>
               
@@ -138,7 +138,7 @@ export default function UsersPage() {
                 <Info className="h-4 w-4 text-primary" />
                 <AlertTitle className="text-[10px] font-black uppercase tracking-widest">Diqqat</AlertTitle>
                 <AlertDescription className="text-xs opacity-70">
-                  Xavfsizlik nuqtai nazaridan, yangi foydalanuvchi uchun <b>Firebase Console {'->'} Authentication</b> bo'limida login va parol ochib bering.
+                  Xavfsizlik nuqtai nazaridan, yangi foydalanuvchi uchun <b>X e M team {'->'} Authentication</b> bo'limida login va parol ochib bering.
                 </AlertDescription>
               </Alert>
 
