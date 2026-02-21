@@ -25,9 +25,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import { cn } from "@/lib/utils";
 
 // Unique ID helper
-const generateId = () => Math.random().toString(36).substring(2, 9);
+const generateId = () => Math.random().toString(36).substring(2, 11);
 
 export default function StockOutPage() {
   const { t } = useLanguage();
@@ -61,6 +62,8 @@ export default function StockOutPage() {
   const removeItem = (id: string) => {
     if (items.length > 1) {
       setItems(items.filter(item => item.id !== id));
+    } else {
+      setItems([{ id: generateId(), productId: "", quantity: 1 }]);
     }
   };
 
@@ -168,8 +171,17 @@ export default function StockOutPage() {
   };
 
   const handleDispatch = () => {
-    if (!orderNumber || !warehouseId || items.some(i => !i.productId)) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Barcha maydonlarni to'ldiring." });
+    // Validation
+    if (!orderNumber) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Buyurtma raqamini kiriting." });
+      return;
+    }
+    if (!warehouseId) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Omborni tanlang." });
+      return;
+    }
+    if (items.some(i => !i.productId)) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Barcha mahsulotlarni tanlang." });
       return;
     }
 
@@ -335,10 +347,19 @@ export default function StockOutPage() {
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
-                      className="flex flex-col md:flex-row gap-4 p-6 rounded-[2rem] bg-muted/10 border border-border/10 group relative"
+                      className={cn(
+                        "flex flex-col md:flex-row gap-4 p-6 rounded-[2rem] bg-muted/10 border transition-all group relative",
+                        !item.productId && "border-rose-500/20 bg-rose-500/[0.02]",
+                        item.productId && "border-border/10"
+                      )}
                     >
                       <div className="flex-1 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.product}</Label>
+                        <Label className={cn(
+                          "text-[10px] font-black uppercase tracking-widest pl-2",
+                          !item.productId ? "text-rose-500 opacity-100" : "opacity-40"
+                        )}>
+                          {t.common.product} {!item.productId && "*"}
+                        </Label>
                         <Select 
                           onValueChange={(val) => updateItem(item.id, "productId", val)}
                           value={item.productId}
@@ -395,7 +416,7 @@ export default function StockOutPage() {
               <CardContent className="p-8 pt-4 space-y-6">
                 <div className="flex justify-between items-center pb-6 border-b border-white/10">
                   <span className="text-white/60 text-xs font-black uppercase tracking-widest">{t.common.totalItems}</span>
-                  <span className="text-2xl font-black">{items.length}</span>
+                  <span className="text-2xl font-black">{items.filter(i => i.productId).length}</span>
                 </div>
                 <div className="space-y-4">
                    <div className="flex items-center gap-3">

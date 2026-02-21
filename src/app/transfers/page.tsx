@@ -17,13 +17,16 @@ import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+// Unique ID helper
+const generateId = () => Math.random().toString(36).substring(2, 11);
+
 export default function TransfersPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([{ id: Date.now(), productId: "", quantity: 1 }]);
+  const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1 }]);
   const [fromWarehouse, setFromWarehouse] = useState("");
   const [toWarehouse, setToWarehouse] = useState("");
 
@@ -40,35 +43,37 @@ export default function TransfersPage() {
   const { data: warehouses } = useCollection(warehousesQuery);
 
   const addItem = () => {
-    setItems([...items, { id: Date.now(), productId: "", quantity: 1 }]);
+    setItems([...items, { id: generateId(), productId: "", quantity: 1 }]);
   };
 
-  const removeItem = (id: number) => {
+  const removeItem = (id: string) => {
     if (items.length > 1) {
       setItems(items.filter(item => item.id !== id));
+    } else {
+      setItems([{ id: generateId(), productId: "", quantity: 1 }]);
     }
   };
 
-  const updateItem = (id: number, field: string, value: any) => {
+  const updateItem = (id: string, field: string, value: any) => {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
   const handleTransfer = () => {
-    if (!fromWarehouse || !toWarehouse || items.some(i => !i.productId)) {
-      toast({
-        variant: "destructive",
-        title: "Xatolik",
-        description: "Barcha maydonlarni to'ldiring.",
-      });
+    // Validation
+    if (!fromWarehouse) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Manba omborini tanlang." });
       return;
     }
-
+    if (!toWarehouse) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Maqsadli omborni tanlang." });
+      return;
+    }
     if (fromWarehouse === toWarehouse) {
-      toast({
-        variant: "destructive",
-        title: "Xatolik",
-        description: "Manba va maqsad ombori bir xil bo'lishi mumkin emas.",
-      });
+      toast({ variant: "destructive", title: "Xatolik", description: "Manba va maqsad ombori bir xil bo'lishi mumkin emas." });
+      return;
+    }
+    if (items.some(i => !i.productId)) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Barcha mahsulotlarni tanlang." });
       return;
     }
 
@@ -94,11 +99,12 @@ export default function TransfersPage() {
         description: "Transfer operatsiyasi muvaffaqiyatli qayd etildi.",
       });
 
-      setItems([{ id: Date.now(), productId: "", quantity: 1 }]);
+      setItems([{ id: generateId(), productId: "", quantity: 1 }]);
       setFromWarehouse("");
       setToWarehouse("");
     } catch (err) {
       console.error(err);
+      toast({ variant: "destructive", title: "Xatolik", description: "Amalni bajarishda xato yuz berdi." });
     } finally {
       setLoading(false);
     }
@@ -179,16 +185,25 @@ export default function TransfersPage() {
               </CardHeader>
               <CardContent className="p-8 pt-0 space-y-4">
                 <AnimatePresence mode="popLayout">
-                  {items.map((item, idx) => (
+                  {items.map((item) => (
                     <motion.div 
                       key={item.id} 
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
-                      className="flex gap-4 items-end p-5 rounded-[2rem] bg-muted/10 border border-border/10 group relative"
+                      className={cn(
+                        "flex gap-4 items-end p-5 rounded-[2rem] bg-muted/10 border transition-all group relative",
+                        !item.productId && "border-rose-500/20 bg-rose-500/[0.02]",
+                        item.productId && "border-border/10"
+                      )}
                     >
                       <div className="flex-1 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.product}</Label>
+                        <Label className={cn(
+                          "text-[10px] font-black uppercase tracking-widest pl-2",
+                          !item.productId ? "text-rose-500 opacity-100" : "opacity-40"
+                        )}>
+                          {t.common.product} {!item.productId && "*"}
+                        </Label>
                         <Select 
                           onValueChange={(val) => updateItem(item.id, "productId", val)}
                           value={item.productId}
@@ -210,7 +225,7 @@ export default function TransfersPage() {
                           className="h-12 rounded-xl bg-background/50 border-none font-black"
                           placeholder="0" 
                           value={item.quantity}
-                          onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value))}
+                          onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
                         />
                       </div>
                       <Button 
@@ -239,7 +254,7 @@ export default function TransfersPage() {
               <CardContent className="p-8 pt-4 space-y-6">
                 <div className="flex justify-between items-center pb-6 border-b border-white/10">
                   <span className="text-white/60 text-xs font-black uppercase tracking-widest">{t.common.totalItems}</span>
-                  <span className="text-2xl font-black">{items.length}</span>
+                  <span className="text-2xl font-black">{items.filter(i => i.productId).length}</span>
                 </div>
                 <div className="space-y-4">
                    <div className="flex items-center gap-3">
