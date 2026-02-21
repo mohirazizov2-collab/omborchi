@@ -1,10 +1,10 @@
 
 # 🚀 ombor.uz - Yakuniy ishga tushirish yo'riqnomasi
 
-Agar Firebase App Hosting-da xatolik yuz bersa, quyidagi mutlaqo bepul va oson yo'ldan foydalaning:
+Agar Firebase App Hosting-da xatolik yuz bersa (billing sababli), quyidagi mutlaqo bepul va oson yo'ldan foydalaning:
 
 ## 🛠 1-qadam: Loyihani GitHub-ga joylash
-Firebase Studio-dagi terminalga (pastki qismdagi qora oyna) quyidagi buyruqlarni ketma-ket kiriting:
+Firebase Studio-dagi terminalga (pastki qismdagi qora oyna) quyidagi buyruqlarni ketma-ket nusxalab kiriting:
 
 1. **Git-ni ishga tushirish:**
    ```bash
@@ -29,13 +29,14 @@ Firebase Studio-dagi terminalga (pastki qismdagi qora oyna) quyidagi buyruqlarni
    ```
 
 ## 🌐 2-qadam: Netlify-da bepul Deploy qilish
-[Netlify](https://app.netlify.com/) saytiga kiring, GitHub orqali ro'yxatdan o'ting va "Add new site" -> "Import an existing project" tugmasini bosing. GitHub-dagi `ombor-uz` loyihasini tanlang.
+1. [Netlify](https://app.netlify.com/) saytiga kiring.
+2. **"Add new site"** -> **"Import an existing project"** tugmasini bosing.
+3. GitHub-dagi `ombor-uz` loyihasini tanlang.
+4. **Sozlamalar (muhim):**
+   - **Build command:** `npm run build`
+   - **Publish directory:** `.next`
 
-**Sozlamalarni quyidagicha to'ldiring:**
-- **Build command:** `npm run build`
-- **Publish directory:** `.next`
-
-## 🔑 3-qadam: AI Kalitini kiritish (Juda muhim!)
+## 🔑 3-qadam: AI Kalitini kiritish
 AI funksiyalari ishlashi uchun Netlify-da:
 1. **Site configuration** -> **Environment variables** bo'limiga o'ting.
 2. **"Add key/value pairs"** tugmasini bosing.
