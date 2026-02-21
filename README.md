@@ -1,38 +1,43 @@
 
-# 🚀 ombor.uz - Boshqaruv va Deploy Qo'llanmasi
+# 🚀 ombor.uz - Tekin Hostingga Joylash Qo'llanmasi
 
-Ushbu loyihani internetga chiqarish uchun barcha kerakli manzillar va qadamlar:
+Ushbu loyihani internetga mutlaqo BEPUL chiqarish uchun eng yaxshi variantlar:
 
-## 🔗 Muhim Havolalar
-1. **Firebase Console (Asosiy):** [https://console.firebase.google.com/project/studio-4209846898-d5885](https://console.firebase.google.com/project/studio-4209846898-d5885)
-2. **App Hosting (Deploy qilish joyi):** [https://console.firebase.google.com/project/studio-4209846898-d5885/apphosting](https://console.firebase.google.com/project/studio-4209846898-d5885/apphosting)
-3. **Firestore Database (Ma'lumotlar):** [https://console.firebase.google.com/project/studio-4209846898-d5885/firestore](https://console.firebase.google.com/project/studio-4209846898-d5885/firestore)
+## 🌐 1-Variant: Vercel (Tavsiya etiladi - Eng osoni)
+Next.js loyihalari uchun eng optimal platforma.
+1. [Vercel.com](https://vercel.com) saytiga kiring va GitHub orqali ro'yxatdan o'ting.
+2. **"Add New" -> "Project"** tugmasini bosing.
+3. GitHub-dagi ushbu loyihani tanlang.
+4. **Environment Variables** bo'limiga:
+   - Key: `GOOGLE_GENAI_API_KEY`
+   - Value: `SIZNING_AI_KALITINGIZ` (Google AI Studio-dan olingan)
+5. "Deploy" tugmasini bosing. Bo'ldi!
+
+## 🌐 2-Variant: Netlify
+1. [Netlify.com](https://www.netlify.com) saytiga kiring.
+2. GitHub-ni ulab, loyihani tanlang.
+3. **Build settings**:
+   - Build command: `npm run build`
+   - Publish directory: `.next`
+4. **Environment Variables** bo'limiga `GOOGLE_GENAI_API_KEY` ni qo'shing.
 
 ---
 
-## 1️⃣ Kodni GitHub-ga yuklash
-Terminalga (pastdagi qora oyna) ushbu buyruqlarni ketma-ket yozing:
+## 🛠 Terminal Buyruqlari (Kodni GitHub-ga yuborish)
+Agar loyihani yangilamoqchi bo'lsangiz, terminalga ketma-ket yozing:
+
 ```bash
-git init
 git add .
-git commit -m "firebase hosting update"
-git remote add origin https://github.com/FOYDALANUVCHI_NOMI/REPOS_NOMI.git
-git push -u origin main
+git commit -m "fix: genkit server-side initialization"
+git push origin main
 ```
 
-## 2️⃣ Firebase Hosting-ni yoqish
-1. [App Hosting](https://console.firebase.google.com/project/studio-4209846898-d5885/apphosting) sahifasiga kiring.
-2. **"Get Started"** tugmasini bosing.
-3. GitHub hisobingizni ulang va loyihangizni (repository) tanlang.
-4. Deploy tugmasini bosing. 
+## 🔑 AI Kalitini olish
+AI funksiyalari ishlashi uchun kalitni bu yerdan oling:
+[https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 
-## 3️⃣ AI Kalitini Sozlash (Muhim!)
-Deploy tugallangandan so'ng, Firebase Console-da:
-1. **App Hosting** -> **Settings** -> **Environment Variables** bo'limiga kiring.
-2. **Key**: `GOOGLE_GENAI_API_KEY`
-3. **Value**: Sizning Google AI Studio kalitingiz.
-
----
-**Eslatma:** Agar Firebase-da billing (karta) bilan muammo bo'lsa, mutlaqo bepul bo'lgan [Netlify.com](https://www.netlify.com/) orqali GitHub-ni ulab ishlatishingiz mumkin.
+## 🔗 Firebase Boshqaruvi
+Ma'lumotlar bazasini (Firestore) kuzatish uchun:
+[Firebase Console](https://console.firebase.google.com/project/studio-4209846898-d5885)
 
 Created by **X e M team** © 2026

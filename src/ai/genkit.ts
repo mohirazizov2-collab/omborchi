@@ -3,9 +3,9 @@ import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview AI konfiguratsiyasi.
+ * @fileOverview AI konfiguratsiyasi (Server-side only).
  * Muhit o'zgaruvchisidan (Environment Variable) foydalaniladi.
- * Netlify-da GOOGLE_GENAI_API_KEY nomi bilan sozlanishi shart.
+ * Vercel yoki Netlify-da GOOGLE_GENAI_API_KEY nomi bilan sozlanishi shart.
  */
 
 const API_KEY = process.env.GOOGLE_GENAI_API_KEY;
