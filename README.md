@@ -1,10 +1,10 @@
 
 # 🚀 ombor.uz - Netlify-da ishga tushirish (Yakuniy qo'llanma)
 
-Agar Netlify-da "Page not found" xatosi chiqsa yoki loyiha ishlamasa, quyidagi amallarni bajaring:
+Agar Netlify-da "Page not found" xatosi chiqsa yoki loyiha "Skipped" bo'lsa, quyidagi amallarni bajaring:
 
 ## 🛠 1-qadam: Kodni GitHub-ga yuklash (Qaytadan)
-Terminalga (pastdagi qora oyna) quyidagi buyruqlarni kiriting:
+Terminalga (pastdagi qora oyna) quyidagi buyruqlarni ketma-ket kiriting:
 
 1. **O'zgarishlarni saqlash:**
    ```bash
@@ -23,7 +23,7 @@ Netlify saytida loyihangizga kiring va **Site configuration** -> **Build & deplo
 ## 🔑 3-qadam: AI Kalitini kiritish (Muhim!)
 AI funksiyalari ishlashi uchun Netlify-da:
 1. **Site configuration** -> **Environment variables** bo'limiga o'ting.
-2. **"Add a variable"** tugmasini bosing:
+2. **"Add a variable"** -> **"Add key/value pairs"** tugmasini bosing:
    - **Key:** `GOOGLE_GENAI_API_KEY`
    - **Value:** [Google AI Studio](https://aistudio.google.com/app/apikey) dan olgan kalitingizni qo'ying.
 3. Saqlab bo'lgach, **"Deploys"** bo'limiga o'tib, **"Trigger deploy"** -> **"Clear cache and deploy site"** tugmasini bosing.
