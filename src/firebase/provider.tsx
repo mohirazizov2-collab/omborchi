@@ -13,7 +13,6 @@ interface FirebaseProviderProps {
   auth: Auth;
 }
 
-// Internal state for user authentication
 interface UserAuthState {
   user: User | null;
   role: string | null;
@@ -21,7 +20,6 @@ interface UserAuthState {
   userError: Error | null;
 }
 
-// Combined state for the Firebase context
 export interface FirebaseContextState {
   areServicesAvailable: boolean;
   firebaseApp: FirebaseApp | null;
@@ -52,6 +50,9 @@ export interface UserHookResult {
 
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
+// DOIMIY SUPER ADMIN EMAILI
+const PERMANENT_SUPER_ADMIN = "f2472839@gmail.com";
+
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
   firebaseApp,
@@ -76,26 +77,37 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       async (firebaseUser) => {
         if (firebaseUser) {
           try {
-            // Default role is Omborchi
+            // 1. Agar email PERMANENT_SUPER_ADMIN bo'lsa, hech qanday tekshiruvsiz Super Admin
+            if (firebaseUser.email === PERMANENT_SUPER_ADMIN) {
+              setUserAuthState({ 
+                user: firebaseUser, 
+                role: "Super Admin", 
+                isUserLoading: false, 
+                userError: null 
+              });
+              return;
+            }
+
+            // 2. Oddiy foydalanuvchilar uchun bazadan rolni o'qish
             let role = "Omborchi";
-            
-            // Check users collection
             const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
             if (userDoc.exists()) {
               role = userDoc.data().role;
             }
             
-            // Check rolesAdmin collection
+            // 3. rolesAdmin to'plamidan Super Adminlikni tekshirish (boshqalar uchun)
             const adminDoc = await getDoc(doc(firestore, "rolesAdmin", firebaseUser.uid));
+            const isSuperAdmin = adminDoc.exists();
             
-            // SUPER ADMIN OVERRIDE: Check by email or rolesAdmin doc
-            const isSuperAdmin = adminDoc.exists() || firebaseUser.email === "f2472839@gmail.com";
-            const finalRole = isSuperAdmin ? "Super Admin" : role;
-
-            setUserAuthState({ user: firebaseUser, role: finalRole, isUserLoading: false, userError: null });
+            setUserAuthState({ 
+              user: firebaseUser, 
+              role: isSuperAdmin ? "Super Admin" : role, 
+              isUserLoading: false, 
+              userError: null 
+            });
           } catch (e) {
-            // Fallback for safety
-            const isHardcodedAdmin = firebaseUser.email === "f2472839@gmail.com";
+            // Xatolik bo'lsa ham emailni tekshirish (offline yoki baza xatosi bo'lsa)
+            const isHardcodedAdmin = firebaseUser.email === PERMANENT_SUPER_ADMIN;
             setUserAuthState({ 
               user: firebaseUser, 
               role: isHardcodedAdmin ? "Super Admin" : "Omborchi", 
@@ -108,7 +120,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         }
       },
       (error) => {
-        console.error("FirebaseProvider: onAuthStateChanged error:", error);
         setUserAuthState({ user: null, role: null, isUserLoading: false, userError: error });
       }
     );
