@@ -71,15 +71,12 @@ export default function StockInPage() {
 
       scanner.render(
         (decodedText) => {
-          // Find product by SKU
           const product = products?.find(p => p.sku === decodedText);
           if (product) {
-            // Check if product already in items
             const existingItem = items.find(i => i.productId === product.id);
             if (existingItem) {
               updateItem(existingItem.id, "quantity", existingItem.quantity + 1);
             } else {
-              // Replace empty last item or add new
               const lastItem = items[items.length - 1];
               if (!lastItem.productId) {
                 updateItem(lastItem.id, "productId", product.id);
@@ -95,9 +92,7 @@ export default function StockInPage() {
             toast({ variant: "destructive", title: "Xatolik", description: "Mahsulot topilmadi (SKU: " + decodedText + ")" });
           }
         },
-        (error) => {
-          // ignore scan errors
-        }
+        (error) => {}
       );
     }
 
@@ -198,7 +193,7 @@ export default function StockInPage() {
 
       toast({
         title: "Muvaffaqiyatli",
-        description: "Nakladnoy saqlandi. Chek yuklanmoqda...",
+        description: "Nakladnoy saqlandi. Check yuklanmoqda...",
       });
 
       generatePDF(receiptData);

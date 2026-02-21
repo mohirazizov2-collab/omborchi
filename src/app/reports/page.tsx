@@ -18,14 +18,18 @@ import {
   CheckCircle2, 
   Activity,
   ArrowUpRight,
-  ArrowDownRight,
-  Wallet
+  Wallet,
+  FileDown,
+  Table as TableIcon
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
@@ -150,6 +154,59 @@ export default function ReportsPage() {
     }
   }, [products, totalValue, warehouses, lowStockCount]);
 
+  const exportToExcel = () => {
+    if (!products) return;
+    const worksheet = XLSX.utils.json_to_sheet(products.map(p => ({
+      "Nomi": p.name,
+      "SKU": p.sku,
+      "Kategoriya": p.categoryId,
+      "Zaxira": p.stock,
+      "Narx (so'm)": p.salePrice,
+      "Jami Qiymat": p.stock * p.salePrice,
+      "Holat": (p.stock || 0) > (p.lowStockThreshold || 10) ? "Active" : "Low Stock"
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Zaxira Hisoboti");
+    XLSX.writeFile(workbook, `ombor_uz_hisobot_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text("ombor.uz - Global Hisobot", 105, 20, { align: "center" });
+    doc.setFontSize(10);
+    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 35);
+    doc.text(`Davr: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 15, 42);
+
+    const statsData = [
+      ["Jami zaxira qiymati", `${totalValue.toLocaleString()} so'm`],
+      ["Sotuv tushumi", `${financials.revenue.toLocaleString()} so'm`],
+      ["Xarajatlar (Maoshlar)", `${financials.expenses.toLocaleString()} so'm`],
+      ["Sof foyda", `${financials.profit.toLocaleString()} so'm`],
+      ["Kam qolgan mahsulotlar", `${lowStockCount} ta`]
+    ];
+
+    (doc as any).autoTable({
+      startY: 55,
+      head: [['Ko\'rsatkich', 'Qiymat']],
+      body: statsData,
+      theme: 'striped',
+      headStyles: { fillColor: [46, 104, 184] }
+    });
+
+    if (products) {
+      (doc as any).autoTable({
+        startY: (doc as any).lastAutoTable.finalY + 15,
+        head: [['#', 'Mahsulot', 'SKU', 'Zaxira', 'Narx']],
+        body: products.slice(0, 15).map((p, i) => [i + 1, p.name, p.sku, p.stock, `${p.salePrice.toLocaleString()} so'm`]),
+        theme: 'grid',
+        headStyles: { fillColor: [100, 100, 100] }
+      });
+    }
+
+    doc.save(`Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   if (!mounted || authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -169,7 +226,7 @@ export default function ReportsPage() {
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.reports.title}</h1>
             <p className="text-muted-foreground font-medium text-sm mt-1">{t.reports.description}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="bg-muted/30 p-1.5 rounded-2xl flex gap-1 mr-4 border border-border/40">
               <Button 
                 variant={reportPeriod === 'weekly' ? 'secondary' : 'ghost'} 
@@ -194,6 +251,16 @@ export default function ReportsPage() {
                 {t.reports.monthly}
               </Button>
             </div>
+            
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={exportToExcel} className="rounded-2xl font-bold h-12 px-5 border-border/50">
+                <TableIcon className="w-4 h-4 mr-2 text-emerald-500" /> Excel
+              </Button>
+              <Button variant="outline" onClick={exportToPDF} className="rounded-2xl font-bold h-12 px-5 border-border/50">
+                <FileDown className="w-4 h-4 mr-2 text-rose-500" /> PDF
+              </Button>
+            </div>
+
             <Button 
               onClick={handleAiAnalyze} 
               disabled={isAiLoading || isLoading || !products?.length}

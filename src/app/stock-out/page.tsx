@@ -91,9 +91,7 @@ export default function StockOutPage() {
             toast({ variant: "destructive", title: "Xatolik", description: "Mahsulot topilmadi (SKU: " + decodedText + ")" });
           }
         },
-        (error) => {
-          // ignore scan errors
-        }
+        (error) => {}
       );
     }
 
@@ -201,7 +199,7 @@ export default function StockOutPage() {
         }
       });
 
-      toast({ title: "Muvaffaqiyatli", description: "Tovarlar chiqarildi. Chek yuklanmoqda..." });
+      toast({ title: "Muvaffaqiyatli", description: "Tovarlar chiqarildi. Check yuklanmoqda..." });
       generatePDF(receiptData);
       setItems([{ id: Date.now(), productId: "", quantity: 1 }]);
       setOrderNumber("");
