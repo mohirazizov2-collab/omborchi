@@ -1,44 +1,43 @@
 
-# 🚀 ombor.uz - Netlify-ga Joylashning Yakuniy Qo'llanmasi
+# 🚀 ombor.uz - GitHub + Netlify Yo'riqnomasi
 
-Ushbu loyihani Netlify-da muammosiz ishga tushirish uchun quyidagi 3 ta bosqichni ketma-ket bajaring:
+Loyihani GitHub-ga yuklash va Netlify-da bir umrga "tiriltirish" uchun ushbu qadamlarni bajaring:
 
 ---
 
-## 1-Bosqich: Kodni GitHub-ga yangilash
-Terminalga (Studio pastidagi qora oyna) quyidagi buyruqlarni birma-bir yozing:
+## 1-Bosqich: Kodni GitHub-ga yuborish
+Terminalga (pastdagi qora oyna) ushbu buyruqlarni birma-bir yozing:
 
 ```bash
 git add .
-git commit -m "fix: netlify deployment configuration"
+git commit -m "feat: optimized search and netlify config"
 git push origin main
 ```
 
 ---
 
-## 2-Bosqich: Netlify Sozlamalari (Muhim!)
-Netlify panelida loyihangizga kiring va **"Site configuration" -> "Build & deploy"** bo'limida quyidagilar to'g'ri ekanligini tekshiring:
-
-1.  **Build command**: `npm run build`
-2.  **Publish directory**: `.next`
-3.  **Environment variables** (AI ishlashi uchun):
-    *   **Key**: `GOOGLE_GENAI_API_KEY`
-    *   **Value**: (Siz Google AI Studio-dan olgan kalit)
-
----
-
-## 3-Bosqich: Qayta ishga tushirish (Redeploy)
-Agar saytingiz hali ham "Page not found" ko'rsatayotgan bo'lsa:
-1. Netlify-da **"Deploys"** menyusiga kiring.
-2. **"Trigger deploy"** tugmasini bosing va ichidan **"Clear cache and deploy site"** variantini tanlang.
+## 2-Bosqich: Netlify-da GitHub-ni ulash
+1.  [Netlify.com](https://app.netlify.com/) sahifasiga kiring.
+2.  **"Add new site"** -> **"Import an existing project"** tugmasini bosing.
+3.  **GitHub**-ni tanlang va loyihangizni ro'yxatdan toping.
+4.  Sozlamalarni o'zi avtomatik tanlaydi:
+    *   **Build command**: `npm run build`
+    *   **Publish directory**: `.next`
+5.  **"Deploy"** tugmasini bosing.
 
 ---
 
-## 🔑 AI Kalitini qayerdan olaman?
-Agar sizda hali kalit bo'lmasa, uni bu yerdan mutlaqo tekinga oling:
-[https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+## 3-Bosqich: AI ishlashi uchun (Muhim!)
+Netlify panelida:
+1.  **Site configuration** -> **Environment variables** bo'limiga kiring.
+2.  **Add a variable** tugmasini bosing.
+3.  **Key**: `GOOGLE_GENAI_API_KEY`
+4.  **Value**: (Sizning Google AI kalitingiz)
+5.  Keyin **Deploys** menyusidan **"Trigger deploy"** -> **"Clear cache and deploy site"**-ni tanlang.
 
-### ⚠️ "Page not found" nega chiqadi?
-Bu xato odatda Netlify saytni qurishni (build) tugatmasidan oldin yoki `Publish directory` noto'g'ri sozlanganida chiqadi. Yuqoridagi `netlify.toml` va `README` bu muammoni hal qiladi.
+---
+
+## 🛠️ Muammo bormi?
+Agar sayt ochilmasa yoki "Page not found" desa, Netlify-da **Next.js Runtime** plagini o'rnatilganini tekshiring (odatda u avtomatik o'rnatiladi).
 
 Created by **X e M team** © 2026

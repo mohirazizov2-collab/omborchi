@@ -2,7 +2,7 @@
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +14,8 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Calendar, FileText, Loader2, Truck, ArrowRight, ScanLine, AlertCircle, Search, PackageSearch } from "lucide-react";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { Plus, Trash2, FileText, Loader2, ScanLine, Search, PackageSearch, ArrowRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
@@ -28,8 +28,7 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-// Unique ID helper
-const generateId = () => Math.random().toString(36).substring(2, 11);
+const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
 export default function StockInPage() {
   const { t } = useLanguage();
@@ -69,10 +68,9 @@ export default function StockInPage() {
   };
 
   const updateItem = (id: string, field: string, value: any) => {
-    setItems(items.map(item => {
+    setItems(prev => prev.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
-        // Agar mahsulot tanlangan bo'lsa, narxni avtomatik to'ldirish
         if (field === "productId" && value) {
           const p = products?.find(prod => prod.id === value);
           if (p) updated.price = p.salePrice || 0;
@@ -87,9 +85,9 @@ export default function StockInPage() {
   useEffect(() => {
     if (isScannerOpen) {
       const scanner = new Html5QrcodeScanner(
-        "reader",
+        "reader-in-page",
         { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
+        false
       );
       scannerRef.current = scanner;
 
@@ -105,17 +103,17 @@ export default function StockInPage() {
               if (!lastItem.productId) {
                 updateItem(lastItem.id, "productId", product.id);
               } else {
-                setItems([...items, { id: generateId(), productId: product.id, quantity: 1, price: product.salePrice || 0, searchQuery: "" }]);
+                setItems(prev => [...prev, { id: generateId(), productId: product.id, quantity: 1, price: product.salePrice || 0, searchQuery: "" }]);
               }
             }
             toast({ title: "Mahsulot topildi", description: `${product.name} ro'yxatga qo'shildi.` });
             scanner.clear();
             setIsScannerOpen(false);
           } else {
-            toast({ variant: "destructive", title: "Xatolik", description: "Mahsulot topilmadi (KOD: " + decodedText + ")" });
+            toast({ variant: "destructive", title: "Xatolik", description: "Mahsulot topilmadi: " + decodedText });
           }
         },
-        (error) => {}
+        () => {}
       );
     }
 
@@ -125,59 +123,6 @@ export default function StockInPage() {
       }
     };
   }, [isScannerOpen, products, items]);
-
-  const generatePDF = (data: any) => {
-    const doc = new jsPDF();
-    
-    doc.setFillColor(59, 130, 246);
-    doc.roundedRect(95, 10, 20, 20, 4, 4, 'F');
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.8);
-    doc.line(100, 20, 105, 15); 
-    doc.line(105, 15, 110, 20);
-    doc.line(101, 20, 109, 20);
-    doc.line(102, 20, 102, 25);
-    doc.line(108, 20, 108, 25);
-
-    doc.setFontSize(24);
-    doc.setTextColor(40);
-    doc.text("ombor.uz", 105, 40, { align: "center" });
-    
-    doc.setFontSize(14);
-    doc.text("KIRIM NAKLADNOYI", 105, 50, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.setTextColor(80);
-    doc.text(`Nakladnoy #: ${data.dnNumber}`, 15, 65);
-    doc.text(`Sana: ${new Date().toLocaleString()}`, 15, 72);
-    doc.text(`Yetkazib beruvchi: ${data.supplier}`, 15, 79);
-    doc.text(`Ombor: ${data.warehouseName}`, 15, 86);
-    doc.text(`Mas'ul: ${user?.displayName || user?.email}`, 15, 93);
-
-    const tableData = data.items.map((item: any, idx: number) => [
-      idx + 1,
-      item.productName,
-      item.quantity,
-      `${(item.price || 0).toLocaleString()} so'm`,
-      `${((item.quantity || 0) * (item.price || 0)).toLocaleString()} so'm`
-    ]);
-
-    (doc as any).autoTable({
-      startY: 100,
-      head: [['#', 'Mahsulot', 'Miqdor', 'Narx', 'Jami']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246], halign: 'center' },
-      styles: { fontSize: 9, cellPadding: 3 }
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY + 15;
-    doc.setFontSize(14);
-    doc.setTextColor(0);
-    doc.text(`JAMI QIYMAT: ${data.totalValue.toLocaleString()} so'm`, 195, finalY, { align: "right" });
-    
-    doc.save(`Kirim_${data.dnNumber}.pdf`);
-  };
 
   const handleProcess = () => {
     if (!dnNumber || !supplier || !warehouseId) {
@@ -190,18 +135,6 @@ export default function StockInPage() {
     }
 
     setLoading(true);
-    const warehouseName = warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum";
-    const receiptData = {
-      dnNumber,
-      supplier,
-      warehouseName,
-      totalValue: items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0),
-      items: items.map(item => ({
-        ...item,
-        productName: products?.find(p => p.id === item.productId)?.name || "Mahsulot"
-      }))
-    };
-
     try {
       items.forEach((item) => {
         const movementData = {
@@ -229,7 +162,6 @@ export default function StockInPage() {
       });
 
       toast({ title: "Muvaffaqiyatli", description: "Kirim amalga oshirildi." });
-      generatePDF(receiptData);
       setItems([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
       setDnNumber("");
       setSupplier("");
@@ -247,7 +179,7 @@ export default function StockInPage() {
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
       <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
-        <header className="flex justify-between items-center mb-10">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.stockIn.title}</h1>
             <p className="text-muted-foreground mt-1 font-medium text-sm">{t.stockIn.description}</p>
@@ -255,8 +187,8 @@ export default function StockInPage() {
           
           <div className="flex gap-3">
             <Link href="/products">
-              <Button variant="ghost" className="rounded-xl h-12 px-6 font-bold text-xs">
-                <PackageSearch className="w-4 h-4 mr-2" /> Katalogga o'tish
+              <Button variant="ghost" className="rounded-xl h-12 px-6 font-bold text-xs hover:bg-primary/10">
+                <PackageSearch className="w-4 h-4 mr-2" /> Katalog
               </Button>
             </Link>
             <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
@@ -265,18 +197,18 @@ export default function StockInPage() {
                   <ScanLine className="w-4 h-4" /> {t.stockIn.scanBarcode}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md rounded-[2rem]">
+              <DialogContent className="max-w-md rounded-[2.5rem] bg-card/90 backdrop-blur-3xl">
                 <DialogHeader>
                   <DialogTitle>{t.stockIn.scanBarcode}</DialogTitle>
                 </DialogHeader>
-                <div id="reader" className="w-full overflow-hidden rounded-xl border-2 border-dashed border-primary/20"></div>
+                <div id="reader-in-page" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-primary/20 bg-background/50"></div>
               </DialogContent>
             </Dialog>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-8">
             <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
               <CardHeader className="p-8">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
@@ -288,7 +220,7 @@ export default function StockInPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.dnNumber}</Label>
                   <Input 
                     placeholder="DN-2026-XXX" 
-                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
+                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all" 
                     value={dnNumber}
                     onChange={(e) => setDnNumber(e.target.value)}
                   />
@@ -296,8 +228,8 @@ export default function StockInPage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.supplier}</Label>
                   <Input 
-                    placeholder="Yetkazib beruvchi nomi" 
-                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
+                    placeholder="Yetkazib beruvchi" 
+                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all" 
                     value={supplier}
                     onChange={(e) => setSupplier(e.target.value)}
                   />
@@ -305,7 +237,7 @@ export default function StockInPage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.targetWarehouse}</Label>
                   <Select onValueChange={setWarehouseId} value={warehouseId}>
-                    <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold">
+                    <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all">
                       <SelectValue placeholder="Omborni tanlang" />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl">
@@ -325,7 +257,7 @@ export default function StockInPage() {
             <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
               <CardHeader className="p-8 flex flex-row items-center justify-between">
                 <CardTitle className="font-headline font-black text-xl tracking-tight">{t.stockIn.productItems}</CardTitle>
-                <Button variant="outline" size="sm" onClick={addItem} className="gap-2 rounded-xl font-black uppercase text-[9px] tracking-widest h-9 px-4 border-primary/20 text-primary">
+                <Button variant="outline" size="sm" onClick={addItem} className="gap-2 rounded-xl font-black uppercase text-[9px] tracking-widest h-9 px-4 border-primary/20 text-primary hover:bg-primary/5">
                   <Plus className="w-4 h-4" /> {t.actions.addItem}
                 </Button>
               </CardHeader>
@@ -334,64 +266,68 @@ export default function StockInPage() {
                   {items.map((item) => (
                     <motion.div 
                       key={item.id} 
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
                       className={cn(
                         "flex flex-col md:flex-row gap-4 p-6 rounded-[2rem] bg-muted/10 border transition-all relative group",
-                        !item.productId ? "border-rose-500/30 bg-rose-500/[0.03]" : "border-border/10"
+                        !item.productId ? "border-rose-500/20 bg-rose-500/[0.02]" : "border-border/10"
                       )}
                     >
                       <div className="flex-1 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Mahsulotni tanlang</Label>
+                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
+                          {t.common.product} {!item.productId && "*"}
+                        </Label>
                         <Select 
                           onValueChange={(val) => updateItem(item.id, "productId", val)}
                           value={item.productId}
                         >
-                          <SelectTrigger className="h-12 rounded-xl bg-background/50 border-none font-bold">
+                          <SelectTrigger className="h-12 rounded-xl bg-background/50 border-none font-bold shadow-sm">
                             <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Mahsulotni qidiring..."} />
                           </SelectTrigger>
-                          <SelectContent className="rounded-xl max-h-[300px]">
+                          <SelectContent className="rounded-xl max-h-[350px]">
                             <div className="p-2 border-b border-white/10 sticky top-0 bg-popover z-10">
                                <div className="relative">
-                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                                   <Input 
                                     placeholder="Nomi yoki SKU..." 
-                                    className="h-8 pl-8 text-xs rounded-lg"
+                                    className="h-9 pl-9 text-xs rounded-lg bg-background/50"
                                     value={item.searchQuery}
                                     onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                </div>
                             </div>
-                            {products?.filter(p => 
-                              p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) || 
-                              p.sku.toLowerCase().includes(item.searchQuery.toLowerCase())
-                            ).map((p) => (
-                              <SelectItem key={p.id} value={p.id} className="py-3">
-                                <div className="flex flex-col">
-                                  <span className="font-bold">{p.name}</span>
-                                  <span className="text-[9px] opacity-50 uppercase tracking-widest">{p.sku}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                            {(!products || products.length === 0) && (
-                              <div className="p-6 text-center text-xs opacity-50">Mahsulotlar topilmadi. Avval katalogga qo'shing.</div>
-                            )}
+                            <div className="py-1">
+                              {products?.filter(p => 
+                                p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) || 
+                                p.sku.toLowerCase().includes(item.searchQuery.toLowerCase())
+                              ).map((p) => (
+                                <SelectItem key={p.id} value={p.id} className="py-3 cursor-pointer">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-sm">{p.name}</span>
+                                    <span className="text-[9px] opacity-50 uppercase tracking-widest font-black">{p.sku}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                              {(!products || products.length === 0) && (
+                                <div className="p-8 text-center text-xs opacity-50 italic">Mahsulotlar topilmadi.</div>
+                              )}
+                            </div>
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="w-full md:w-32 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Miqdor</Label>
+                      <div className="w-full md:w-28 space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.quantity}</Label>
                         <Input 
                           type="number" 
-                          className="h-12 rounded-xl bg-background/50 border-none font-black"
+                          className="h-12 rounded-xl bg-background/50 border-none font-black text-center"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
                         />
                       </div>
-                      <div className="w-full md:w-32 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Narx</Label>
+                      <div className="w-full md:w-36 space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.price}</Label>
                         <Input 
                           type="number" 
                           className="h-12 rounded-xl bg-background/50 border-none font-black"
@@ -402,7 +338,7 @@ export default function StockInPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-12 w-12 rounded-xl hover:bg-rose-500/10 text-rose-500 self-end md:self-auto"
+                        className="h-12 w-12 rounded-xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors"
                         onClick={() => removeItem(item.id)}
                       >
                         <Trash2 className="w-5 h-5" />
@@ -414,28 +350,28 @@ export default function StockInPage() {
             </Card>
           </div>
 
-          <div className="space-y-8">
-            <Card className="border-none glass-card bg-primary text-white rounded-[3rem] shadow-2xl shadow-primary/20 sticky top-8 overflow-hidden">
+          <div className="lg:col-span-4 space-y-8">
+            <Card className="border-none glass-card bg-primary text-white rounded-[3rem] shadow-2xl shadow-primary/30 sticky top-8 overflow-hidden">
               <CardHeader className="p-8 pb-4">
-                <CardTitle className="font-headline font-black text-2xl tracking-tight">Kirim Xulosasi</CardTitle>
+                <CardTitle className="font-headline font-black text-2xl tracking-tight">{t.common.summary}</CardTitle>
               </CardHeader>
-              <CardContent className="p-8 pt-4 space-y-6">
+              <CardContent className="p-8 pt-4 space-y-8">
                 <div className="flex justify-between items-center pb-6 border-b border-white/10">
-                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">Jami mahsulotlar</span>
-                  <span className="text-2xl font-black">{items.filter(i => i.productId).length}</span>
+                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">{t.common.totalItems}</span>
+                  <span className="text-3xl font-black">{items.filter(i => i.productId).length}</span>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-white/60 text-xs font-black uppercase tracking-widest">Umumiy qiymat</p>
-                  <p className="text-4xl font-black font-headline tracking-tighter">{totalValue.toLocaleString()} so'm</p>
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Umumiy qiymat</p>
+                  <p className="text-4xl font-black font-headline tracking-tighter leading-none">{totalValue.toLocaleString()} <span className="text-lg">so'm</span></p>
                 </div>
               </CardContent>
               <CardFooter className="p-8 pt-0">
                 <Button 
-                  className="w-full h-16 rounded-2xl bg-white text-primary hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-xl border-none premium-button" 
+                  className="w-full h-16 rounded-2xl bg-white text-primary hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button" 
                   onClick={handleProcess} 
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3" /> Yakunlash</>}
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3" /> {t.stockIn.process}</>}
                 </Button>
               </CardFooter>
             </Card>
