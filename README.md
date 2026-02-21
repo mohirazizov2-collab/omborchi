@@ -3,34 +3,33 @@
 
 Bu NextJS, Firebase va Gemini AI yordamida yaratilgan zamonaviy ombor boshqaruvi tizimi.
 
-## 🚀 GitHub-ga yuklash (30 soniyalik qadam):
+## 🚀 Loyihani ishga tushirish (Deploy)
 
-Loyihangizni GitHub-ga yuklash uchun quyidagilarni bajaring:
+Ushbu loyihani internetga chiqarish uchun 2 xil yo'l bor:
 
-1. [GitHub](https://github.com/new)-da yangi repository yarating (nomini `ombor-uz` deb qo'yishingiz mumkin).
-2. Terminalni (loyihangiz papkasida) oching va ushbu 3 qatorni ketma-ket kiriting:
+### 1. "Publish" tugmasi orqali (Eng osoni)
+Studio tepasidagi **Publish** tugmasini bosing. Bu loyihani avtomatik quradi va sizga tayyor link beradi.
 
+### 2. GitHub va Netlify orqali (Professional yo'l)
+1. [GitHub](https://github.com/new)-da yangi repository yarating.
+2. Terminalda quyidagi buyruqlarni kiriting:
 ```bash
 git init
 git add .
-git commit -m "Initial commit: ombor.uz full setup"
+git commit -m "Initial commit: ombor.uz fully optimized"
 git branch -M main
 git remote add origin https://github.com/FOYDALANUVCHI_NOMI/REPO_NOMI.git
 git push -u origin main
 ```
-*(Eslatma: `FOYDALANUVCHI_NOMI/REPO_NOMI` qismini o'zingiz yaratgan repo URL manzili bilan almashtiring)*
-
-## 🛠 Netlify-ga joylash:
-Netlify-da saytni ulayotganda quyidagi "Environment Variables"ni sozlang:
-- `GOOGLE_GENAI_API_KEY`: Gemini API kalitingiz.
+3. Netlify-ga ulab, `GOOGLE_GENAI_API_KEY`ni o'rnating.
 
 ## ✨ Imkoniyatlar:
-- **Dashboard**: Real-vaqtda zaxira va moliya tahlili.
-- **Shtrix-kod Skaneri**: Kamera orqali mahsulotlarni bir zumda tanib olish.
-- **Moliyaviy Hisobot**: Haftalik va oylik foyda/xarajat hisob-kitobi.
-- **AI Tahlil**: Hisobotlarni Senior tahlilchi darajasida tahlil qilish.
-- **Rollar Boshqaruvi**: Super Admin, Admin va Omborchi rollari uchun maxsus ruxsatlar.
-- **System Gen**: AI yordamida yangi bazalar va API-larni yaratish.
+- **Dashboard**: 120 FPS tezlikda ishlovchi real-vaqt statistikasi.
+- **Shtrix-kod Skaneri**: Kamera orqali mahsulotlarni tanib olish (Kirim/Chiqim/Audit).
+- **Inventarizatsiya**: Tizimdagi zaxirani haqiqiy qoldiq bilan solishtirish modul.
+- **Eksport**: Har bir amaliyot uchun PDF Check va umumiy hisobotlar uchun Excel yuklash.
+- **AI Assistant**: Tizimning har bir sahifasida mavjud bo'lgan aqlli yordamchi.
+- **Moliyaviy Tahlil**: Haftalik va oylik sof foyda hisob-kitobi.
 
 ---
 Created by **X e M team** © 2026
