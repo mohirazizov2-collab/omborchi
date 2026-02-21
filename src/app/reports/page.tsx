@@ -1,16 +1,13 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { 
-  FileDown, 
-  Filter, 
   Loader2, 
   TrendingUp, 
   Package, 
@@ -18,22 +15,16 @@ import {
   Wand2, 
   Sparkles, 
   CheckCircle2, 
-  ChevronRight, 
-  FileBarChart, 
-  PieChart as PieIcon, 
   Activity,
-  DollarSign,
   ArrowUpRight,
   ArrowDownRight,
-  Wallet,
-  Calendar
+  Wallet
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
-import * as XLSX from 'xlsx';
 
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
@@ -42,11 +33,6 @@ const XAxis = dynamic(() => import("recharts").then(m => m.XAxis), { ssr: false 
 const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false });
 const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
 const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
-const PieChart = dynamic(() => import("recharts").then(m => m.PieChart), { ssr: false });
-const Pie = dynamic(() => import("recharts").then(m => m.Pie), { ssr: false });
-const Cell = dynamic(() => import("recharts").then(m => m.Cell), { ssr: false });
-
-const COLORS = ['#2E68B8', '#669995', '#193D3E', '#B88B2E', '#B8452E'];
 
 export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
@@ -55,7 +41,6 @@ export default function ReportsPage() {
   const { user, role, isUserLoading: authLoading } = useUser();
   const router = useRouter();
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [aiResult, setAiResult] = useState<AnalyzeReportsOutput | null>(null);
   const [reportPeriod, setReportPeriod] = useState<'weekly' | 'monthly'>('monthly');
 
@@ -69,7 +54,6 @@ export default function ReportsPage() {
     }
   }, [role, authLoading, router]);
 
-  // Firestore Queries
   const productsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return collection(db, "products");
@@ -94,40 +78,29 @@ export default function ReportsPage() {
   }, [db, user]);
   const { data: movements, isLoading: movementsLoading } = useCollection(movementsQuery);
 
-  // Financial Calculations
   const financials = useMemo(() => {
     if (!movements || !products || !employees) return { revenue: 0, expenses: 0, profit: 0 };
 
+    const productMap = new Map(products.map(p => [p.id, p.salePrice || 0]));
     const now = new Date();
     const days = reportPeriod === 'weekly' ? 7 : 30;
     const startDate = new Date();
     startDate.setDate(now.getDate() - days);
 
-    // Revenue from StockOut (Chiqim)
     const revenue = movements
       .filter(m => m.movementType === 'StockOut' && new Date(m.movementDate) >= startDate)
-      .reduce((acc, m) => {
-        const product = products.find(p => p.id === m.productId);
-        const price = product?.salePrice || 0;
-        return acc + (Math.abs(m.quantityChange) * price);
-      }, 0);
+      .reduce((acc, m) => acc + (Math.abs(m.quantityChange) * (productMap.get(m.productId) || 0)), 0);
 
-    // Expenses (Total Salaries)
     const expenses = employees.reduce((acc, e) => {
       const monthlyTotal = (e.baseSalary || 0) + (e.bonus || 0) - (e.deductions || 0);
-      // Agar haftalik bo'lsa, oylik xarajatni 4 ga bo'lamiz (taxminiy)
       return acc + (reportPeriod === 'weekly' ? monthlyTotal / 4 : monthlyTotal);
     }, 0);
 
-    return {
-      revenue,
-      expenses,
-      profit: revenue - expenses
-    };
+    return { revenue, expenses, profit: revenue - expenses };
   }, [movements, products, employees, reportPeriod]);
 
-  const totalValue = (products || []).reduce((acc, p) => acc + (p.salePrice * (p.stock || 0)), 0);
-  const lowStockCount = (products || []).filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length;
+  const totalValue = useMemo(() => (products || []).reduce((acc, p) => acc + ((p.salePrice || 0) * (p.stock || 0)), 0), [products]);
+  const lowStockCount = useMemo(() => (products || []).filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length, [products]);
 
   const handleAiAnalyze = async () => {
     if (!products) return;
@@ -181,7 +154,7 @@ export default function ReportsPage() {
                 variant={reportPeriod === 'weekly' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 className={cn(
-                  "rounded-xl text-[10px] font-black uppercase h-10 px-4",
+                  "rounded-xl text-[10px] font-black uppercase h-10 px-4 transition-all",
                   reportPeriod === 'weekly' && "bg-background shadow-sm"
                 )}
                 onClick={() => setReportPeriod('weekly')}
@@ -192,7 +165,7 @@ export default function ReportsPage() {
                 variant={reportPeriod === 'monthly' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 className={cn(
-                  "rounded-xl text-[10px] font-black uppercase h-10 px-4",
+                  "rounded-xl text-[10px] font-black uppercase h-10 px-4 transition-all",
                   reportPeriod === 'monthly' && "bg-background shadow-sm"
                 )}
                 onClick={() => setReportPeriod('monthly')}
@@ -211,7 +184,6 @@ export default function ReportsPage() {
           </div>
         </header>
 
-        {/* Profit Analysis Section */}
         <section className="mb-12">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
@@ -221,9 +193,6 @@ export default function ReportsPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group rounded-[2rem]">
-              <div className="absolute right-[-10px] top-[-10px] opacity-[0.03] group-hover:scale-110 transition-transform duration-500">
-                <ArrowUpRight className="w-32 h-32 text-emerald-500" />
-              </div>
               <CardContent className="pt-8">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">{t.reports.revenue}</p>
                 <p className="text-3xl font-black font-headline tracking-tighter text-emerald-500">{financials.revenue.toLocaleString()} so'm</p>
@@ -235,9 +204,6 @@ export default function ReportsPage() {
             </Card>
 
             <Card className="border-none glass-card bg-card/40 backdrop-blur-xl relative overflow-hidden group rounded-[2rem]">
-              <div className="absolute right-[-10px] top-[-10px] opacity-[0.03] group-hover:scale-110 transition-transform duration-500">
-                <ArrowDownRight className="w-32 h-32 text-rose-500" />
-              </div>
               <CardContent className="pt-8">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">{t.reports.expenses}</p>
                 <p className="text-3xl font-black font-headline tracking-tighter text-rose-500">{financials.expenses.toLocaleString()} so'm</p>
@@ -249,9 +215,6 @@ export default function ReportsPage() {
             </Card>
 
             <Card className="border-none glass-card bg-primary text-white relative overflow-hidden group shadow-2xl shadow-primary/20 rounded-[2rem]">
-              <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover:scale-110 transition-transform duration-500">
-                <Sparkles className="w-32 h-32" />
-              </div>
               <CardContent className="pt-8">
                 <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em] mb-2">{t.reports.netProfit}</p>
                 <p className="text-3xl font-black font-headline tracking-tighter">
@@ -269,20 +232,20 @@ export default function ReportsPage() {
         <AnimatePresence>
           {aiResult && (
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: -20 }}
+              initial={{ opacity: 0, scale: 0.98, y: -10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              exit={{ opacity: 0, scale: 0.98 }}
               className="mb-12"
             >
               <Card className="border-none glass-card bg-primary/5 border border-primary/20 overflow-hidden relative rounded-[2.5rem]">
                 <CardHeader className="pt-8 px-8">
                   <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                    <Sparkles className="w-4 h-4 text-primary" />
                     <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/70">Intelligent Analysis</span>
                   </div>
                   <CardTitle className="font-headline font-black text-3xl tracking-tight">AI Xulosasi</CardTitle>
                 </CardHeader>
-                <CardContent className="px-8 pb-8 space-y-8 relative z-10">
+                <CardContent className="px-8 pb-8 space-y-8">
                   <div className="p-6 rounded-[2rem] bg-background/40 backdrop-blur-xl border border-white/5 italic font-medium leading-relaxed shadow-sm">
                     "{aiResult.summary}"
                   </div>
@@ -314,7 +277,7 @@ export default function ReportsPage() {
         </AnimatePresence>
 
         {isLoading ? (
-          <div className="flex h-[400px] items-center justify-center opacity-20">
+          <div className="flex h-[200px] items-center justify-center opacity-20">
             <Loader2 className="w-12 h-12 animate-spin text-primary" />
           </div>
         ) : (

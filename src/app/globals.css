@@ -55,25 +55,21 @@
   }
   body {
     @apply bg-background text-foreground font-body antialiased selection:bg-primary/20;
-    /* Murakkab gradientlar soddalashtirildi */
     background-color: hsl(var(--background));
-  }
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-headline font-bold tracking-tight;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
 @layer components {
   .glass-card {
-    @apply bg-card border border-border/50 shadow-sm transition-shadow duration-200 hover:shadow-md;
+    @apply bg-card border border-border/50 shadow-sm transition-all duration-200;
+    will-change: transform, opacity;
   }
   
-  .sidebar-item-active {
-    @apply bg-primary/10 text-primary;
-  }
-
   .premium-button {
     @apply transition-all duration-150 active:scale-[0.98];
+    will-change: transform;
   }
 
   .page-transition {
@@ -81,7 +77,6 @@
   }
 }
 
-/* Scrollbar optimizatsiyasi */
 ::-webkit-scrollbar {
   width: 6px;
 }
