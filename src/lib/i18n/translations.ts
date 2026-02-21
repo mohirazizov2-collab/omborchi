@@ -135,9 +135,9 @@ export const translations = {
       save: 'O\'zgarishlarni saqlash'
     },
     systemGen: {
-      title: 'Tizim generatsiya vositasi',
-      description: 'AI yordamica arxitektura artefaktlarini yaratish.',
-      inputReqs: 'Talablarni kiritish',
+      title: 'AI Tizim Generatsiyasi',
+      description: 'Sun\'iy intellekt yordamida yangi tizim arxitekturasini va kodlarini avtomatik yaratish vositasi.',
+      inputReqs: 'Tizim talablarini kiritish',
       generate: 'Arxitekturani yaratish',
       database: 'Ma\'lumotlar bazasi',
       structure: 'Tuzilma',
@@ -303,8 +303,8 @@ export const translations = {
       save: 'Сохранить изменения'
     },
     systemGen: {
-      title: 'Инструмент генерации системы',
-      description: 'Создание архитектурных артефактов с помощью ИИ.',
+      title: 'AI Генерация Системы',
+      description: 'Инструмент для автоматического создания архитектуры и кода системы с помощью ИИ.',
       inputReqs: 'Ввод требований',
       generate: 'Генерировать архитектуру',
       database: 'База данных',
@@ -471,8 +471,8 @@ export const translations = {
       save: 'Save Changes'
     },
     systemGen: {
-      title: 'System Generation Tool',
-      description: 'AI-powered architectural artifacts generator.',
+      title: 'AI System Generation',
+      description: 'An AI-powered tool to automatically generate system architecture and boilerplate code.',
       inputReqs: 'Input Requirements',
       generate: 'Generate Architecture',
       database: 'Database',
