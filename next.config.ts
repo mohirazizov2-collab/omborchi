@@ -1,4 +1,3 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -30,10 +29,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Firebase Studio Preview uchun optimallashtirish
-  devIndicators: {
-    appIsrStatus: false,
-  }
 };
 
 export default nextConfig;
