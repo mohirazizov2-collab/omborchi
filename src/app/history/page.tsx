@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, Search, Filter, Loader2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, FileText, User, ShoppingCart, Trash2, ShieldCheck } from "lucide-react";
+import { History, Search, Filter, Loader2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, FileText, User, ShoppingCart, Trash2, Warehouse } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, orderBy, query, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
@@ -25,6 +25,7 @@ export default function HistoryPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
+  // Faqat Admin yoki Super Admin o'chira oladi
   const isAdmin = role === "Super Admin" || role === "Admin";
 
   const movementsQuery = useMemoFirebase(() => {
@@ -39,7 +40,8 @@ export default function HistoryPage() {
       const matchesSearch = 
         m.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
         (m.productName && m.productName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (m.recipient && m.recipient.toLowerCase().includes(searchQuery.toLowerCase()));
+        (m.recipient && m.recipient.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (m.responsibleUserName && m.responsibleUserName.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesType = typeFilter === "all" || m.movementType === typeFilter;
       return matchesSearch && matchesType;
     }) || [];
@@ -47,17 +49,16 @@ export default function HistoryPage() {
 
   const handleDelete = async (movement: any) => {
     if (!isAdmin || !db) return;
-    if (!confirm("Haqiqatdan ham ushbu operatsiyani o'chirib, zaxirani qayta tiklamoqchimisiz?")) return;
+    if (!confirm("Haqiqatdan ham ushbu operatsiyani o'chirib, zaxirani qayta tiklamoqchimisiz? Oddiy foydalanuvchilar buni qila olmaydi.")) return;
 
     setIsDeleting(movement.id);
     try {
-      // 1. Zaxirani qayta tiklash
+      // 1. Zaxirani qayta tiklash (Reverse action)
       const productRef = doc(db, "products", movement.productId);
       const productSnap = await getDoc(productRef);
       if (productSnap.exists()) {
         const currentStock = productSnap.data().stock || 0;
-        // Agar stock-in bo'lgan bo'lsa, endi u miqdorni ayiramiz. 
-        // Agar stock-out bo'lgan bo'lsa (quantityChange manfiy), uni ayirganda aslida qo'shiladi.
+        // Agar StockIn bo'lgan bo'lsa, endi ayiramiz. Agar StockOut bo'lsa (manfiy), ayirganda qo'shiladi.
         await updateDoc(productRef, {
           stock: currentStock - movement.quantityChange,
           updatedAt: new Date().toISOString()
@@ -76,13 +77,13 @@ export default function HistoryPage() {
         });
       }
 
-      // 3. Movement logini o'chirish
+      // 3. Logini o'chirish
       await deleteDoc(doc(db, "stockMovements", movement.id));
       
-      toast({ title: "Muvaffaqiyatli", description: "Operatsiya bekor qilindi va zaxira tiklandi." });
+      toast({ title: "Muvaffaqiyatli", description: "Operatsiya bekor qilindi va zaxira qayta hisoblandi." });
     } catch (err) {
       console.error(err);
-      toast({ variant: "destructive", title: "Xatolik", description: "O'chirishda xato yuz berdi." });
+      toast({ variant: "destructive", title: "Xatolik", description: "O'chirishda xatolik yuz berdi yoki ruxsatingiz yo'q." });
     } finally {
       setIsDeleting(null);
     }
@@ -106,7 +107,7 @@ export default function HistoryPage() {
             <div className="relative flex-1 group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
               <Input 
-                placeholder={t.history.search} 
+                placeholder="ID, mahsulot yoki bajaruvchi bo'yicha qidirish..." 
                 className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-medium" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -117,7 +118,7 @@ export default function HistoryPage() {
                 <SelectTrigger className="h-12 w-[200px] rounded-2xl bg-background/50 border-border/40 font-bold uppercase text-[10px] tracking-widest">
                   <div className="flex items-center gap-2">
                     <Filter className="w-3 h-3" />
-                    <SelectValue placeholder={t.history.filterType} />
+                    <SelectValue placeholder="Turi" />
                   </div>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -125,6 +126,7 @@ export default function HistoryPage() {
                   <SelectItem value="StockIn">{t.nav.stockIn}</SelectItem>
                   <SelectItem value="StockOut">{t.nav.stockOut}</SelectItem>
                   <SelectItem value="Transfer">{t.nav.transfers}</SelectItem>
+                  <SelectItem value="Adjustment">Koreksiya</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -172,7 +174,7 @@ export default function HistoryPage() {
                           </div>
                           <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
                             <span className="flex items-center gap-1.5"><FileText className="w-3 h-3" /> {m.id.substring(0,8).toUpperCase()}</span>
-                            <span className="flex items-center gap-1.5 text-primary"><User className="w-3 h-3" /> {m.responsibleUserName || 'N/A'}</span>
+                            <span className="flex items-center gap-1.5 text-primary"><User className="w-3 h-3" /> {m.responsibleUserName || 'Noma\'lum'}</span>
                             <span className="flex items-center gap-1.5"><Warehouse className="w-3 h-3" /> {m.warehouseName || 'Ombor'}</span>
                           </div>
                         </div>
@@ -197,6 +199,8 @@ export default function HistoryPage() {
                             {new Date(m.movementDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
+                        
+                        {/* Faqat Adminlar o'chirishi mumkin */}
                         {isAdmin && (
                           <div className="flex items-center pl-4 border-l border-white/5">
                             <Button 

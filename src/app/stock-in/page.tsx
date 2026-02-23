@@ -96,6 +96,8 @@ export default function StockInPage() {
     setLoading(true);
     try {
       const invoiceItems = [];
+      const currentUserName = user?.displayName || user?.email || "Noma'lum";
+
       for (const item of items) {
         const product = products?.find(p => p.id === item.productId);
         invoiceItems.push({
@@ -114,7 +116,7 @@ export default function StockInPage() {
           movementType: "StockIn",
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
-          responsibleUserName: user?.displayName || user?.email || "Noma'lum foydalanuvchi",
+          responsibleUserName: currentUserName, // Bajaruvchi ismini saqlash
           dnNumber: dnNumber,
           supplier: supplier,
           unitPrice: item.price,
@@ -155,7 +157,8 @@ export default function StockInPage() {
         supplier,
         warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
         date: new Date().toLocaleString(),
-        items: invoiceItems
+        items: invoiceItems,
+        responsible: currentUserName
       });
 
       toast({ title: "Muvaffaqiyatli", description: "Kirim nakladnoyi saqlandi." });
@@ -192,6 +195,7 @@ export default function StockInPage() {
     doc.text(`Nakladnoy #: ${processedInvoice.dnNumber}`, 20, 50);
     doc.text(`Yetkazib beruvchi: ${processedInvoice.supplier}`, 20, 57);
     doc.text(`Qabul qilgan ombor: ${processedInvoice.warehouse}`, 20, 64);
+    doc.text(`Mas'ul xodim: ${processedInvoice.responsible}`, 20, 71);
     doc.text(`Sana: ${processedInvoice.date}`, 140, 50);
 
     const tableData = processedInvoice.items.map((it: any, i: number) => [
@@ -204,7 +208,7 @@ export default function StockInPage() {
     ]);
 
     (doc as any).autoTable({
-      startY: 75,
+      startY: 80,
       head: [['#', 'Mahsulot nomi', 'Miqdor', 'Birlik', 'Narx', 'Jami']],
       body: tableData,
       theme: 'grid',

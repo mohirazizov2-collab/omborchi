@@ -45,10 +45,17 @@ service cloud.firestore {
     }
 
     // --- Zaxira harakatlari (Audit Trail) ---
+    // Faqat adminlar o'chirish yoki o'zgartirish huquqiga ega
     match /stockMovements/{movementId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin(); // Faqat adminlar o'zgartirishi yoki o'chirishi mumkin
+      allow update, delete: if isAdmin(); 
+    }
+
+    // --- Inventar (Ombordagi qoldiqlar) ---
+    match /inventory/{inventoryId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // --- Qolgan barcha hujjatlar ---
