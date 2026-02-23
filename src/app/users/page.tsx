@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,15 +19,12 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { UserPlus, MoreHorizontal, ShieldCheck, Loader2, UserX, Mail, User, AlertCircle, Info, Lock, Eye, EyeOff } from "lucide-react";
+import { UserPlus, MoreHorizontal, ShieldCheck, Loader2, UserX, Mail, User, Lock, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { initializeApp, getApp, getApps } from "firebase/app";
+import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { firebaseConfig } from "@/firebase/config";
 import { cn } from "@/lib/utils";
@@ -84,11 +82,12 @@ export default function UsersPage() {
     }
 
     setIsSaving(true);
+    let secondaryApp;
     
     try {
       // Admin sessiyasini saqlab qolish uchun vaqtinchalik Firebase App instance yaratamiz
       const secondaryAppName = `SecondaryApp_${Date.now()}`;
-      const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+      secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
       const secondaryAuth = getAuth(secondaryApp);
 
       // 1. Authentication akkauntini ochish
@@ -123,16 +122,26 @@ export default function UsersPage() {
       setIsDialogOpen(false);
       setFormData({ displayName: "", email: "", password: "", role: "Omborchi" });
     } catch (error: any) {
-      console.error("User creation error:", error);
       let message = "Foydalanuvchini yaratishda xatolik yuz berdi.";
-      if (error.code === 'auth/email-already-in-use') message = "Ushbu email bilan allaqachon ro'yxatdan o'tilgan.";
       
+      if (error.code === 'auth/email-already-in-use') {
+        message = "Ushbu elektron pochta manzili allaqachon ro'yxatdan o'tgan.";
+      } else if (error.code === 'auth/invalid-email') {
+        message = "Elektron pochta manzili noto'g'ri formatda.";
+      } else if (error.code === 'auth/weak-password') {
+        message = "Parol juda zaif.";
+      }
+
       toast({
         variant: "destructive",
         title: "Xatolik",
         description: message,
       });
     } finally {
+      // Vaqtinchalik app instance-ni o'chirib tashlash (Cleaning up)
+      if (secondaryApp) {
+        deleteApp(secondaryApp).catch(() => {});
+      }
       setIsSaving(false);
     }
   };
