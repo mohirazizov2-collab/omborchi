@@ -1,10 +1,75 @@
 'use server';
 /**
- * @fileOverview ombor.uz AI Assistant uchun Genkit flow.
+ * @fileOverview Omborchi GPT - Aqlli yordamchi uchun Genkit flow.
+ * Bu flow endi mahsulotlar va omborlar haqida real ma'lumotlarni olish uchun asboblarga (tools) ega.
  */
 
 import { ai, model } from '@/ai/genkit';
 import { z } from 'genkit';
+import { initializeFirebase } from '@/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+
+// --- AI ASBOBLARI (TOOLS) ---
+
+/** Mahsulot qoldig'ini tekshirish asbobi */
+const checkProductStock = ai.defineTool(
+  {
+    name: 'checkProductStock',
+    description: "Ombordagi muayyan mahsulotning joriy qoldig'ini va narxini tekshiradi.",
+    inputSchema: z.object({
+      productName: z.string().describe("Mahsulot nomi (to'liq yoki qisman)"),
+    }),
+    outputSchema: z.array(z.object({
+      name: z.string(),
+      stock: z.number(),
+      price: z.number(),
+      unit: z.string(),
+    })),
+  },
+  async (input) => {
+    const { firestore } = initializeFirebase();
+    const q = query(collection(firestore, 'products'));
+    const snapshot = await getDocs(q);
+    const results = snapshot.docs
+      .map(doc => doc.data())
+      .filter(p => p.name.toLowerCase().includes(input.productName.toLowerCase()))
+      .map(p => ({
+        name: p.name,
+        stock: p.stock || 0,
+        price: p.salePrice || 0,
+        unit: p.unit || 'dona'
+      }));
+    return results;
+  }
+);
+
+/** Omborlar ro'yxatini olish asbobi */
+const listWarehouses = ai.defineTool(
+  {
+    name: 'listWarehouses',
+    description: "Tizimdagi barcha faol omborxonalar va ularning manzillarini ko'rsatadi.",
+    inputSchema: z.object({}),
+    outputSchema: z.array(z.object({
+      name: z.string(),
+      address: z.string(),
+      phone: z.string(),
+    })),
+  },
+  async () => {
+    const { firestore } = initializeFirebase();
+    const snapshot = await getDocs(collection(firestore, 'warehouses'));
+    return snapshot.docs.map(doc => {
+      const d = doc.data();
+      return {
+        name: d.name,
+        address: d.address || 'Manzil yo\'q',
+        phone: d.phoneNumber || 'Telefon yo\'q'
+      };
+    });
+  }
+);
+
+// --- FLOW DEFINITION ---
 
 const ChatInputSchema = z.object({
   message: z.string().describe('Foydalanuvchi xabari'),
@@ -22,27 +87,24 @@ const ChatOutputSchema = z.object({
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
-export async function chatWithAI(input: ChatInput): Promise<ChatOutput> {
-  return chatWithAIFlow(input);
-}
-
 const chatPrompt = ai.definePrompt({
   name: 'chatPrompt',
   model: model,
+  tools: [checkProductStock, listWarehouses],
   input: { schema: ChatInputSchema },
   output: { schema: ChatOutputSchema },
-  prompt: `Siz "ombor.uz" tizimining aqlli yordamchisisiz. Sizning ismingiz - Ombor AI.
-Sizning vazifangiz foydalanuvchilarga ombor boshqaruvi, logistika, inventarizatsiya va tizimdan foydalanish bo'yicha yordam berishdir.
+  prompt: `Siz "ombor.uz" tizimining aqlli va kuchli yordamchisisiz. Ismingiz - Omborchi GPT.
+Sizning vazifangiz ombor boshqaruvi, logistika va inventarizatsiya bo'yicha foydalanuvchilarga yordam berish.
 
-Maxsus funksiya: "Tizim Gen" haqida ma'lumot:
-- "Tizim Gen" (System Gen) - bu foydalanuvchi talablariga asoslanib yangi tizim arxitekturasini (bazalar, kodlar, papkalar) avtomatik yaratib beruvchi AI vositadir.
-- U dasturchilar va biznes egalariga yangi modullarni tezkor yaratishda yordam beradi.
+Sizda quyidagi imkoniyatlar bor:
+1. Mahsulotlar qoldig'ini va narxini bazadan qidirib topish (checkProductStock asbobi orqali).
+2. Omborlar ro'yxatini va manzillarini ko'rsatish (listWarehouses asbobi orqali).
 
-Muloqot qoidalari:
-1. Doimo xushmuomala va professional bo'ling.
-2. Javoblarni o'zbek tilida bering.
-3. Agar foydalanuvchi tizim funksiyalari (kirim, chiqim, transfer, hisobot, Tizim Gen) haqida so'rasa, ularga qisqacha tushuntirish bering.
-4. Javoblaringiz qisqa va lo'nda bo'lsin.
+Qoidalar:
+- Javoblaringiz qisqa, aniq va professional bo'lsin.
+- O'zbek tilida muloqot qiling.
+- Agar foydalanuvchi mahsulot qoldig'ini so'rasa, albatta asbobdan foydalaning.
+- Pul summalarini '100 000 so'm' formatida ko'rsating.
 
 Suhbat tarixi:
 {{#each history}}
@@ -52,6 +114,10 @@ Suhbat tarixi:
 Foydalanuvchi xabari: {{{message}}}`,
 });
 
+export async function chatWithAI(input: ChatInput): Promise<ChatOutput> {
+  return chatWithAIFlow(input);
+}
+
 const chatWithAIFlow = ai.defineFlow(
   {
     name: 'chatWithAIFlow',
@@ -60,7 +126,7 @@ const chatWithAIFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await chatPrompt(input);
-    if (!output) throw new Error('AI javob bera olmadi.');
+    if (!output) throw new Error('Omborchi GPT hozirda javob bera olmaydi.');
     return output;
   }
 );
