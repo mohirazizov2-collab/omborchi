@@ -19,7 +19,8 @@ import {
   Calendar,
   Layers,
   PlusCircle,
-  Wallet
+  Wallet,
+  TrendingUp
 } from "lucide-react";
 import Link from "next/link";
 
@@ -61,62 +62,50 @@ export default function DashboardPage() {
   }, [mounted, db, user]);
   const { data: employees } = useCollection(employeesQuery);
 
+  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+
   const stats = useMemo(() => {
     if (!products && !employees && !warehouses) return [];
     
-    const totalVal = products?.reduce((acc, p) => acc + ((p.salePrice || 0) * (p.stock || 0)), 0) || 0;
+    const totalInventoryVal = products?.reduce((acc, p) => acc + ((p.salePrice || 0) * (p.stock || 0)), 0) || 0;
     const lowStock = products?.filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length || 0;
-    const totalSalary = employees?.reduce((acc, e) => acc + ((e.baseSalary || 0) + (e.bonus || 0) - (e.deductions || 0)), 0) || 0;
+    const totalSalary = employees?.reduce((acc, e) => acc + (e.baseSalary || 0), 0) || 0;
     
     return [
-      { label: t.dashboard.totalStockValue, value: `${totalVal.toLocaleString()} so'm`, icon: Layers, color: "bg-primary/10 text-primary", trend: "+3.2%", trendColor: "text-emerald-500" },
-      { label: t.dashboard.activeWarehouses, value: (warehouses?.length || 0).toString(), icon: WarehouseIcon, color: "bg-purple-500/10 text-purple-500", trend: "Normal", trendColor: "text-amber-500" },
-      { label: t.dashboard.totalSalaryExpense, value: `${totalSalary.toLocaleString()} so'm`, icon: Wallet, color: "bg-emerald-500/10 text-emerald-500", trend: `${employees?.length || 0} xodim`, trendColor: "text-blue-500" },
-      { label: t.dashboard.lowStockAlerts, value: lowStock.toString(), icon: AlertTriangle, color: lowStock > 0 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500", trend: lowStock > 0 ? "Action Req" : "Safe", trendColor: lowStock > 0 ? "text-rose-500" : "text-emerald-500" }
+      { 
+        label: t.dashboard.totalStockValue, 
+        value: `${formatMoney(totalInventoryVal)} so'm`, 
+        icon: Layers, 
+        color: "bg-primary/10 text-primary", 
+        trend: "Aktiv", 
+        trendColor: "text-emerald-500" 
+      },
+      { 
+        label: t.dashboard.activeWarehouses, 
+        value: (warehouses?.length || 0).toString(), 
+        icon: WarehouseIcon, 
+        color: "bg-purple-500/10 text-purple-500", 
+        trend: "Ishchi", 
+        trendColor: "text-amber-500" 
+      },
+      { 
+        label: t.dashboard.totalSalaryExpense, 
+        value: `${formatMoney(totalSalary)} so'm`, 
+        icon: Wallet, 
+        color: "bg-emerald-500/10 text-emerald-500", 
+        trend: `${employees?.length || 0} xodim`, 
+        trendColor: "text-blue-500" 
+      },
+      { 
+        label: t.dashboard.lowStockAlerts, 
+        value: lowStock.toString(), 
+        icon: AlertTriangle, 
+        color: lowStock > 0 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500", 
+        trend: lowStock > 0 ? "Nazorat" : "Xavfsiz", 
+        trendColor: lowStock > 0 ? "text-rose-500" : "text-emerald-500" 
+      }
     ];
   }, [t, products, warehouses, employees]);
-
-  const handleDownloadReport = async () => {
-    if (!products) return;
-    toast({ title: "Hisobot tayyorlanmoqda..." });
-    
-    // Performance: Load jspdf only when needed
-    const jsPDFLib = (await import("jspdf")).default;
-    await import("jspdf-autotable");
-    
-    const doc = new jsPDFLib();
-    
-    // Header
-    doc.setFillColor(59, 130, 246);
-    doc.roundedRect(95, 15, 20, 20, 4, 4, 'F');
-    doc.setFontSize(22);
-    doc.setTextColor(40, 40, 40);
-    doc.text("ombor.uz", 105, 45, { align: "center" });
-    
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Dashboard Umumiy Hisoboti", 105, 55, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.text(`Sana: ${new Date().toLocaleString()}`, 105, 62, { align: "center" });
-
-    const statsData = stats.map(s => [s.label, s.value]);
-    (doc as any).autoTable({
-      startY: 75,
-      head: [['Ko\'rsatkich', 'Qiymat']],
-      body: statsData,
-      theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246], halign: 'center' },
-      styles: { cellPadding: 5, fontSize: 11 },
-      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } }
-    });
-
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text("Bu hisobot ombor.uz tizimi orqali avtomatik shakllantirildi.", 105, 285, { align: "center" });
-
-    doc.save(`Dashboard_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-  };
 
   if (!mounted || isUserLoading) {
     return (
@@ -136,9 +125,11 @@ export default function DashboardPage() {
             <p className="text-muted-foreground font-medium text-sm">{t.dashboard.description}</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={handleDownloadReport} className="rounded-2xl font-bold h-12 px-6">
-              <Calendar className="w-4 h-4 mr-2" /> {t.actions.downloadReport}
-            </Button>
+            <Link href="/reports">
+              <Button variant="outline" className="rounded-2xl font-bold h-12 px-6">
+                <TrendingUp className="w-4 h-4 mr-2" /> Moliyaviy Tahlil
+              </Button>
+            </Link>
             <Link href="/stock-in">
               <Button className="rounded-2xl font-black uppercase tracking-widest text-[10px] text-white shadow-2xl shadow-primary/20 h-12 px-8 bg-primary premium-button">
                 <PlusCircle className="w-4 h-4 mr-2" /> {t.actions.newOperation}
@@ -196,7 +187,7 @@ export default function DashboardPage() {
                 <div key={item.id} className="flex items-center justify-between p-4 rounded-3xl bg-muted/10">
                   <div className="min-w-0">
                     <p className="text-xs font-black truncate">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{item.sku}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{item.unit || 'pcs'}</p>
                   </div>
                   <Badge variant="destructive" className="h-7 px-3 font-black rounded-xl">{item.stock}</Badge>
                 </div>
