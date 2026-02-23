@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -14,17 +15,19 @@ import {
   Loader2, 
   Search, 
   Package, 
-  UserCheck, 
   Download,
   CheckCircle2,
   Calendar,
   Warehouse,
-  FileOutput
+  FileOutput,
+  AlertTriangle,
+  ArrowRight,
+  Info
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,12 +41,15 @@ export default function StockOutPage() {
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
+  
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
   const [orderNumber, setOrderNumber] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [recipient, setRecipient] = useState("");
   const [clientType, setClientType] = useState<"internal" | "external">("external");
+  
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [processedInvoice, setProcessedInvoice] = useState<any>(null);
 
@@ -59,6 +65,18 @@ export default function StockOutPage() {
   }, [db]);
   const { data: warehouses } = useCollection(warehousesQuery);
 
+  const inventoryQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "inventory");
+  }, [db]);
+  const { data: inventory } = useCollection(inventoryQuery);
+
+  const getStockForProduct = (pId: string) => {
+    if (!warehouseId || !pId || !inventory) return 0;
+    const invItem = inventory.find(i => i.warehouseId === warehouseId && i.productId === pId);
+    return invItem ? (invItem.stock || 0) : 0;
+  };
+
   const addItem = () => {
     setItems([...items, { id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
   };
@@ -73,7 +91,6 @@ export default function StockOutPage() {
     setItems(prev => prev.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
-        // Mahsulot o'zgarganda katalogdagi narxni avtomatik to'ldirish
         if (field === "productId" && value) {
           const p = products?.find(prod => prod.id === value);
           if (p) updated.price = p.salePrice || 0;
@@ -84,52 +101,67 @@ export default function StockOutPage() {
     }));
   };
 
-  const handleDispatch = async () => {
-    if (!warehouseId || !recipient) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Mijoz va omborni tanlang." });
-      return;
-    }
-    if (items.some(i => !i.productId)) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Barcha mahsulotlarni tanlang." });
-      return;
-    }
+  const validation = useMemo(() => {
+    const errors = [];
+    const itemErrors: Record<string, string> = {};
 
+    if (!warehouseId) errors.push("Omborni tanlang.");
+    if (!recipient) errors.push("Mijoz nomini kiriting.");
+    
+    items.forEach(item => {
+      if (!item.productId) {
+        itemErrors[item.id] = "Mahsulot tanlanmagan";
+      } else {
+        const stock = getStockForProduct(item.productId);
+        if (item.quantity > stock) {
+          itemErrors[item.id] = `Zaxira yetarli emas (Mavjud: ${stock})`;
+        }
+        if (item.quantity <= 0) {
+          itemErrors[item.id] = "Miqdor noto'g'ri";
+        }
+      }
+    });
+
+    return { 
+      isValid: errors.length === 0 && Object.keys(itemErrors).length === 0,
+      errors,
+      itemErrors
+    };
+  }, [items, warehouseId, recipient, inventory]);
+
+  const totalValue = useMemo(() => {
+    return items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0);
+  }, [items]);
+
+  const handlePreDispatch = () => {
+    if (!validation.isValid) {
+      toast({ 
+        variant: "destructive", 
+        title: "Xatolik", 
+        description: validation.errors[0] || "Jadvaldagi xatoliklarni to'g'rilang." 
+      });
+      return;
+    }
+    setIsConfirmOpen(true);
+  };
+
+  const handleFinalProcess = async () => {
+    setIsConfirmOpen(false);
     setLoading(true);
     const saleId = `SALE_${Date.now()}`;
 
     try {
       const invoiceItems = [];
-      // Avval zaxira yetarli ekanligini tekshiramiz
-      for (const item of items) {
-        const invId = `${warehouseId}_${item.productId}`;
-        const invRef = doc(db, "inventory", invId);
-        const invSnap = await getDoc(invRef);
-        const currentWhStock = invSnap.exists() ? (invSnap.data().stock || 0) : 0;
-
-        if (currentWhStock < (item.quantity || 0)) {
-          const pName = products?.find(p => p.id === item.productId)?.name || "Noma'lum mahsulot";
-          toast({ 
-            variant: "destructive", 
-            title: "Zaxira yetarli emas!", 
-            description: `${pName} omborda faqat ${currentWhStock} ta bor.` 
-          });
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Hammasi joyida bo'lsa, operatsiyani bajaramiz
       for (const item of items) {
         const product = products?.find(p => p.id === item.productId);
+        const stock = getStockForProduct(item.productId);
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
-        const invSnap = await getDoc(invRef);
-        const currentWhStock = invSnap.exists() ? (invSnap.data().stock || 0) : 0;
 
         invoiceItems.push({
           name: product?.name || "Noma'lum",
           quantity: item.quantity,
-          price: item.price, // Foydalanuvchi kiritgan narx
+          price: item.price,
           unit: product?.unit || "pcs"
         });
 
@@ -142,7 +174,7 @@ export default function StockOutPage() {
           movementType: "StockOut",
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
-          responsibleUserName: user?.displayName || user?.email || "Noma'lum foydalanuvchi",
+          responsibleUserName: user?.displayName || user?.email || "Noma'lum",
           orderNumber: orderNumber || saleId,
           recipient: recipient,
           clientType: clientType,
@@ -161,7 +193,7 @@ export default function StockOutPage() {
         }
 
         updateDocumentNonBlocking(invRef, {
-          stock: currentWhStock - (item.quantity || 0),
+          stock: stock - (item.quantity || 0),
           updatedAt: new Date().toISOString()
         });
       }
@@ -183,7 +215,7 @@ export default function StockOutPage() {
       setWarehouseId("");
     } catch (err) {
       console.error(err);
-      toast({ variant: "destructive", title: "Xatolik", description: "Amalni bajarishda xato yuz berdi." });
+      toast({ variant: "destructive", title: "Xatolik", description: "Saqlashda xato yuz berdi." });
     } finally {
       setLoading(false);
     }
@@ -191,11 +223,8 @@ export default function StockOutPage() {
 
   const handleDownloadPDF = async () => {
     if (!processedInvoice) return;
-    
     const jsPDFLib = (await import("jspdf")).default;
-    // @ts-ignore
     await import("jspdf-autotable");
-    
     const doc = new jsPDFLib();
     
     doc.setFillColor(225, 29, 72); 
@@ -207,7 +236,7 @@ export default function StockOutPage() {
     doc.setFontSize(10);
     doc.setTextColor(40, 40, 40);
     doc.text(`Hujjat #: ${processedInvoice.orderNumber}`, 20, 50);
-    doc.text(`Mijoz: ${processedInvoice.recipient} (${processedInvoice.clientType})`, 20, 57);
+    doc.text(`Mijoz: ${processedInvoice.recipient} (${processedInvoice.clientType === 'internal' ? 'Ichki' : 'Tashqi'})`, 20, 57);
     doc.text(`Chiqarilgan ombor: ${processedInvoice.warehouse}`, 20, 64);
     doc.text(`Sana: ${processedInvoice.date}`, 140, 50);
 
@@ -215,7 +244,7 @@ export default function StockOutPage() {
       i + 1,
       it.name,
       it.quantity,
-      it.unit,
+      t.units[it.unit as keyof typeof t.units] || it.unit,
       `${it.price.toLocaleString()} so'm`,
       `${(it.quantity * it.price).toLocaleString()} so'm`
     ]);
@@ -238,10 +267,6 @@ export default function StockOutPage() {
     doc.save(`Chiqim_Nakladnoy_${processedInvoice.orderNumber}.pdf`);
   };
 
-  const totalValue = useMemo(() => {
-    return items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0);
-  }, [items]);
-
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
@@ -256,7 +281,6 @@ export default function StockOutPage() {
         </header>
 
         <div className="space-y-6">
-          {/* Metadata Section */}
           <Card className="border-none shadow-sm rounded-3xl bg-card/40 backdrop-blur-xl">
             <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -319,7 +343,6 @@ export default function StockOutPage() {
             </CardContent>
           </Card>
 
-          {/* Items Table Section */}
           <Card className="border-none shadow-sm rounded-3xl bg-card/40 backdrop-blur-xl overflow-hidden">
             <div className="p-6 border-b border-border/10 flex justify-between items-center bg-muted/10">
               <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
@@ -335,7 +358,7 @@ export default function StockOutPage() {
                   <thead className="bg-muted/30 text-[10px] uppercase font-black tracking-widest text-muted-foreground">
                     <tr>
                       <th className="px-6 py-4 w-12 text-center">№</th>
-                      <th className="px-4 py-4 min-w-[300px]">Mahsulot nomi</th>
+                      <th className="px-4 py-4 min-w-[250px]">Mahsulot nomi</th>
                       <th className="px-4 py-4 w-24">Birlik</th>
                       <th className="px-4 py-4 w-32 text-center">Ombordagi qoldiq</th>
                       <th className="px-4 py-4 w-32">Chiqim miqdori</th>
@@ -348,44 +371,56 @@ export default function StockOutPage() {
                     <AnimatePresence mode="popLayout">
                       {items.map((item, index) => {
                         const p = products?.find(prod => prod.id === item.productId);
+                        const stock = getStockForProduct(item.productId);
                         const rowTotal = (item.quantity || 0) * (item.price || 0);
+                        const hasError = validation.itemErrors[item.id];
+
                         return (
                           <motion.tr 
                             key={item.id}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            className="hover:bg-rose-600/[0.02] group"
+                            className={cn(
+                              "hover:bg-muted/5 transition-colors group",
+                              hasError && "bg-rose-500/[0.03]"
+                            )}
                           >
                             <td className="px-6 py-3 text-center text-xs font-bold opacity-40">{index + 1}</td>
                             <td className="px-4 py-3">
-                              <Select 
-                                onValueChange={(val) => updateItem(item.id, "productId", val)}
-                                value={item.productId}
-                              >
-                                <SelectTrigger className="h-10 rounded-lg bg-background/50 border-border/40 font-bold focus:ring-rose-600/20">
-                                  <SelectValue placeholder="Mahsulot tanlang..." />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl max-h-[300px]">
-                                  <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
-                                    <div className="relative">
-                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                                      <Input 
-                                        placeholder="Qidirish..." 
-                                        className="h-9 pl-9 text-xs rounded-lg bg-background/50 border-none"
-                                        value={item.searchQuery}
-                                        onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
+                              <div className="space-y-1">
+                                <Select 
+                                  onValueChange={(val) => updateItem(item.id, "productId", val)}
+                                  value={item.productId}
+                                >
+                                  <SelectTrigger className={cn(
+                                    "h-10 rounded-lg bg-background/50 border-border/40 font-bold focus:ring-rose-600/20",
+                                    !item.productId && "border-dashed"
+                                  )}>
+                                    <SelectValue placeholder="Mahsulot tanlang..." />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-xl max-h-[300px]">
+                                    <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
+                                      <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                                        <Input 
+                                          placeholder="Qidirish..." 
+                                          className="h-9 pl-9 text-xs rounded-lg bg-background/50 border-none"
+                                          value={item.searchQuery}
+                                          onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
                                     </div>
-                                  </div>
-                                  {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
-                                    <SelectItem key={p.id} value={p.id} className="py-2.5 rounded-lg cursor-pointer font-bold">
-                                      {p.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                    {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
+                                      <SelectItem key={p.id} value={p.id} className="py-2.5 rounded-lg cursor-pointer font-bold">
+                                        {p.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {hasError && <p className="text-[9px] font-black text-rose-600 uppercase flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {hasError}</p>}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <span className="text-xs font-black uppercase text-muted-foreground">
@@ -393,14 +428,21 @@ export default function StockOutPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span className={cn("text-xs font-black px-2 py-1 rounded-md", (p?.stock || 0) < 5 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600")}>
-                                {p?.stock || 0}
-                              </span>
+                              <div className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase",
+                                stock <= 0 ? "bg-rose-500/10 text-rose-600" : stock < 10 ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"
+                              )}>
+                                {stock <= 0 && <AlertTriangle className="w-3 h-3" />}
+                                {stock}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <Input 
                                 type="number" 
-                                className="h-10 rounded-lg bg-background/50 border-border/40 font-black text-center"
+                                className={cn(
+                                  "h-10 rounded-lg bg-background/50 border-border/40 font-black text-center",
+                                  item.quantity > stock && "border-rose-600 text-rose-600"
+                                )}
                                 value={item.quantity}
                                 onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
                               />
@@ -413,7 +455,10 @@ export default function StockOutPage() {
                                 onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
                               />
                             </td>
-                            <td className="px-4 py-3 font-black text-sm text-rose-600">
+                            <td className={cn(
+                              "px-4 py-3 font-black text-sm",
+                              item.quantity > stock ? "text-rose-600" : "text-foreground"
+                            )}>
                               {rowTotal.toLocaleString()}
                             </td>
                             <td className="px-6 py-3">
@@ -442,21 +487,75 @@ export default function StockOutPage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Umumiy Sotuv Summasi</span>
-                  <span className="text-2xl font-black text-rose-600">{totalValue.toLocaleString()} <span className="text-xs">so'm</span></span>
+                  <span className={cn("text-2xl font-black", validation.isValid ? "text-rose-600" : "text-muted-foreground opacity-50")}>
+                    {totalValue.toLocaleString()} <span className="text-xs">so'm</span>
+                  </span>
                 </div>
               </div>
               <Button 
                 className="h-14 rounded-2xl px-10 bg-rose-600 text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-rose-600/20 border-none premium-button" 
-                onClick={handleDispatch} 
-                disabled={loading}
+                onClick={handlePreDispatch} 
+                disabled={loading || !validation.isValid}
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileOutput className="w-5 h-5 mr-2" />}
                 Tasdiqlash va Chiqarish
               </Button>
             </CardFooter>
           </Card>
         </div>
 
+        {/* Confirmation Modal */}
+        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
+            <DialogHeader>
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4">
+                <Info className="w-8 h-8" />
+              </div>
+              <DialogTitle className="text-2xl font-black tracking-tight">Chiqimni tasdiqlang</DialogTitle>
+              <p className="text-muted-foreground font-medium pt-2">Operatsiyani yakunlashdan oldin barcha ma'lumotlarni tekshiring.</p>
+            </DialogHeader>
+            
+            <div className="py-6 space-y-4">
+              <div className="p-4 rounded-2xl bg-muted/20 space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground font-bold">Qabul qiluvchi:</span>
+                  <span className="font-black">{recipient}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground font-bold">Ombor:</span>
+                  <span className="font-black">{warehouses?.find(w => w.id === warehouseId)?.name}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm border-t border-white/5 pt-3">
+                  <span className="text-muted-foreground font-bold">Jami mahsulotlar:</span>
+                  <span className="font-black">{items.length} ta</span>
+                </div>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-rose-600 font-black uppercase text-[10px] tracking-widest">Umumiy Summa</span>
+                  <span className="text-xl font-black text-rose-600">{totalValue.toLocaleString()} so'm</span>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] font-bold text-emerald-600/80 leading-relaxed">
+                  Tasdiqlashni bossangiz, ombor qoldig'i avtomatik kamaytiriladi va tarixda saqlanadi.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-3">
+              <Button variant="ghost" onClick={() => setIsConfirmOpen(false)} className="rounded-2xl h-12 font-bold px-6">Bekor qilish</Button>
+              <Button 
+                onClick={handleFinalProcess}
+                className="rounded-2xl h-12 flex-1 bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-2"
+              >
+                Tasdiqlayman <ArrowRight className="w-4 h-4" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Success Modal */}
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
           <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl text-center">
             <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
