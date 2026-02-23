@@ -60,6 +60,27 @@ export const translations = {
       hourlyRate: "Soatlik narxi",
       standardHours: "Oylik norma (soat)"
     },
+    history: {
+      title: "Harakatlar tarixi",
+      description: "Barcha kirim, chiqim va omborlararo harakatlarning batafsil jurnali.",
+      search: "ID yoki mahsulot bo'yicha qidirish...",
+      filterType: "Operatsiya turi",
+      all: "Barcha operatsiyalar",
+      details: "Tafsilotlar",
+      empty: "Hozircha hech qanday harakat qayd etilmagan."
+    },
+    inventoryAudit: {
+      title: "Inventarizatsiya",
+      description: "Tizimdagi qoldiqni amaldagi (jismoniy) qoldiq bilan solishtirish va to'g'irlash.",
+      physicalStock: "Amaldagi miqdor",
+      systemStock: "Tizimdagi miqdor",
+      discrepancy: "Farq",
+      reconcile: "Zaxirani to'g'irlash",
+      success: "Zaxira muvaffaqiyatli to'g'irlandi",
+      scanToAudit: "Skanerlash orqali tekshirish",
+      confirmAudit: "Auditni tasdiqlash",
+      auditSummary: "Audit natijalari"
+    },
     employees: {
       title: "Xodimlarni boshqarish",
       description: "Ishchilar ro'yxati, lavozimlar va maoshlarni hisoblash.",
