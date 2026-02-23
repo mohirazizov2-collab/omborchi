@@ -8,7 +8,7 @@ export const translations = {
       warehouses: "Omborlar",
       products: "Mahsulotlar",
       stockIn: "Kirim",
-      stockOut: "Chiqim",
+      stockOut: "Chiqim (Sotuv)",
       transfers: "Transferlar",
       employees: "Ishchilar",
       history: "Harakatlar tarixi",
@@ -146,16 +146,20 @@ export const translations = {
       scanBarcode: "Skanerlash"
     },
     stockOut: {
-      title: "Tovarlar Chiqimi (Goods Issue)",
-      description: "Ombordan tovarlarni chiqarish (mijozlarga yoki loyihalarga).",
-      issueDetails: "Chiqim tafsilotlari",
-      refNumber: "Buyurtma / Referans raqami",
-      issueDate: "Chiqarilgan sana",
+      title: "Rasxod (Goods Issue / Sale)",
+      description: "Ombordan tovarlarni chiqarish (mijozlarga yoki ichki ehtiyojlar uchun).",
+      issueDetails: "Chiqim / Sotuv tafsilotlari",
+      refNumber: "Hujjat / Buyurtma raqami",
+      issueDate: "Sotilgan sana",
       sourceWarehouse: "Chiqaruvchi ombor",
-      recipient: "Mijoz / Qabul qiluvchi",
-      dispatch: "Chiqimni jo'natish",
-      pickingList: "Terish varaqasini chop etish",
-      scanBarcode: "Skanerlash"
+      recipient: "Mijoz (Klient)",
+      clientType: "Mijoz turi",
+      internal: "Ichki mijoz",
+      external: "Tashqi mijoz",
+      dispatch: "Tasdiqlash va Chiqarish",
+      insufficientStock: "Zaxira yetarli emas!",
+      noWarehouseSelected: "Avval omborni tanlang",
+      process: "Chiqimni yakunlash"
     },
     transfers: {
       title: "Omborlararo Transferlar",
@@ -231,7 +235,8 @@ export const translations = {
       summary: "Xulosa",
       totalItems: "Jami buyumlar",
       totalValue: "Jami qiymat",
-      price: "Narx"
+      price: "Narx",
+      client: "Mijoz"
     }
   },
   ru: {
@@ -240,7 +245,7 @@ export const translations = {
       warehouses: 'Склады',
       products: 'Товары',
       stockIn: 'Приход',
-      stockOut: 'Расход',
+      stockOut: 'Расход (Продажа)',
       transfers: 'Переводы',
       employees: 'Сотрудники',
       history: 'История операций',
@@ -379,15 +384,19 @@ export const translations = {
     },
     stockOut: {
       title: 'Расход товара (Stock Out)',
-      description: 'Выдача товаров со склада (клиентам или на проекты).',
-      issueDetails: 'Детали выдачи',
-      refNumber: 'Номер заказа / Референс',
-      issueDate: 'Дата выдачи',
+      description: 'Выдача товаров со склада (клиентам или на внутренние нужды).',
+      issueDetails: 'Детали расхода / продажи',
+      refNumber: 'Номер документа / заказа',
+      issueDate: 'Дата продажи',
       sourceWarehouse: 'Склад отгрузки',
-      recipient: 'Клиент / Получатель',
-      dispatch: 'Отправить товар',
-      pickingList: 'Печать листа сборки',
-      scanBarcode: 'Сканировать'
+      recipient: 'Клиент (Мягкое имя)',
+      clientType: "Тип клиента",
+      internal: "Внутренний клиент",
+      external: "Внешний клиент",
+      dispatch: 'Подтвердить и выдать',
+      insufficientStock: 'Недостаточно запасов!',
+      noWarehouseSelected: 'Сначала выберите склад',
+      process: "Завершить расход"
     },
     transfers: {
       title: 'Складские Переводы',
@@ -463,7 +472,8 @@ export const translations = {
       summary: 'Итог',
       totalItems: 'Всего позиций',
       totalValue: 'Общая стоимость',
-      price: 'Цена'
+      price: 'Цена',
+      client: "Клиент"
     }
   },
   en: {
@@ -472,7 +482,7 @@ export const translations = {
       warehouses: 'Warehouses',
       products: 'Products',
       stockIn: 'Stock In',
-      stockOut: 'Stock Out',
+      stockOut: 'Stock Out (Sale)',
       transfers: 'Transfers',
       employees: 'Employees',
       history: 'Movement History',
@@ -611,15 +621,19 @@ export const translations = {
     },
     stockOut: {
       title: 'Stock Out (Goods Issue)',
-      description: 'Record items leaving the warehouse for customers or projects.',
-      issueDetails: 'Issue Details',
+      description: 'Record items leaving the warehouse for customers or internal needs.',
+      issueDetails: 'Issue / Sale Details',
       refNumber: 'Order / Reference #',
-      issueDate: 'Date of Issue',
+      issueDate: 'Date of Sale',
       sourceWarehouse: 'Source Warehouse',
-      recipient: 'Client / Recipient',
-      dispatch: 'Dispatch Order',
-      pickingList: 'Print Picking List',
-      scanBarcode: 'Scan'
+      recipient: 'Client (Recipient)',
+      clientType: "Client Type",
+      internal: "Internal Client",
+      external: "External Client",
+      dispatch: 'Confirm & Dispatch',
+      insufficientStock: 'Insufficient Stock!',
+      noWarehouseSelected: 'Select a warehouse first',
+      process: "Complete Dispatch"
     },
     transfers: {
       title: 'Stock Transfers',
@@ -695,7 +709,8 @@ export const translations = {
       summary: 'Summary',
       totalItems: 'Total Items',
       totalValue: 'Total Value',
-      price: 'Price'
+      price: 'Price',
+      client: "Client"
     }
   }
 };

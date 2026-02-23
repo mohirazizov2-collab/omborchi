@@ -4,12 +4,11 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, Search, Filter, Loader2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, FileText, User } from "lucide-react";
+import { History, Search, Filter, Loader2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, FileText, User, ShoppingCart } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, orderBy, query } from "firebase/firestore";
@@ -31,8 +30,10 @@ export default function HistoryPage() {
 
   const filteredMovements = useMemo(() => {
     return movements?.filter(m => {
-      const matchesSearch = m.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           m.productId.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = 
+        m.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        m.productId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.recipient && m.recipient.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesType = typeFilter === "all" || m.movementType === typeFilter;
       return matchesSearch && matchesType;
     }) || [];
@@ -105,7 +106,7 @@ export default function HistoryPage() {
                           "bg-blue-500/10 text-blue-500"
                         )}>
                           {m.movementType === 'StockIn' ? <ArrowDownLeft className="w-7 h-7" /> : 
-                           m.movementType === 'StockOut' ? <ArrowUpRight className="w-7 h-7" /> : 
+                           m.movementType === 'StockOut' ? <ShoppingCart className="w-7 h-7" /> : 
                            <ArrowRightLeft className="w-7 h-7" />}
                         </div>
                         <div className="space-y-1 min-w-0">
@@ -120,9 +121,9 @@ export default function HistoryPage() {
                               {m.movementType}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
+                          <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
                             <span className="flex items-center gap-1.5"><FileText className="w-3 h-3" /> {m.id.substring(0,8).toUpperCase()}</span>
-                            <span className="flex items-center gap-1.5"><User className="w-3 h-3" /> {m.responsibleUserId?.substring(0,6)}</span>
+                            <span className="flex items-center gap-1.5"><User className="w-3 h-3" /> {m.recipient || m.supplier || 'N/A'}</span>
                           </div>
                         </div>
                       </div>
@@ -146,9 +147,6 @@ export default function HistoryPage() {
                             {new Date(m.movementDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
-                        <Button variant="ghost" size="icon" className="rounded-xl opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex">
-                          <ArrowUpRight className="w-5 h-5 text-primary" />
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
