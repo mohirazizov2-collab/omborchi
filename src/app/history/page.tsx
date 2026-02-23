@@ -5,21 +5,27 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, Search, Filter, Loader2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, FileText, User, ShoppingCart } from "lucide-react";
+import { History, Search, Filter, Loader2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, FileText, User, ShoppingCart, Trash2, ShieldCheck } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, orderBy, query } from "firebase/firestore";
+import { collection, orderBy, query, doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function HistoryPage() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const db = useFirestore();
-  const { user } = useUser();
+  const { user, role } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const isAdmin = role === "Super Admin" || role === "Admin";
 
   const movementsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -32,12 +38,55 @@ export default function HistoryPage() {
     return movements?.filter(m => {
       const matchesSearch = 
         m.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        m.productId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.productName && m.productName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (m.recipient && m.recipient.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesType = typeFilter === "all" || m.movementType === typeFilter;
       return matchesSearch && matchesType;
     }) || [];
   }, [movements, searchQuery, typeFilter]);
+
+  const handleDelete = async (movement: any) => {
+    if (!isAdmin || !db) return;
+    if (!confirm("Haqiqatdan ham ushbu operatsiyani o'chirib, zaxirani qayta tiklamoqchimisiz?")) return;
+
+    setIsDeleting(movement.id);
+    try {
+      // 1. Zaxirani qayta tiklash
+      const productRef = doc(db, "products", movement.productId);
+      const productSnap = await getDoc(productRef);
+      if (productSnap.exists()) {
+        const currentStock = productSnap.data().stock || 0;
+        // Agar stock-in bo'lgan bo'lsa, endi u miqdorni ayiramiz. 
+        // Agar stock-out bo'lgan bo'lsa (quantityChange manfiy), uni ayirganda aslida qo'shiladi.
+        await updateDoc(productRef, {
+          stock: currentStock - movement.quantityChange,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // 2. Ombor inventarini tiklash
+      const invId = `${movement.warehouseId}_${movement.productId}`;
+      const invRef = doc(db, "inventory", invId);
+      const invSnap = await getDoc(invRef);
+      if (invSnap.exists()) {
+        const currentWhStock = invSnap.data().stock || 0;
+        await updateDoc(invRef, {
+          stock: currentWhStock - movement.quantityChange,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // 3. Movement logini o'chirish
+      await deleteDoc(doc(db, "stockMovements", movement.id));
+      
+      toast({ title: "Muvaffaqiyatli", description: "Operatsiya bekor qilindi va zaxira tiklandi." });
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "Xatolik", description: "O'chirishda xato yuz berdi." });
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-background font-body">
@@ -111,7 +160,7 @@ export default function HistoryPage() {
                         </div>
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-black text-lg tracking-tight truncate">{m.productId}</span>
+                            <span className="font-black text-lg tracking-tight truncate">{m.productName || m.productId}</span>
                             <Badge variant="outline" className={cn(
                               "rounded-lg font-black text-[8px] uppercase px-2 py-0.5 border-none",
                               m.movementType === 'StockIn' ? "bg-emerald-500/10 text-emerald-500" : 
@@ -123,7 +172,8 @@ export default function HistoryPage() {
                           </div>
                           <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
                             <span className="flex items-center gap-1.5"><FileText className="w-3 h-3" /> {m.id.substring(0,8).toUpperCase()}</span>
-                            <span className="flex items-center gap-1.5"><User className="w-3 h-3" /> {m.recipient || m.supplier || 'N/A'}</span>
+                            <span className="flex items-center gap-1.5 text-primary"><User className="w-3 h-3" /> {m.responsibleUserName || 'N/A'}</span>
+                            <span className="flex items-center gap-1.5"><Warehouse className="w-3 h-3" /> {m.warehouseName || 'Ombor'}</span>
                           </div>
                         </div>
                       </div>
@@ -147,6 +197,19 @@ export default function HistoryPage() {
                             {new Date(m.movementDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
+                        {isAdmin && (
+                          <div className="flex items-center pl-4 border-l border-white/5">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 rounded-xl text-rose-500 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                              onClick={() => handleDelete(m)}
+                              disabled={isDeleting === m.id}
+                            >
+                              {isDeleting === m.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

@@ -9,35 +9,46 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn() && 
+        (exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid)) || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin']);
+    }
+
     // --- Foydalanuvchilar ---
     match /users/{userId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || request.auth.uid == userId;
     }
 
     match /rolesAdmin/{userId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // --- Omborxonalar ---
     match /warehouses/{warehouseId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // --- Mahsulotlar ---
     match /products/{productId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // --- Ishchilar ---
     match /employees/{employeeId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // --- Zaxira harakatlari (Audit Trail) ---
     match /stockMovements/{movementId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if false; // Tarixni o'zgartirib bo'lmaydi
+      allow update, delete: if isAdmin(); // Faqat adminlar o'zgartirishi yoki o'chirishi mumkin
     }
 
     // --- Qolgan barcha hujjatlar ---

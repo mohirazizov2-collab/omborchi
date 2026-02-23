@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -106,11 +107,14 @@ export default function StockInPage() {
 
         const movementData = {
           productId: item.productId,
+          productName: product?.name || "Noma'lum",
           warehouseId: warehouseId,
+          warehouseName: warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum",
           quantityChange: item.quantity,
           movementType: "StockIn",
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
+          responsibleUserName: user?.displayName || user?.email || "Noma'lum foydalanuvchi",
           dnNumber: dnNumber,
           supplier: supplier,
           unitPrice: item.price,

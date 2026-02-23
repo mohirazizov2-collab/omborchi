@@ -123,11 +123,14 @@ export default function StockOutPage() {
 
         const movementData = {
           productId: item.productId,
+          productName: product?.name || "Noma'lum",
           warehouseId: warehouseId,
+          warehouseName: warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum",
           quantityChange: -(item.quantity || 0),
           movementType: "StockOut",
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
+          responsibleUserName: user?.displayName || user?.email || "Noma'lum foydalanuvchi",
           orderNumber: orderNumber || saleId,
           recipient: recipient,
           clientType: clientType,
