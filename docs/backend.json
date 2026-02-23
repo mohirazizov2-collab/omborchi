@@ -45,7 +45,7 @@
     },
     "StockMovement": {
       "title": "StockMovement",
-      "description": "Audit Trail: Zaxira harakati tarixi. Hech qachon o'chirib bo'lmaydi.",
+      "description": "Audit Trail: Zaxira harakati tarixi.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -54,25 +54,46 @@
         "quantityChange": { "type": "number" },
         "movementType": { "type": "string", "enum": ["StockIn", "StockOut", "Transfer", "Adjustment"] },
         "movementDate": { "type": "string", "format": "date-time" },
-        "responsibleUserId": { "type": "string" }
+        "responsibleUserId": { "type": "string" },
+        "responsibleUserName": { "type": "string" }
       },
       "required": ["id", "productId", "warehouseId", "quantityChange", "movementType"]
     },
     "Employee": {
       "title": "Employee",
-      "description": "Ishchilar ma'lumotlari va maosh hisobi.",
+      "description": "Ishchilar ma'lumotlari va moliyaviy sozlamalari.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "fullName": { "type": "string" },
         "position": { "type": "string" },
+        "department": { "type": "string" },
         "baseSalary": { "type": "number" },
-        "bonus": { "type": "number" },
-        "deductions": { "type": "number" },
+        "overtimeHourlyRate": { "type": "number" },
+        "taxRate": { "type": "number" },
+        "standardHours": { "type": "number" },
         "phoneNumber": { "type": "string" },
         "hiredAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "fullName", "position", "baseSalary"]
+    },
+    "Payroll": {
+      "title": "Payroll",
+      "description": "Oylik maosh hisob-kitoblari tarixi.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "month": { "type": "string" },
+        "workingHours": { "type": "number" },
+        "overtimeHours": { "type": "number" },
+        "bonus": { "type": "number" },
+        "deductions": { "type": "number" },
+        "brutto": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "netto": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "AdminRole": {
       "title": "AdminRole",
@@ -86,36 +107,36 @@
   },
   "auth": {
     "providers": ["password"],
-    "securityPolicy": "Strict: Email/Password login required. Super Admin roles checked via rolesAdmin collection."
+    "securityPolicy": "Strict: Email/Password login required."
   },
   "firestore": {
     "/warehouses/{warehouseId}": {
       "schema": "#/entities/Warehouse",
-      "description": "Barcha faol omborlar ro'yxati."
+      "description": "Omborlar ro'yxati."
     },
     "/products/{productId}": {
       "schema": "#/entities/Product",
-      "description": "Global mahsulotlar katalogi."
+      "description": "Mahsulotlar katalogi."
     },
     "/inventory/{inventoryId}": {
       "schema": "#/entities/WarehouseInventory",
-      "description": "Omborlar bo'yicha tovar qoldiqlari."
+      "description": "Ombordagi qoldiqlar."
     },
     "/stockMovements/{movementId}": {
       "schema": "#/entities/StockMovement",
-      "description": "Audit Trail: O'chirilishi taqiqlangan harakatlar tarixi."
+      "description": "Harakatlar jurnali."
     },
     "/employees/{employeeId}": {
       "schema": "#/entities/Employee",
-      "description": "Barcha ishchilar va ularning maoshlari ro'yxati."
+      "description": "Ishchilar ma'lumotlari."
+    },
+    "/payrolls/{payrollId}": {
+      "schema": "#/entities/Payroll",
+      "description": "Maosh hisoblari."
     },
     "/users/{userId}": {
       "schema": { "type": "object" },
-      "description": "Foydalanuvchi profillari."
-    },
-    "/rolesAdmin/{userId}": {
-      "schema": "#/entities/AdminRole",
-      "description": "Super Admin huquqini tasdiqlovchi UID ro'yxati."
+      "description": "Profillar."
     }
   }
 }

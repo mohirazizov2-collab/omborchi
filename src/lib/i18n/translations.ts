@@ -21,7 +21,6 @@ export const translations = {
       administration: "Administratsiya",
       profile: "Profil",
       inventoryAudit: "Inventarizatsiya",
-      // Guruh nomlari
       analyticsGroup: "Analitika",
       operationsGroup: "Operatsiyalar",
       inventoryGroup: "Inventar boshqaruvi",
@@ -44,26 +43,22 @@ export const translations = {
       box: "Karobka",
       pack: "Pachka"
     },
-    inventoryAudit: {
-      title: "Inventarizatsiya",
-      description: "Tizimdagi zaxiralarni amaldagi qoldiq bilan solishtirish va to'g'rilash.",
-      physicalStock: "Jismoniy miqdor",
-      systemStock: "Tizimdagi miqdor",
-      discrepancy: "Farq",
-      reconcile: "Zaxirani to'g'rilash",
-      success: "Zaxira muvaffaqiyatli to'g'rilandi",
-      scanToAudit: "Skanerlash orqali tekshirish",
-      confirmAudit: "Auditni tasdiqlash",
-      auditSummary: "Audit xulosasi"
-    },
-    history: {
-      title: "Harakatlar tarixi",
-      description: "Ombordagi barcha kirim, chiqim va transfer operatsiyalarining batafsil jurnali.",
-      search: "ID yoki mahsulot bo'yicha qidirish...",
-      filterType: "Operatsiya turi",
-      all: "Barcha amallar",
-      details: "Batafsil ma'lumot",
-      empty: "Hozircha harakatlar qayd etilmagan."
+    payroll: {
+      title: "Maosh hisoblash",
+      brutto: "Brutto maosh",
+      netto: "Netto (Qo'lga)",
+      tax: "Soliq",
+      overtime: "Ortiqcha ish",
+      hours: "Ish soatlari",
+      overtimeHours: "Ortiqcha soat",
+      calculate: "Hisoblash",
+      savePayroll: "Hisobni saqlash",
+      history: "To'lovlar tarixi",
+      lastPaid: "Oxirgi to'lov",
+      department: "Bo'lim",
+      taxRate: "Soliq stavkasi (%)",
+      hourlyRate: "Soatlik narxi",
+      standardHours: "Oylik norma (soat)"
     },
     employees: {
       title: "Xodimlarni boshqarish",
@@ -287,6 +282,23 @@ export const translations = {
       box: "Коробка",
       pack: "Пачка"
     },
+    payroll: {
+      title: "Расчет зарплаты",
+      brutto: "Зарплата Брутто",
+      netto: "Нетто (На руки)",
+      tax: "Налог",
+      overtime: "Сверхурочные",
+      hours: "Рабочие часы",
+      overtimeHours: "Сверхурочные часы",
+      calculate: "Рассчитать",
+      savePayroll: "Сохранить расчет",
+      history: "История выплат",
+      lastPaid: "Последняя выплата",
+      department: "Отдел",
+      taxRate: "Ставка налога (%)",
+      hourlyRate: "Почасовая ставка",
+      standardHours: "Норма в месяц (ч)"
+    },
     inventoryAudit: {
       title: 'Инвентаризация',
       description: 'Сравнение системных запасов с фактическими остатками и корректировка.',
@@ -329,7 +341,7 @@ export const translations = {
       passwordLabel: 'Пароль',
       loginButton: 'Войти',
       forgotPassword: 'Забыли пароль?',
-      noAccount: 'Нет аккаунта? Свяжитесь с Супер Админом.',
+      noAccount: 'Нет аккаунта? Свяжитесь с Спер Админом.',
       errorInvalid: 'Неверный email или пароль.',
       loggingIn: 'Вход...'
     },
@@ -529,6 +541,23 @@ export const translations = {
       bag: "Bag",
       box: "Box",
       pack: "Pack"
+    },
+    payroll: {
+      title: "Payroll Calculation",
+      brutto: "Gross Salary",
+      netto: "Net Salary",
+      tax: "Tax",
+      overtime: "Overtime",
+      hours: "Working Hours",
+      overtimeHours: "Overtime Hours",
+      calculate: "Calculate",
+      savePayroll: "Save Calculation",
+      history: "Payment History",
+      lastPaid: "Last Paid",
+      department: "Department",
+      taxRate: "Tax Rate (%)",
+      hourlyRate: "Hourly Rate",
+      standardHours: "Monthly Norma (h)"
     },
     inventoryAudit: {
       title: 'Inventory Audit',
