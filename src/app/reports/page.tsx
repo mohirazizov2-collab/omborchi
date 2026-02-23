@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -10,15 +9,9 @@ import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { 
   Loader2, 
-  TrendingUp, 
-  Package, 
-  Warehouse, 
   Wand2, 
   Sparkles, 
-  CheckCircle2, 
   Activity,
-  ArrowUpRight,
-  Wallet,
   FileDown,
   Table as TableIcon
 } from "lucide-react";
@@ -29,10 +22,7 @@ import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-re
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-// Dynamic Imports for Large Libraries
-const jsPDF = dynamic(() => import("jspdf").then(m => m.default), { ssr: false });
-const XLSX = dynamic(() => import("xlsx").then(m => m), { ssr: false });
-
+// Recharts components are only needed on the client
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
 const Line = dynamic(() => import("recharts").then(m => m.Line), { ssr: false });
@@ -171,7 +161,8 @@ export default function ReportsPage() {
     toast({ title: "PDF tayyorlanmoqda..." });
     
     const jsPDFLib = (await import("jspdf")).default;
-    const autoTable = (await import("jspdf-autotable")).default;
+    // @ts-ignore
+    await import("jspdf-autotable");
     
     const doc = new jsPDFLib();
     

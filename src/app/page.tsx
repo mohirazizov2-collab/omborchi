@@ -1,11 +1,10 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -14,26 +13,17 @@ import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebas
 import { collection, query, limit, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  TrendingUp, 
   Warehouse as WarehouseIcon, 
   AlertTriangle,
   Loader2,
   Calendar,
   Layers,
-  Zap,
   PlusCircle,
-  History,
-  ArrowRightLeft,
-  Wallet,
-  Users,
-  ArrowUpRight
+  Wallet
 } from "lucide-react";
 import Link from "next/link";
 
-// Dynamic Imports for Large Libraries
-const jsPDF = dynamic(() => import("jspdf").then(m => m.default), { ssr: false });
-const autoTable = dynamic(() => import("jspdf-autotable"), { ssr: false });
-
+// Recharts components are only needed on the client
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
@@ -57,25 +47,19 @@ export default function DashboardPage() {
     if (!mounted || !db || !user) return null;
     return collection(db, "warehouses");
   }, [mounted, db, user]);
-  const { data: warehouses, isLoading: warehousesLoading } = useCollection(warehousesQuery);
+  const { data: warehouses } = useCollection(warehousesQuery);
 
   const productsQuery = useMemoFirebase(() => {
     if (!mounted || !db || !user) return null;
     return collection(db, "products");
   }, [mounted, db, user]);
-  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
+  const { data: products } = useCollection(productsQuery);
 
   const employeesQuery = useMemoFirebase(() => {
     if (!mounted || !db || !user) return null;
     return collection(db, "employees");
   }, [mounted, db, user]);
-  const { data: employees, isLoading: employeesLoading } = useCollection(employeesQuery);
-
-  const recentMovementsQuery = useMemoFirebase(() => {
-    if (!mounted || !db || !user) return null;
-    return query(collection(db, "stockMovements"), orderBy("movementDate", "desc"), limit(6));
-  }, [mounted, db, user]);
-  const { data: movements } = useCollection(recentMovementsQuery);
+  const { data: employees } = useCollection(employeesQuery);
 
   const stats = useMemo(() => {
     if (!products && !employees && !warehouses) return [];
@@ -97,7 +81,8 @@ export default function DashboardPage() {
     toast({ title: "Hisobot tayyorlanmoqda..." });
     
     const jsPDFLib = (await import("jspdf")).default;
-    const autoTable = (await import("jspdf-autotable")).default;
+    // @ts-ignore
+    await import("jspdf-autotable");
     
     const doc = new jsPDFLib();
     
