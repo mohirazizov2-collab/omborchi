@@ -17,18 +17,17 @@
     },
     "Product": {
       "title": "Product",
-      "description": "Mahsulotlar katalogi: SKU, narx va joriy zaxira miqdori.",
+      "description": "Mahsulotlar katalogi: nomi, narxi va joriy zaxira miqdori.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "sku": { "type": "string" },
         "salePrice": { "type": "number" },
         "stock": { "type": "number" },
         "lowStockThreshold": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "sku", "salePrice"]
+      "required": ["id", "name", "salePrice"]
     },
     "WarehouseInventory": {
       "title": "WarehouseInventory",

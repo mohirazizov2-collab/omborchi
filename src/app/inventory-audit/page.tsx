@@ -1,30 +1,20 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger,
-  DialogFooter
-} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardCheck, Search, ScanLine, Loader2, Save, Warehouse } from "lucide-react";
+import { ClipboardCheck, Search, Loader2, Save, Warehouse } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc, getDoc } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import { updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
-import { Html5QrcodeScanner } from "html5-qrcode";
 import { cn } from "@/lib/utils";
 
 export default function InventoryAuditPage() {
@@ -34,10 +24,8 @@ export default function InventoryAuditPage() {
   const { user, role } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [auditData, setAuditData] = useState<Record<string, number>>({});
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   const isAdmin = role === "Super Admin" || role === "Admin";
 
@@ -63,8 +51,7 @@ export default function InventoryAuditPage() {
     if (!products || !selectedWarehouseId) return [];
     
     return products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
     }).map(p => {
       const invItem = inventory?.find(inv => inv.warehouseId === selectedWarehouseId && inv.productId === p.id);
@@ -131,38 +118,6 @@ export default function InventoryAuditPage() {
     }
   };
 
-  useEffect(() => {
-    if (isScannerOpen) {
-      const scanner = new Html5QrcodeScanner(
-        "reader-audit",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      );
-      scannerRef.current = scanner;
-
-      scanner.render(
-        (decodedText) => {
-          const product = products?.find(p => p.sku === decodedText);
-          if (product) {
-            setSearchQuery(product.sku);
-            toast({ title: "Mahsulot topildi", description: product.name });
-            scanner.clear();
-            setIsScannerOpen(false);
-          } else {
-            toast({ variant: "destructive", title: "Xatolik", description: "Topilmadi: " + decodedText });
-          }
-        },
-        () => {}
-      );
-    }
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(e => console.error("Scanner error", e));
-      }
-    };
-  }, [isScannerOpen, products]);
-
   if (!isAdmin) return null;
 
   return (
@@ -177,22 +132,6 @@ export default function InventoryAuditPage() {
           <div>
             <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground">{t.inventoryAudit.title}</h1>
             <p className="text-sm text-muted-foreground mt-1 font-medium">{t.inventoryAudit.description}</p>
-          </div>
-          
-          <div className="flex gap-3">
-            <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
-                  <ScanLine className="w-4 h-4" /> {t.inventoryAudit.scanToAudit}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl">
-                <DialogHeader>
-                  <DialogTitle>{t.inventoryAudit.scanToAudit}</DialogTitle>
-                </DialogHeader>
-                <div id="reader-audit" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-primary/20"></div>
-              </DialogContent>
-            </Dialog>
           </div>
         </header>
 
@@ -259,8 +198,7 @@ export default function InventoryAuditPage() {
                             <ClipboardCheck className="w-6 h-6" />
                           </div>
                           <div className="min-w-0">
-                            <h3 className="font-black text-lg tracking-tight truncate max-w-[200px]">{p.name}</h3>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-50">{p.sku}</p>
+                            <h3 className="font-black text-lg tracking-tight truncate max-w-[250px]">{p.name}</h3>
                           </div>
                         </div>
 

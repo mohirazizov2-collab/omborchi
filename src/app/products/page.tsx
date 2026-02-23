@@ -18,7 +18,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, Search, Plus, Filter, MoreHorizontal, Loader2, Trash2, Edit2, LayoutGrid, List } from "lucide-react";
+import { Package, Search, Plus, Filter, Loader2, Trash2, Edit2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -40,7 +40,6 @@ export default function ProductsPage() {
 
   const [formData, setFormData] = useState({
     name: "",
-    sku: "",
     price: "0",
     stock: "0",
     category: "general"
@@ -54,8 +53,7 @@ export default function ProductsPage() {
 
   const filteredProducts = useMemo(() => {
     return products?.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = categoryFilter === "all" || p.categoryId === categoryFilter;
       return matchesSearch && matchesCategory;
     }) || [];
@@ -67,7 +65,7 @@ export default function ProductsPage() {
   }, [products]);
 
   const handleSave = () => {
-    if (!db || !user || !formData.name || !formData.sku) return;
+    if (!db || !user || !formData.name) return;
     
     setIsSaving(true);
     const productId = doc(collection(db, "products")).id;
@@ -76,7 +74,6 @@ export default function ProductsPage() {
     const newProduct = {
       id: productId,
       name: formData.name,
-      sku: formData.sku,
       salePrice: parseFloat(formData.price),
       stock: parseInt(formData.stock),
       categoryId: formData.category,
@@ -90,7 +87,7 @@ export default function ProductsPage() {
     setDoc(productRef, newProduct)
       .then(() => {
         setIsDialogOpen(false);
-        setFormData({ name: "", sku: "", price: "0", stock: "0", category: "general" });
+        setFormData({ name: "", price: "0", stock: "0", category: "general" });
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -137,51 +134,31 @@ export default function ProductsPage() {
                 </DialogHeader>
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Product Name</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Mahsulot nomi</Label>
                     <Input 
                       className="h-12 rounded-2xl bg-white/5 border-white/10 text-white placeholder:text-white/20"
                       value={formData.name} 
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      placeholder="e.g. Industrial Pallet" 
+                      placeholder="Masalan: Stol" 
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">SKU Code</Label>
-                      <Input 
-                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white placeholder:text-white/20"
-                        value={formData.sku} 
-                        onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                        placeholder="SKU-001" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Category</Label>
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Kategoriya</Label>
                       <Select value={formData.category} onValueChange={(val) => setFormData({...formData, category: val})}>
                         <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10">
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder="Tanlang" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-white/10 bg-black text-white">
-                          <SelectItem value="general">General</SelectItem>
-                          <SelectItem value="electronics">Electronics</SelectItem>
-                          <SelectItem value="furniture">Furniture</SelectItem>
-                          <SelectItem value="parts">Spare Parts</SelectItem>
+                          <SelectItem value="general">Umumiy</SelectItem>
+                          <SelectItem value="electronics">Elektronika</SelectItem>
+                          <SelectItem value="furniture">Mebel</SelectItem>
+                          <SelectItem value="parts">Ehtiyot qismlar</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Base Price (so'm)</Label>
-                      <Input 
-                        type="number"
-                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
-                        value={formData.price} 
-                        onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Initial Stock</Label>
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Boshlang'ich zaxira</Label>
                       <Input 
                         type="number"
                         className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
@@ -189,6 +166,15 @@ export default function ProductsPage() {
                         onChange={(e) => setFormData({...formData, stock: e.target.value})}
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Sotuv narxi (so'm)</Label>
+                    <Input 
+                      type="number"
+                      className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
+                      value={formData.price} 
+                      onChange={(e) => setFormData({...formData, price: e.target.value})}
+                    />
                   </div>
                 </div>
                 <DialogFooter className="mt-10 gap-2">
@@ -218,11 +204,11 @@ export default function ProductsPage() {
                 <SelectTrigger className="h-12 w-[160px] rounded-2xl bg-background/50 border-border/40 font-bold uppercase text-[10px] tracking-widest">
                   <div className="flex items-center gap-2">
                     <Filter className="w-3 h-3" />
-                    <SelectValue placeholder="Category" />
+                    <SelectValue placeholder="Kategoriya" />
                   </div>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="all">Barcha kategoriyalar</SelectItem>
                   {categories.map(cat => (
                     <SelectItem key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</SelectItem>
                   ))}
@@ -244,7 +230,6 @@ export default function ProductsPage() {
                   <tr>
                     <th className="px-8 py-6">{t.products.productInfo}</th>
                     <th className="px-6 py-6">{t.products.category}</th>
-                    <th className="px-6 py-6">{t.products.sku}</th>
                     <th className="px-6 py-6">{t.products.stock}</th>
                     <th className="px-6 py-6">{t.products.price}</th>
                     <th className="px-6 py-6">{t.products.status}</th>
@@ -275,10 +260,9 @@ export default function ProductsPage() {
                         </td>
                         <td className="px-6 py-5">
                           <Badge variant="outline" className="rounded-lg font-black text-[9px] uppercase tracking-widest bg-muted/30 border-none px-2 py-0.5 opacity-60">
-                            {p.categoryId || 'General'}
+                            {p.categoryId || 'Umumiy'}
                           </Badge>
                         </td>
-                        <td className="px-6 py-5 font-code text-[11px] font-black text-primary/60">{p.sku}</td>
                         <td className="px-6 py-5 font-black text-sm">{p.stock || 0}</td>
                         <td className="px-6 py-5 font-black text-sm">{p.salePrice.toLocaleString()} so'm</td>
                         <td className="px-6 py-5">
@@ -289,7 +273,7 @@ export default function ProductsPage() {
                               (p.stock || 0) > (p.lowStockThreshold || 10) ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" : "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
                             )}
                           >
-                            {(p.stock || 0) > (p.lowStockThreshold || 10) ? "Available" : "Critical"}
+                            {(p.stock || 0) > (p.lowStockThreshold || 10) ? "Mavjud" : "Kam qolgan"}
                           </Badge>
                         </td>
                         {canEdit && (
@@ -317,10 +301,10 @@ export default function ProductsPage() {
                   </AnimatePresence>
                   {filteredProducts.length === 0 && (
                     <tr>
-                      <td colSpan={canEdit ? 7 : 6} className="px-6 py-32 text-center">
+                      <td colSpan={canEdit ? 6 : 5} className="px-6 py-32 text-center">
                         <div className="flex flex-col items-center justify-center opacity-10">
                           <Package className="w-16 h-16 mb-4" />
-                          <p className="text-[12px] font-black uppercase tracking-[0.4em]">No products match filter</p>
+                          <p className="text-[12px] font-black uppercase tracking-[0.4em]">Mahsulotlar topilmadi</p>
                         </div>
                       </td>
                     </tr>

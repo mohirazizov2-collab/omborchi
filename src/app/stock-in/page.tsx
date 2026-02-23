@@ -17,7 +17,7 @@ import {
 import { Plus, Trash2, FileText, Loader2, ScanLine, Search, PackageSearch, ArrowRight, AlertCircle, ShoppingCart } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
-import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, getDoc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -90,7 +90,7 @@ export default function StockInPage() {
 
       scanner.render(
         (decodedText) => {
-          const product = products?.find(p => p.sku === decodedText || p.id === decodedText);
+          const product = products?.find(p => p.id === decodedText);
           if (product) {
             const existingItem = items.find(i => i.productId === product.id);
             if (existingItem) {
@@ -211,19 +211,6 @@ export default function StockInPage() {
                 <PackageSearch className="w-4 h-4 mr-2" /> Katalog
               </Button>
             </Link>
-            <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 rounded-2xl h-12 px-6 bg-primary text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 premium-button">
-                  <ScanLine className="w-4 h-4" /> {t.stockIn.scanBarcode}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md rounded-[2.5rem] bg-card/90 backdrop-blur-3xl border-white/10 shadow-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-black tracking-tight">{t.stockIn.scanBarcode}</DialogTitle>
-                </DialogHeader>
-                <div id="reader-in-page" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-primary/20 bg-background/50 aspect-square"></div>
-              </DialogContent>
-            </Dialog>
           </div>
         </header>
 
@@ -318,7 +305,7 @@ export default function StockInPage() {
                                <div className="relative">
                                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                   <Input 
-                                    placeholder="Nomi yoki SKU bo'yicha qidiruv..." 
+                                    placeholder="Nomi bo'yicha qidiruv..." 
                                     className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none focus:ring-primary/30"
                                     value={item.searchQuery}
                                     onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
@@ -328,14 +315,10 @@ export default function StockInPage() {
                             </div>
                             <div className="space-y-1">
                               {products?.filter(p => 
-                                p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) || 
-                                p.sku.toLowerCase().includes(item.searchQuery.toLowerCase())
+                                p.name.toLowerCase().includes(item.searchQuery.toLowerCase())
                               ).map((p) => (
                                 <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer hover:bg-primary/5">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="font-bold text-sm">{p.name}</span>
-                                    <span className="text-[10px] opacity-50 uppercase tracking-widest font-black text-primary">{p.sku}</span>
-                                  </div>
+                                  <span className="font-bold text-sm">{p.name}</span>
                                 </SelectItem>
                               ))}
                               {(!products || products.length === 0) && (

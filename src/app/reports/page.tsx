@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -21,15 +22,6 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-
-// Recharts components are only needed on the client
-const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
-const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
-const Line = dynamic(() => import("recharts").then(m => m.Line), { ssr: false });
-const XAxis = dynamic(() => import("recharts").then(m => m.XAxis), { ssr: false });
-const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import("recharts").then(m => m.CartesianGrid), { ssr: false });
-const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
 
 export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
@@ -144,12 +136,11 @@ export default function ReportsPage() {
     const XLSXLib = await import("xlsx");
     const worksheet = XLSXLib.utils.json_to_sheet(products.map(p => ({
       "Nomi": p.name,
-      "SKU": p.sku,
-      "Kategoriya": p.categoryId || "General",
+      "Kategoriya": p.categoryId || "Umumiy",
       "Zaxira": p.stock || 0,
       "Narx (so'm)": p.salePrice || 0,
       "Jami Qiymat": (p.stock || 0) * (p.salePrice || 0),
-      "Holat": (p.stock || 0) > (p.lowStockThreshold || 10) ? "Active" : "Low Stock"
+      "Holat": (p.stock || 0) > (p.lowStockThreshold || 10) ? "Mavjud" : "Kam qolgan"
     })));
     const workbook = XLSXLib.utils.book_new();
     XLSXLib.utils.book_append_sheet(workbook, worksheet, "Zaxira");
@@ -166,17 +157,8 @@ export default function ReportsPage() {
     
     const doc = new jsPDFLib();
     
-    // Logo Drawing
     doc.setFillColor(59, 130, 246);
     doc.roundedRect(95, 15, 20, 20, 4, 4, 'F');
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.8);
-    doc.line(100, 25, 105, 20); 
-    doc.line(105, 20, 110, 25);
-    doc.line(101, 25, 109, 25);
-    doc.line(102, 25, 102, 30);
-    doc.line(108, 25, 108, 30);
-
     doc.setFontSize(22);
     doc.setTextColor(40);
     doc.text("ombor.uz", 105, 45, { align: "center" });

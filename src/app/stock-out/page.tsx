@@ -7,22 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog";
-import { Trash2, Plus, Truck, User, Loader2, ArrowRight, ScanLine, Search, PackageSearch, AlertCircle, Package } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Trash2, Plus, Truck, User, Loader2, ArrowRight, Search, PackageSearch, AlertCircle, Package } from "lucide-react";
+import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, getDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
-import { Html5QrcodeScanner } from "html5-qrcode";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -38,8 +30,6 @@ export default function StockOutPage() {
   const [orderNumber, setOrderNumber] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   const productsQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -68,48 +58,6 @@ export default function StockOutPage() {
   const updateItem = (id: string, field: string, value: any) => {
     setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
-
-  useEffect(() => {
-    if (isScannerOpen) {
-      const scanner = new Html5QrcodeScanner(
-        "reader-out-page",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      );
-      scannerRef.current = scanner;
-
-      scanner.render(
-        (decodedText) => {
-          const product = products?.find(p => p.sku === decodedText || p.id === decodedText);
-          if (product) {
-            const existingItem = items.find(i => i.productId === product.id);
-            if (existingItem) {
-              updateItem(existingItem.id, "quantity", (existingItem.quantity || 0) + 1);
-            } else {
-              const lastItem = items[items.length - 1];
-              if (!lastItem.productId) {
-                updateItem(lastItem.id, "productId", product.id);
-              } else {
-                setItems(prev => [...prev, { id: generateId(), productId: product.id, quantity: 1, searchQuery: "" }]);
-              }
-            }
-            toast({ title: "Mahsulot topildi", description: `${product.name} ro'yxatga qo'shildi.` });
-            scanner.clear();
-            setIsScannerOpen(false);
-          } else {
-            toast({ variant: "destructive", title: "Xatolik", description: "Mahsulot topilmadi: " + decodedText });
-          }
-        },
-        () => {}
-      );
-    }
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(e => console.error("Scanner clear error", e));
-      }
-    };
-  }, [isScannerOpen, products, items]);
 
   const handleDispatch = async () => {
     if (!orderNumber || !warehouseId || !recipient) {
@@ -195,19 +143,6 @@ export default function StockOutPage() {
                 <PackageSearch className="w-4 h-4 mr-2" /> Katalog
               </Button>
             </Link>
-            <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 rounded-2xl h-12 px-6 bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-rose-600/20 premium-button">
-                  <ScanLine className="w-4 h-4" /> {t.stockOut.scanBarcode}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md rounded-[2.5rem] bg-card/90 backdrop-blur-3xl border-white/10 shadow-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-black tracking-tight">{t.stockOut.scanBarcode}</DialogTitle>
-                </DialogHeader>
-                <div id="reader-out-page" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-rose-500/20 bg-background/50 aspect-square"></div>
-              </DialogContent>
-            </Dialog>
           </div>
         </header>
 
@@ -302,7 +237,7 @@ export default function StockOutPage() {
                                <div className="relative">
                                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                   <Input 
-                                    placeholder="Nomi yoki SKU bo'yicha qidiruv..." 
+                                    placeholder="Nomi bo'yicha qidiruv..." 
                                     className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none focus:ring-rose-500/30"
                                     value={item.searchQuery}
                                     onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
@@ -312,13 +247,12 @@ export default function StockOutPage() {
                             </div>
                             <div className="space-y-1">
                               {products?.filter(p => 
-                                p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) || 
-                                p.sku.toLowerCase().includes(item.searchQuery.toLowerCase())
+                                p.name.toLowerCase().includes(item.searchQuery.toLowerCase())
                               ).map((p) => (
                                 <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer hover:bg-rose-500/5">
                                   <div className="flex flex-col gap-0.5">
                                     <span className="font-bold text-sm">{p.name}</span>
-                                    <span className="text-[10px] opacity-50 uppercase tracking-widest font-black text-rose-600">{p.sku} ({p.stock || 0} ta mavjud)</span>
+                                    <span className="text-[10px] opacity-50 uppercase tracking-widest font-black text-rose-600">({p.stock || 0} ta mavjud)</span>
                                   </div>
                                 </SelectItem>
                               ))}

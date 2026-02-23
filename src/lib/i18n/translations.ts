@@ -105,12 +105,11 @@ export const translations = {
     },
     products: {
       title: "Mahsulotlar katalogi",
-      description: "Inventar buyumlari, SKU va zaxira darajalarini boshqaring.",
+      description: "Inventar buyumlari va zaxira darajalarini boshqaring.",
       addNew: "Yangi mahsulot",
-      search: "Nomi, SKU yoki kategoriya bo'yicha qidirish...",
+      search: "Nomi yoki kategoriya bo'yicha qidirish...",
       productInfo: "Mahsulot ma'lumoti",
       category: "Kategoriya",
-      sku: "SKU",
       stock: "Zaxira",
       price: "Narx (so'm)",
       status: "Holat",
@@ -128,7 +127,7 @@ export const translations = {
       productItems: "Mahsulotlar ro'yxati",
       process: "Kirimni yakunlash",
       saveDraft: "Qoralama sifatida saqlash",
-      scanBarcode: "Shtrix-kodni skanerlash"
+      scanBarcode: "Skanerlash"
     },
     stockOut: {
       title: "Tovarlar Chiqimi (Goods Issue)",
@@ -140,7 +139,7 @@ export const translations = {
       recipient: "Mijoz / Qabul qiluvchi",
       dispatch: "Chiqimni jo'natish",
       pickingList: "Terish varaqasini chop etish",
-      scanBarcode: "Shtrix-kodni skanerlash"
+      scanBarcode: "Skanerlash"
     },
     transfers: {
       title: "Omborlararo Transferlar",
@@ -322,12 +321,11 @@ export const translations = {
     },
     products: {
       title: 'Каталог товаров',
-      description: 'Управляйте товарами, SKU и уровнями запасов.',
+      description: 'Управляйте товарами и уровнями запасов.',
       addNew: 'Новый товар',
-      search: 'Поиск по названию, SKU или категории...',
+      search: 'Поиск по названию или категории...',
       productInfo: 'Инфо о продукте',
       category: 'Категория',
-      sku: 'SKU',
       stock: 'Запас',
       price: 'Цена (сум)',
       status: 'Статус',
@@ -345,7 +343,7 @@ export const translations = {
       productItems: 'Список товаров',
       process: 'Завершить приход',
       saveDraft: 'Сохранить черновик',
-      scanBarcode: 'Сканировать штрих-код'
+      scanBarcode: 'Сканировать'
     },
     stockOut: {
       title: 'Расход товара (Stock Out)',
@@ -357,7 +355,7 @@ export const translations = {
       recipient: 'Клиент / Получатель',
       dispatch: 'Отправить товар',
       pickingList: 'Печать листа сборки',
-      scanBarcode: 'Сканировать штрих-код'
+      scanBarcode: 'Сканировать'
     },
     transfers: {
       title: 'Складские Переводы',
@@ -463,7 +461,7 @@ export const translations = {
       discrepancy: 'Discrepancy',
       reconcile: 'Reconcile Inventory',
       success: 'Stock reconciled successfully',
-      scanToAudit: 'Scan Barcode to Audit',
+      scanToAudit: 'Scan to Audit',
       confirmAudit: 'Confirm Audit',
       auditSummary: 'Audit Summary'
     },
@@ -539,12 +537,11 @@ export const translations = {
     },
     products: {
       title: 'Products Catalog',
-      description: 'Manage your inventory items, SKUs, and stock levels.',
+      description: 'Manage your inventory items and stock levels.',
       addNew: 'Add New Product',
-      search: 'Search by name, SKU or category...',
+      search: 'Search by name or category...',
       productInfo: 'Product info',
       category: 'Category',
-      sku: 'SKU',
       stock: 'Stock',
       price: 'Price (UZS)',
       status: 'Status',
@@ -562,7 +559,7 @@ export const translations = {
       productItems: 'Product Items',
       process: 'Process Receipt',
       saveDraft: 'Save Draft',
-      scanBarcode: 'Scan Barcode'
+      scanBarcode: 'Scan'
     },
     stockOut: {
       title: 'Stock Out (Goods Issue)',
@@ -574,7 +571,7 @@ export const translations = {
       recipient: 'Client / Recipient',
       dispatch: 'Dispatch Order',
       pickingList: 'Print Picking List',
-      scanBarcode: 'Scan Barcode'
+      scanBarcode: 'Scan'
     },
     transfers: {
       title: 'Stock Transfers',
