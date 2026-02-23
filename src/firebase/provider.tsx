@@ -3,7 +3,7 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc } from 'firebase/firestore';
+import { Firestore, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
@@ -76,7 +76,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       auth,
       (firebaseUser) => {
         if (firebaseUser) {
-          // Birinchi navbatda foydalanuvchini o'rnatamiz (Non-blocking)
           const isPermanentAdmin = firebaseUser.email === PERMANENT_SUPER_ADMIN;
           
           setUserAuthState({ 
@@ -86,23 +85,27 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             userError: null 
           });
 
-          // Rolni orqa fonda (background) tekshiramiz
-          if (!isPermanentAdmin) {
-            Promise.all([
-              getDoc(doc(firestore, "users", firebaseUser.uid)),
-              getDoc(doc(firestore, "rolesAdmin", firebaseUser.uid))
-            ]).then(([userDoc, adminDoc]) => {
-              let finalRole = "Omborchi";
-              if (adminDoc.exists()) {
-                finalRole = "Super Admin";
-              } else if (userDoc.exists()) {
-                finalRole = userDoc.data().role;
-              }
-              setUserAuthState(prev => ({ ...prev, role: finalRole }));
-            }).catch(err => {
-              console.error("Role fetching background error", err);
-            });
-          }
+          // Real-time role syncing
+          const userRef = doc(firestore, "users", firebaseUser.uid);
+          const adminRef = doc(firestore, "rolesAdmin", firebaseUser.uid);
+
+          const unsubUser = onSnapshot(userRef, (uDoc) => {
+            if (uDoc.exists()) {
+              const uData = uDoc.data();
+              setUserAuthState(prev => ({ ...prev, role: isPermanentAdmin ? "Super Admin" : (uData.role || "Omborchi") }));
+            }
+          });
+
+          const unsubAdmin = onSnapshot(adminRef, (aDoc) => {
+            if (aDoc.exists()) {
+              setUserAuthState(prev => ({ ...prev, role: "Super Admin" }));
+            }
+          });
+
+          return () => {
+            unsubUser();
+            unsubAdmin();
+          };
         } else {
           setUserAuthState({ user: null, role: null, isUserLoading: false, userError: null });
         }

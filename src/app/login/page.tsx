@@ -9,11 +9,13 @@ import { useLanguage } from "@/lib/i18n/context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Mail, Globe, AlertCircle, Warehouse, ArrowRight, Box, Package, Truck, Layers } from "lucide-react";
+import { Loader2, Lock, Mail, Globe, AlertCircle, Warehouse, ArrowRight, Box, Package, Truck, Layers, ShieldCheck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "@/components/theme-toggle";
+
+const SUPER_ADMIN_EMAIL = "f2472839@gmail.com";
 
 export default function LoginPage() {
   const { t, language, setLanguage } = useLanguage();
@@ -54,10 +56,19 @@ export default function LoginPage() {
         description: "Dashboardga yo'naltirilmoqdasiz...",
       });
     } catch (err: any) {
+      console.error(err);
       setError("Email yoki parol noto'g'ri. Iltimos, qaytadan urinib ko'ring.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQuickAdmin = () => {
+    setEmail(SUPER_ADMIN_EMAIL);
+    toast({
+      title: "Super Admin tanlandi",
+      description: "Endi parolingizni kiriting.",
+    });
   };
 
   return (
@@ -189,6 +200,17 @@ export default function LoginPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="pt-2">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    className="w-full h-12 rounded-2xl bg-primary/5 hover:bg-primary/10 text-primary border border-primary/10 font-bold text-[10px] uppercase tracking-widest gap-2"
+                    onClick={handleQuickAdmin}
+                  >
+                    <ShieldCheck className="w-4 h-4" /> Super Admin sifatida kirish
+                  </Button>
                 </div>
               </CardContent>
               <CardFooter className="pt-6 pb-12 px-10">
