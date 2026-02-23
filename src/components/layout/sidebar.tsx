@@ -8,20 +8,18 @@ import {
   LayoutDashboard,
   Warehouse,
   Package,
-  ArrowRightLeft,
   Users,
   Settings,
   Database,
   BarChart3,
-  Archive,
-  Globe,
   ChevronRight,
   UserRound,
   History,
   ClipboardCheck,
   FileInput,
   FileOutput,
-  FileText
+  FileText,
+  Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -59,7 +57,6 @@ export function OmniSidebar() {
     { name: t.nav.history, href: "/history", icon: History },
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
-    { name: t.nav.systemGen, href: "/system-gen", icon: Database, hide: !isSuperAdmin },
   ], [t, isAdmin, isSuperAdmin, isOmborchi]);
 
   const invoiceNavigation = useMemo(() => [
