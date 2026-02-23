@@ -5,12 +5,12 @@ Loyihani internetga (Netlify) chiqarish va undan samarali foydalanish bo'yicha t
 
 ---
 
-## 🛠️ Texnologiyalar
-*   **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS
-*   **UI Komponentlar**: ShadCN UI, Framer Motion (Animatsiyalar)
-*   **Backend & DB**: Firebase Auth, Firestore
-*   **AI (Sun'iy Intellekt)**: Google Gemini 1.5 Flash (Genkit orqali)
-*   **Hisobotlar**: jsPDF, XLSX, Recharts
+## 🛠️ Texnologiyalar va Chidamlilik
+Ushbu tizim eng zamonaviy **Serverless** arxitektura asosida qurilgan:
+*   **Frontend**: Next.js 15 (App Router) - Maksimal tezlik.
+*   **Backend**: Firebase Auth & Firestore - Millionlab foydalanuvchi va ma'lumotlarni ko'tara oladi.
+*   **AI**: Google Gemini 1.5 Flash - Sekundiga bir necha tahlillarni bajarish quvvatiga ega.
+*   **Hosting**: Netlify - Global barqarorlik va yuqori trafikni (High Traffic) boshqarish.
 
 ---
 
