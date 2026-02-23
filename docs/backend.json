@@ -24,10 +24,11 @@
         "name": { "type": "string" },
         "salePrice": { "type": "number" },
         "stock": { "type": "number" },
+        "unit": { "type": "string", "enum": ["pcs", "kg", "m", "l", "m2", "m3", "set", "bag", "box"] },
         "lowStockThreshold": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "salePrice"]
+      "required": ["id", "name", "salePrice", "unit"]
     },
     "WarehouseInventory": {
       "title": "WarehouseInventory",

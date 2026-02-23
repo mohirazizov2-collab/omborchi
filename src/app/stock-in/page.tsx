@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog";
 import { Plus, Trash2, FileText, Loader2, ScanLine, Search, PackageSearch, ArrowRight, AlertCircle, ShoppingCart } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
@@ -272,96 +265,101 @@ export default function StockInPage() {
               </CardHeader>
               <CardContent className="p-8 pt-0 space-y-4">
                 <AnimatePresence mode="popLayout">
-                  {items.map((item) => (
-                    <motion.div 
-                      key={item.id} 
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className={cn(
-                        "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border transition-all relative group",
-                        !item.productId ? "border-rose-500/20 bg-rose-500/[0.02]" : "border-border/10"
-                      )}
-                    >
-                      <div className="flex-1 space-y-3">
-                        <Label className={cn(
-                          "text-[10px] font-black uppercase tracking-widest pl-2",
-                          !item.productId ? "text-rose-500 opacity-100 animate-pulse" : "opacity-40"
-                        )}>
-                          {t.common.product} {!item.productId && " (Tanlang)"}
-                        </Label>
-                        <Select 
-                          onValueChange={(val) => updateItem(item.id, "productId", val)}
-                          value={item.productId}
-                        >
-                          <SelectTrigger className={cn(
-                            "h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm transition-all",
-                            !item.productId && "ring-2 ring-rose-500/20"
-                          )}>
-                            <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Mahsulotni qidiring..."} />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl max-h-[400px] border-border/40 shadow-2xl p-2">
-                            <div className="p-2 border-b border-border/10 sticky top-0 bg-popover z-10 mb-2">
-                               <div className="relative">
-                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                  <Input 
-                                    placeholder="Nomi bo'yicha qidiruv..." 
-                                    className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none focus:ring-primary/30"
-                                    value={item.searchQuery}
-                                    onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                               </div>
-                            </div>
-                            <div className="space-y-1">
-                              {products?.filter(p => 
-                                p.name.toLowerCase().includes(item.searchQuery.toLowerCase())
-                              ).map((p) => (
-                                <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer hover:bg-primary/5">
-                                  <span className="font-bold text-sm">{p.name}</span>
-                                </SelectItem>
-                              ))}
-                              {(!products || products.length === 0) && (
-                                <div className="p-10 text-center flex flex-col items-center gap-3">
-                                  <AlertCircle className="w-8 h-8 text-muted-foreground opacity-20" />
-                                  <p className="text-xs opacity-50 italic">Mahsulotlar topilmadi. Avval katalogga qo'shing.</p>
-                                  <Link href="/products">
-                                    <Button variant="link" className="text-primary font-black text-[10px] uppercase tracking-widest">Katalogga o'tish</Button>
-                                  </Link>
-                                </div>
-                              )}
-                            </div>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-full md:w-32 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.quantity}</Label>
-                        <Input 
-                          type="number" 
-                          className="h-14 rounded-2xl bg-background/50 border-none font-black text-center text-lg"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div className="w-full md:w-40 space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.price} (so'm)</Label>
-                        <Input 
-                          type="number" 
-                          className="h-14 rounded-2xl bg-background/50 border-none font-black text-lg"
-                          value={item.price}
-                          onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-14 w-14 rounded-2xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors shrink-0"
-                        onClick={() => removeItem(item.id)}
+                  {items.map((item) => {
+                    const selectedProduct = products?.find(p => p.id === item.productId);
+                    return (
+                      <motion.div 
+                        key={item.id} 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className={cn(
+                          "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border transition-all relative group",
+                          !item.productId ? "border-rose-500/20 bg-rose-500/[0.02]" : "border-border/10"
+                        )}
                       >
-                        <Trash2 className="w-6 h-6" />
-                      </Button>
-                    </motion.div>
-                  ))}
+                        <div className="flex-1 space-y-3">
+                          <Label className={cn(
+                            "text-[10px] font-black uppercase tracking-widest pl-2",
+                            !item.productId ? "text-rose-500 opacity-100 animate-pulse" : "opacity-40"
+                          )}>
+                            {t.common.product} {!item.productId && " (Tanlang)"}
+                          </Label>
+                          <Select 
+                            onValueChange={(val) => updateItem(item.id, "productId", val)}
+                            value={item.productId}
+                          >
+                            <SelectTrigger className={cn(
+                              "h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm transition-all",
+                              !item.productId && "ring-2 ring-rose-500/20"
+                            )}>
+                              <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Mahsulotni qidiring..."} />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl max-h-[400px] border-border/40 shadow-2xl p-2">
+                              <div className="p-2 border-b border-border/10 sticky top-0 bg-popover z-10 mb-2">
+                                 <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                    <Input 
+                                      placeholder="Nomi bo'yicha qidiruv..." 
+                                      className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none focus:ring-primary/30"
+                                      value={item.searchQuery}
+                                      onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                 </div>
+                              </div>
+                              <div className="space-y-1">
+                                {products?.filter(p => 
+                                  p.name.toLowerCase().includes(item.searchQuery.toLowerCase())
+                                ).map((p) => (
+                                  <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer hover:bg-primary/5">
+                                    <span className="font-bold text-sm">{p.name}</span>
+                                  </SelectItem>
+                                ))}
+                                {(!products || products.length === 0) && (
+                                  <div className="p-10 text-center flex flex-col items-center gap-3">
+                                    <AlertCircle className="w-8 h-8 text-muted-foreground opacity-20" />
+                                    <p className="text-xs opacity-50 italic">Mahsulotlar topilmadi. Avval katalogga qo'shing.</p>
+                                    <Link href="/products">
+                                      <Button variant="link" className="text-primary font-black text-[10px] uppercase tracking-widest">Katalogga o'tish</Button>
+                                    </Link>
+                                  </div>
+                                )}
+                              </div>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-full md:w-32 space-y-3">
+                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
+                            {t.common.quantity} {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}
+                          </Label>
+                          <Input 
+                            type="number" 
+                            className="h-14 rounded-2xl bg-background/50 border-none font-black text-center text-lg"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="w-full md:w-40 space-y-3">
+                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.price} (so'm)</Label>
+                          <Input 
+                            type="number" 
+                            className="h-14 rounded-2xl bg-background/50 border-none font-black text-lg"
+                            value={item.price}
+                            onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-14 w-14 rounded-2xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors shrink-0"
+                          onClick={() => removeItem(item.id)}
+                        >
+                          <Trash2 className="w-6 h-6" />
+                        </Button>
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
               </CardContent>
             </Card>
@@ -373,7 +371,7 @@ export default function StockInPage() {
                 <ShoppingCart className="w-32 h-32" />
               </div>
               <CardHeader className="p-8 pb-4 relative z-10">
-                <CardTitle className="font-headline font-black text-2xl tracking-tight">{t.common.summary}</CardTitle>
+                <CardTitle className="font-headline font-black text-xl tracking-tight">{t.common.summary}</CardTitle>
               </CardHeader>
               <CardContent className="p-8 pt-4 space-y-8 relative z-10">
                 <div className="flex justify-between items-center pb-6 border-b border-white/10">

@@ -42,7 +42,8 @@ export default function ProductsPage() {
     name: "",
     price: "0",
     stock: "0",
-    category: "general"
+    category: "general",
+    unit: "pcs"
   });
 
   const productsQuery = useMemoFirebase(() => {
@@ -77,7 +78,7 @@ export default function ProductsPage() {
       salePrice: parseFloat(formData.price),
       stock: parseInt(formData.stock),
       categoryId: formData.category,
-      unitOfMeasure: "pcs",
+      unit: formData.unit,
       lowStockThreshold: 10,
       isDeleted: false,
       createdAt: new Date().toISOString(),
@@ -87,7 +88,7 @@ export default function ProductsPage() {
     setDoc(productRef, newProduct)
       .then(() => {
         setIsDialogOpen(false);
-        setFormData({ name: "", price: "0", stock: "0", category: "general" });
+        setFormData({ name: "", price: "0", stock: "0", category: "general", unit: "pcs" });
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -158,6 +159,27 @@ export default function ProductsPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">{t.units.label}</Label>
+                      <Select value={formData.unit} onValueChange={(val) => setFormData({...formData, unit: val})}>
+                        <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10">
+                          <SelectValue placeholder="Tanlang" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-white/10 bg-black text-white">
+                          <SelectItem value="pcs">{t.units.pcs}</SelectItem>
+                          <SelectItem value="kg">{t.units.kg}</SelectItem>
+                          <SelectItem value="m">{t.units.m}</SelectItem>
+                          <SelectItem value="l">{t.units.l}</SelectItem>
+                          <SelectItem value="m2">{t.units.m2}</SelectItem>
+                          <SelectItem value="m3">{t.units.m3}</SelectItem>
+                          <SelectItem value="set">{t.units.set}</SelectItem>
+                          <SelectItem value="bag">{t.units.bag}</SelectItem>
+                          <SelectItem value="box">{t.units.box}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Boshlang'ich zaxira</Label>
                       <Input 
                         type="number"
@@ -166,15 +188,15 @@ export default function ProductsPage() {
                         onChange={(e) => setFormData({...formData, stock: e.target.value})}
                       />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Sotuv narxi (so'm)</Label>
-                    <Input 
-                      type="number"
-                      className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
-                      value={formData.price} 
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
-                    />
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Sotuv narxi (so'm)</Label>
+                      <Input 
+                        type="number"
+                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
+                        value={formData.price} 
+                        onChange={(e) => setFormData({...formData, price: e.target.value})}
+                      />
+                    </div>
                   </div>
                 </div>
                 <DialogFooter className="mt-10 gap-2">
@@ -231,6 +253,7 @@ export default function ProductsPage() {
                     <th className="px-8 py-6">{t.products.productInfo}</th>
                     <th className="px-6 py-6">{t.products.category}</th>
                     <th className="px-6 py-6">{t.products.stock}</th>
+                    <th className="px-6 py-6">{t.units.label}</th>
                     <th className="px-6 py-6">{t.products.price}</th>
                     <th className="px-6 py-6">{t.products.status}</th>
                     {canEdit && <th className="px-6 py-6"></th>}
@@ -264,6 +287,11 @@ export default function ProductsPage() {
                           </Badge>
                         </td>
                         <td className="px-6 py-5 font-black text-sm">{p.stock || 0}</td>
+                        <td className="px-6 py-5">
+                          <span className="text-xs font-bold text-muted-foreground">
+                            {t.units[p.unit as keyof typeof t.units] || p.unit || '---'}
+                          </span>
+                        </td>
                         <td className="px-6 py-5 font-black text-sm">{p.salePrice.toLocaleString()} so'm</td>
                         <td className="px-6 py-5">
                           <Badge 
@@ -301,7 +329,7 @@ export default function ProductsPage() {
                   </AnimatePresence>
                   {filteredProducts.length === 0 && (
                     <tr>
-                      <td colSpan={canEdit ? 6 : 5} className="px-6 py-32 text-center">
+                      <td colSpan={canEdit ? 7 : 6} className="px-6 py-32 text-center">
                         <div className="flex flex-col items-center justify-center opacity-10">
                           <Package className="w-16 h-16 mb-4" />
                           <p className="text-[12px] font-black uppercase tracking-[0.4em]">Mahsulotlar topilmadi</p>

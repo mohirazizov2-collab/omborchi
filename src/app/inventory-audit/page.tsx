@@ -107,7 +107,7 @@ export default function InventoryAuditPage() {
 
       toast({
         title: t.inventoryAudit.success,
-        description: `${product.name} zaxirasi ${physicalCount} ga o'zgartirildi.`,
+        description: `${product.name} zaxirasi ${physicalCount} ${t.units[product.unit as keyof typeof t.units] || product.unit} ga o'zgartirildi.`,
       });
 
       const newAuditData = { ...auditData };
@@ -183,6 +183,7 @@ export default function InventoryAuditPage() {
               {filteredProducts.map((p: any, idx) => {
                 const physical = auditData[p.id] ?? p.warehouseStock;
                 const discrepancy = physical - (p.warehouseStock || 0);
+                const unitLabel = t.units[p.unit as keyof typeof t.units] || p.unit || '';
                 
                 return (
                   <motion.div
@@ -199,13 +200,14 @@ export default function InventoryAuditPage() {
                           </div>
                           <div className="min-w-0">
                             <h3 className="font-black text-lg tracking-tight truncate max-w-[250px]">{p.name}</h3>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground opacity-50">{unitLabel}</p>
                           </div>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-8 w-full md:w-auto justify-between md:justify-end">
                           <div className="text-center md:text-right">
                             <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">{t.inventoryAudit.systemStock}</p>
-                            <p className="text-xl font-black font-headline">{p.warehouseStock || 0}</p>
+                            <p className="text-xl font-black font-headline">{p.warehouseStock || 0} <span className="text-[10px] opacity-40 uppercase">{unitLabel}</span></p>
                           </div>
 
                           <div className="w-32">

@@ -21,6 +21,18 @@ export const translations = {
       profile: "Profil",
       inventoryAudit: "Inventarizatsiya"
     },
+    units: {
+      label: "O'lcham birligi",
+      pcs: "Dona",
+      kg: "Kilogramm (kg)",
+      m: "Metr (m)",
+      l: "Litr (l)",
+      m2: "Kvadrat metr (m²)",
+      m3: "Kub metr (m³)",
+      set: "Komplekt",
+      bag: "Qop",
+      box: "Karobka"
+    },
     inventoryAudit: {
       title: "Inventarizatsiya",
       description: "Tizimdagi zaxiralarni amaldagi qoldiq bilan solishtirish va to'g'rilash.",
@@ -237,6 +249,18 @@ export const translations = {
       profile: 'Профиль',
       inventoryAudit: 'Инвентаризация'
     },
+    units: {
+      label: "Ед. измерения",
+      pcs: "Штук",
+      kg: "Килограмм (кг)",
+      m: "Метр (м)",
+      l: "Литр (л)",
+      m2: "Кв. метр (м²)",
+      m3: "Куб. метр (м³)",
+      set: "Комплект",
+      bag: "Мешок",
+      box: "Коробка"
+    },
     inventoryAudit: {
       title: 'Инвентаризация',
       description: 'Сравнение системных запасов с фактическими остатками и корректировка.',
@@ -452,6 +476,18 @@ export const translations = {
       administration: 'Administration',
       profile: 'Profile',
       inventoryAudit: 'Stock Audit'
+    },
+    units: {
+      label: "Unit",
+      pcs: "Pieces",
+      kg: "Kilogram (kg)",
+      m: "Meter (m)",
+      l: "Liter (l)",
+      m2: "Square Meter (m²)",
+      m3: "Cubic Meter (m³)",
+      set: "Set",
+      bag: "Bag",
+      box: "Box"
     },
     inventoryAudit: {
       title: 'Inventory Audit',
