@@ -39,7 +39,7 @@ export default function StockOutPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1, searchQuery: "" }]);
+  const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
   const [orderNumber, setOrderNumber] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [recipient, setRecipient] = useState("");
@@ -60,7 +60,7 @@ export default function StockOutPage() {
   const { data: warehouses } = useCollection(warehousesQuery);
 
   const addItem = () => {
-    setItems([...items, { id: generateId(), productId: "", quantity: 1, searchQuery: "" }]);
+    setItems([...items, { id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
   };
 
   const removeItem = (id: string) => {
@@ -70,7 +70,18 @@ export default function StockOutPage() {
   };
 
   const updateItem = (id: string, field: string, value: any) => {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+    setItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const updated = { ...item, [field]: value };
+        // Mahsulot o'zgarganda katalogdagi narxni avtomatik to'ldirish
+        if (field === "productId" && value) {
+          const p = products?.find(prod => prod.id === value);
+          if (p) updated.price = p.salePrice || 0;
+        }
+        return updated;
+      }
+      return item;
+    }));
   };
 
   const handleDispatch = async () => {
@@ -88,6 +99,7 @@ export default function StockOutPage() {
 
     try {
       const invoiceItems = [];
+      // Avval zaxira yetarli ekanligini tekshiramiz
       for (const item of items) {
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
@@ -106,6 +118,7 @@ export default function StockOutPage() {
         }
       }
 
+      // Hammasi joyida bo'lsa, operatsiyani bajaramiz
       for (const item of items) {
         const product = products?.find(p => p.id === item.productId);
         const invId = `${warehouseId}_${item.productId}`;
@@ -116,7 +129,7 @@ export default function StockOutPage() {
         invoiceItems.push({
           name: product?.name || "Noma'lum",
           quantity: item.quantity,
-          price: product?.salePrice || 0,
+          price: item.price, // Foydalanuvchi kiritgan narx
           unit: product?.unit || "pcs"
         });
 
@@ -133,7 +146,9 @@ export default function StockOutPage() {
           orderNumber: orderNumber || saleId,
           recipient: recipient,
           clientType: clientType,
-          saleId: saleId
+          saleId: saleId,
+          unitPrice: item.price,
+          totalPrice: (item.quantity || 0) * (item.price || 0)
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
@@ -162,7 +177,7 @@ export default function StockOutPage() {
 
       toast({ title: "Muvaffaqiyatli", description: "Chiqim nakladnoyi saqlandi." });
       setIsSuccessOpen(true);
-      setItems([{ id: generateId(), productId: "", quantity: 1, searchQuery: "" }]);
+      setItems([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
       setOrderNumber("");
       setRecipient("");
       setWarehouseId("");
@@ -224,11 +239,8 @@ export default function StockOutPage() {
   };
 
   const totalValue = useMemo(() => {
-    return items.reduce((acc, item) => {
-      const p = products?.find(prod => prod.id === item.productId);
-      return acc + ((item.quantity || 0) * (p?.salePrice || 0));
-    }, 0);
-  }, [items, products]);
+    return items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0);
+  }, [items]);
 
   return (
     <div className="flex min-h-screen bg-background font-body">
@@ -265,7 +277,7 @@ export default function StockOutPage() {
                         <Label htmlFor="internal" className="cursor-pointer font-bold text-xs uppercase">Ichki</Label>
                       </div>
                     </RadioGroup>
-                    <div className="flex-1-relative">
+                    <div className="relative flex-1">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-600/40" />
                       <Input 
                         placeholder="Mijoz / Qabul qiluvchi nomi" 
@@ -327,7 +339,7 @@ export default function StockOutPage() {
                       <th className="px-4 py-4 w-24">Birlik</th>
                       <th className="px-4 py-4 w-32 text-center">Ombordagi qoldiq</th>
                       <th className="px-4 py-4 w-32">Chiqim miqdori</th>
-                      <th className="px-4 py-4 w-40">Sotuv narxi</th>
+                      <th className="px-4 py-4 w-40">Sotuv narxi (so'm)</th>
                       <th className="px-4 py-4 w-40">Jami summasi</th>
                       <th className="px-6 py-4 w-12"></th>
                     </tr>
@@ -336,7 +348,7 @@ export default function StockOutPage() {
                     <AnimatePresence mode="popLayout">
                       {items.map((item, index) => {
                         const p = products?.find(prod => prod.id === item.productId);
-                        const rowTotal = (item.quantity || 0) * (p?.salePrice || 0);
+                        const rowTotal = (item.quantity || 0) * (item.price || 0);
                         return (
                           <motion.tr 
                             key={item.id}
@@ -393,8 +405,13 @@ export default function StockOutPage() {
                                 onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
                               />
                             </td>
-                            <td className="px-4 py-3 font-bold text-sm">
-                              {p?.salePrice.toLocaleString() || 0}
+                            <td className="px-4 py-3">
+                              <Input 
+                                type="number" 
+                                className="h-10 rounded-lg bg-background/50 border-border/40 font-black"
+                                value={item.price}
+                                onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
+                              />
                             </td>
                             <td className="px-4 py-3 font-black text-sm text-rose-600">
                               {rowTotal.toLocaleString()}
