@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
   FileInput,
   FileOutput,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -34,6 +35,12 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/firebase";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export function OmniSidebar() {
   const pathname = usePathname();
@@ -48,14 +55,17 @@ export function OmniSidebar() {
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
     { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
     { name: t.nav.products, href: "/products", icon: Package },
-    { name: t.nav.stockIn, href: "/stock-in", icon: FileInput },
-    { name: t.nav.stockOut, href: "/stock-out", icon: FileOutput },
     { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
     { name: t.nav.history, href: "/history", icon: History },
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
     { name: t.nav.systemGen, href: "/system-gen", icon: Database, hide: !isSuperAdmin },
   ], [t, isAdmin, isSuperAdmin, isOmborchi]);
+
+  const invoiceNavigation = useMemo(() => [
+    { name: t.nav.stockIn, href: "/stock-in", icon: FileInput },
+    { name: t.nav.stockOut, href: "/stock-out", icon: FileOutput },
+  ], [t]);
 
   const adminNavigation = useMemo(() => [
     { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isSuperAdmin },
@@ -65,6 +75,8 @@ export function OmniSidebar() {
   const userInitials = useMemo(() => user?.displayName 
     ? user.displayName.split(' ').map(n => n[0]).join('')
     : (user?.email ? user.email[0].toUpperCase() : 'U'), [user]);
+
+  const isInvoiceActive = pathname === "/stock-in" || pathname === "/stock-out";
 
   return (
     <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
@@ -119,6 +131,38 @@ export function OmniSidebar() {
               </Link>
             );
           })}
+
+          <Accordion type="single" collapsible defaultValue={isInvoiceActive ? "invoices" : ""}>
+            <AccordionItem value="invoices" className="border-none">
+              <AccordionTrigger className={cn(
+                "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 hover:no-underline hover:bg-muted group",
+                isInvoiceActive ? "text-primary" : "text-muted-foreground"
+              )}>
+                <div className="flex items-center gap-3">
+                  <FileText className={cn("w-4 h-4", isInvoiceActive ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
+                  {t.nav.invoices}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-0 pt-1 pl-4 space-y-1">
+                {invoiceNavigation.map((subItem) => {
+                  const isSubActive = pathname === subItem.href;
+                  return (
+                    <Link
+                      key={subItem.name}
+                      href={subItem.href}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-200",
+                        isSubActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <subItem.icon className="w-3.5 h-3.5" />
+                      {subItem.name}
+                    </Link>
+                  );
+                })}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </nav>
 
         {(isAdmin || isSuperAdmin) && (
