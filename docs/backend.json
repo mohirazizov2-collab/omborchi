@@ -24,7 +24,7 @@
         "name": { "type": "string" },
         "salePrice": { "type": "number" },
         "stock": { "type": "number" },
-        "unit": { "type": "string", "enum": ["pcs", "kg", "m", "l", "m2", "m3", "set", "bag", "box"] },
+        "unit": { "type": "string", "enum": ["pcs", "kg", "g", "m", "cm", "l", "ml", "m2", "m3", "set", "bag", "box", "pack"] },
         "lowStockThreshold": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       },

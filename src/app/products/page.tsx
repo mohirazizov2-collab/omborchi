@@ -164,16 +164,20 @@ export default function ProductsPage() {
                         <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10">
                           <SelectValue placeholder="Tanlang" />
                         </SelectTrigger>
-                        <SelectContent className="rounded-xl border-white/10 bg-black text-white">
+                        <SelectContent className="rounded-xl border-white/10 bg-black text-white max-h-[300px]">
                           <SelectItem value="pcs">{t.units.pcs}</SelectItem>
                           <SelectItem value="kg">{t.units.kg}</SelectItem>
+                          <SelectItem value="g">{t.units.g}</SelectItem>
                           <SelectItem value="m">{t.units.m}</SelectItem>
+                          <SelectItem value="cm">{t.units.cm}</SelectItem>
                           <SelectItem value="l">{t.units.l}</SelectItem>
+                          <SelectItem value="ml">{t.units.ml}</SelectItem>
                           <SelectItem value="m2">{t.units.m2}</SelectItem>
                           <SelectItem value="m3">{t.units.m3}</SelectItem>
                           <SelectItem value="set">{t.units.set}</SelectItem>
                           <SelectItem value="bag">{t.units.bag}</SelectItem>
                           <SelectItem value="box">{t.units.box}</SelectItem>
+                          <SelectItem value="pack">{t.units.pack}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

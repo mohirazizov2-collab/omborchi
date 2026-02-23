@@ -25,13 +25,17 @@ export const translations = {
       label: "O'lcham birligi",
       pcs: "Dona",
       kg: "Kilogramm (kg)",
+      g: "Gramm (g)",
       m: "Metr (m)",
+      cm: "Santimetr (cm)",
       l: "Litr (l)",
+      ml: "Millilitr (ml)",
       m2: "Kvadrat metr (m²)",
       m3: "Kub metr (m³)",
       set: "Komplekt",
       bag: "Qop",
-      box: "Karobka"
+      box: "Karobka",
+      pack: "Pachka"
     },
     inventoryAudit: {
       title: "Inventarizatsiya",
@@ -253,13 +257,17 @@ export const translations = {
       label: "Ед. измерения",
       pcs: "Штук",
       kg: "Килограмм (кг)",
+      g: "Грамм (г)",
       m: "Метр (м)",
+      cm: "Сантиметр (см)",
       l: "Литр (л)",
+      ml: "Миллилитр (мл)",
       m2: "Кв. метр (м²)",
       m3: "Куб. метр (м³)",
       set: "Комплект",
       bag: "Мешок",
-      box: "Коробка"
+      box: "Коробка",
+      pack: "Пачка"
     },
     inventoryAudit: {
       title: 'Инвентаризация',
@@ -481,13 +489,17 @@ export const translations = {
       label: "Unit",
       pcs: "Pieces",
       kg: "Kilogram (kg)",
+      g: "Gram (g)",
       m: "Meter (m)",
+      cm: "Centimeter (cm)",
       l: "Liter (l)",
+      ml: "Milliliter (ml)",
       m2: "Square Meter (m²)",
       m3: "Cubic Meter (m³)",
       set: "Set",
       bag: "Bag",
-      box: "Box"
+      box: "Box",
+      pack: "Pack"
     },
     inventoryAudit: {
       title: 'Inventory Audit',
