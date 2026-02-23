@@ -7,7 +7,7 @@
 import { ai, model } from '@/ai/genkit';
 import { z } from 'genkit';
 import { initializeFirebase } from '@/firebase';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 // --- AI ASBOBLARI (TOOLS) ---
 
