@@ -1,51 +1,57 @@
 
-# 🚀 ombor.uz - GitHub + Netlify To'liq Yo'riqnomasi
+# 🚀 ombor.uz - Professional Ombor Boshqaruvi Tizimi
 
-Loyihani Netlify-da mutlaqo bepul ishga tushirish uchun ushbu qadamlarni bajaring:
+Loyihani internetga (Netlify) chiqarish va undan samarali foydalanish bo'yicha to'liq qo'llanma.
 
 ---
 
-## 1-Bosqich: Kodni GitHub-ga yuborish
-Terminalga ushbu buyruqlarni ketma-ket yozing:
+## 🛠️ Texnologiyalar
+*   **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS
+*   **UI Komponentlar**: ShadCN UI, Framer Motion (Animatsiyalar)
+*   **Backend & DB**: Firebase Auth, Firestore
+*   **AI (Sun'iy Intellekt)**: Google Gemini 1.5 Flash (Genkit orqali)
+*   **Hisobotlar**: jsPDF, XLSX, Recharts
+
+---
+
+## 🚀 1-bosqich: GitHub-ga yuklash
+Loyiha kodini GitHub omboringizga yuborish uchun terminalda quyidagilarni bajaring:
 
 ```bash
 git add .
-git commit -m "feat: finalized deployment config"
+git commit -m "feat: finalized all processes and AI logic"
 git push origin main
 ```
 
 ---
 
-## 2-Bosqich: Netlify-da sozlash (Siz ko'rib turgan oyna)
-Netlify-da loyihani tanlagandan so'ng, quyidagi ma'lumotlarni kiriting:
-
-1.  **Build settings**:
+## 🌍 2-bosqich: Netlify-da ishga tushirish (Deploy)
+1.  Netlify panelida **"Add new site"** -> **"Import from GitHub"** tanlang.
+2.  Loyiha sozlamalarida quyidagilarni kiriting:
     *   **Build command**: `npm run build`
     *   **Publish directory**: `.next`
-2.  **Environment Variables (Siz yuborgan rasm qismi)**:
-    *   **"Contents of .env file"** oynasiga quyidagilarni yozing:
+3.  **Environment Variables** (Muhim!):
+    *   **"Contents of .env file"** oynasiga o'z AI kalitingizni kiriting:
     ```text
     GOOGLE_GENAI_API_KEY=Sizning_Google_AI_Kalitingiz
     ```
-    *(Eslatma: Kalitni `https://aistudio.google.com/` saytidan olishingiz mumkin)*
-
-3.  **Tugmalarni tanlang**:
-    *   **Scopes**: `All scopes` (tanlangan bo'lsin)
-    *   **Deploy contexts**: `All deploy contexts` (tanlangan bo'lsin)
-
-4.  **"Import variables"** tugmasini bosing va pastdagi **"Deploy site"** ni bosing.
+4.  **"Deploy site"** tugmasini bosing.
 
 ---
 
-## 3-Bosqich: AI ishlashi uchun muhim!
-Agar sayt qurilib bo'lgandan keyin AI (chat) ishlamasa:
-1.  Netlify panelida **Site configuration** -> **Environment variables** bo'limiga kiring.
-2.  `GOOGLE_GENAI_API_KEY` borligini tekshiring.
-3.  **Deploys** menyusidan **"Trigger deploy"** -> **"Clear cache and deploy site"** ni tanlang.
+## 📦 Tizim Imkoniyatlari
+1.  **Dashboard**: Umumiy zaxira qiymati, kam qolgan tovarlar va moliyaviy tahlil.
+2.  **Mahsulotlar**: Katalog, SKU boshqaruvi va shtrix-kod skanerlash.
+3.  **Operatsiyalar**: Kirim (In), Chiqim (Out) va Transfer.
+4.  **Inventarizatsiya**: Jismoniy qoldiqni tizim bilan solishtirish.
+5.  **Ishchilar**: Xodimlar ro'yxati va oylik maosh hisob-kitobi.
+6.  **AI System Gen**: Yangi tizimlar uchun tayyor backend kodlarini yaratish.
+7.  **AI Assistant**: Tizim ichidagi aqlli yordamchi (Chat).
 
 ---
 
-## 🛠️ Muammo bormi?
-Agar sayt ochilmasa, `netlify.toml` fayli loyiha ildizida borligiga ishonch hosil qiling. Hozirgi kodda bu fayl tayyor holatda.
+## 🔑 Kirish Ma'lumotlari (Demo)
+*   **Email**: `f2472839@gmail.com` (Super Admin)
+*   **Parol**: *(O'zingiz o'rnatgan parol)*
 
 Created by **X e M team** © 2026

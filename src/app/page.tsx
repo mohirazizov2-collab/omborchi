@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, limit, orderBy } from "firebase/firestore";
+import { collection } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Warehouse as WarehouseIcon, 
@@ -23,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-// Recharts components are only needed on the client
+// Recharts components are client-only and heavy, load them dynamically
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
@@ -80,25 +81,15 @@ export default function DashboardPage() {
     if (!products) return;
     toast({ title: "Hisobot tayyorlanmoqda..." });
     
+    // Performance: Load jspdf only when needed
     const jsPDFLib = (await import("jspdf")).default;
-    // @ts-ignore
     await import("jspdf-autotable");
     
     const doc = new jsPDFLib();
     
-    // Logo Drawing
+    // Header
     doc.setFillColor(59, 130, 246);
     doc.roundedRect(95, 15, 20, 20, 4, 4, 'F');
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.8);
-    doc.line(100, 25, 105, 20); 
-    doc.line(105, 20, 110, 25);
-    doc.line(101, 25, 109, 25);
-    doc.line(102, 25, 102, 30);
-    doc.line(108, 25, 108, 30);
-    doc.line(103, 27, 107, 27);
-    doc.line(103, 29, 107, 29);
-
     doc.setFontSize(22);
     doc.setTextColor(40, 40, 40);
     doc.text("ombor.uz", 105, 45, { align: "center" });
@@ -181,13 +172,17 @@ export default function DashboardPage() {
             <CardTitle className="font-headline font-black text-xl mb-6">{t.dashboard.stockMovements}</CardTitle>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[{month: 'Jan', in: 400, out: 240}, {month: 'Feb', in: 300, out: 139}, {month: 'Mar', in: 200, out: 980}]}>
+                <BarChart data={[
+                  {month: 'Yanvar', in: 400, out: 240}, 
+                  {month: 'Fevral', in: 300, out: 139}, 
+                  {month: 'Mart', in: 200, out: 980}
+                ]}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900}} />
                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900}} />
                   <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'}} />
-                  <Bar dataKey="in" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} barSize={32} />
-                  <Bar dataKey="out" fill="rgba(0,0,0,0.1)" radius={[8, 8, 0, 0]} barSize={32} />
+                  <Bar dataKey="in" name="Kirim" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} barSize={32} />
+                  <Bar dataKey="out" name="Chiqim" fill="rgba(0,0,0,0.1)" radius={[8, 8, 0, 0]} barSize={32} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -207,6 +202,11 @@ export default function DashboardPage() {
                   <Badge variant="destructive" className="h-7 px-3 font-black rounded-xl">{item.stock}</Badge>
                 </div>
               ))}
+              {(!products || products.filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length === 0) && (
+                <div className="py-10 text-center opacity-20">
+                  <p className="text-[10px] font-black uppercase">Hammasi joyida ✅</p>
+                </div>
+              )}
             </div>
           </Card>
         </div>
