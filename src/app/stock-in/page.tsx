@@ -17,8 +17,8 @@ import {
 import { Plus, Trash2, FileText, Loader2, ScanLine, Search, PackageSearch, ArrowRight, AlertCircle, ShoppingCart } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
+import { collection, doc, getDoc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
@@ -79,7 +79,6 @@ export default function StockInPage() {
     }));
   };
 
-  // Barcode Scanning logic
   useEffect(() => {
     if (isScannerOpen) {
       const scanner = new Html5QrcodeScanner(
@@ -122,7 +121,7 @@ export default function StockInPage() {
     };
   }, [isScannerOpen, products, items]);
 
-  const handleProcess = () => {
+  const handleProcess = async () => {
     if (!dnNumber || !supplier || !warehouseId) {
       toast({ variant: "destructive", title: "Xatolik", description: "Barcha asosiy maydonlarni (DN, Yetkazib beruvchi, Ombor) to'ldiring." });
       return;
@@ -134,7 +133,8 @@ export default function StockInPage() {
 
     setLoading(true);
     try {
-      items.forEach((item) => {
+      for (const item of items) {
+        // 1. Log Movement
         const movementData = {
           productId: item.productId,
           warehouseId: warehouseId,
@@ -149,6 +149,7 @@ export default function StockInPage() {
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
+        // 2. Update Global Product Stock
         const product = products?.find(p => p.id === item.productId);
         if (product) {
           const productRef = doc(db, "products", item.productId);
@@ -157,14 +158,35 @@ export default function StockInPage() {
             updatedAt: new Date().toISOString()
           });
         }
-      });
 
-      toast({ title: "Muvaffaqiyatli", description: "Kirim amalga oshirildi." });
+        // 3. Update Warehouse-Specific Stock
+        const invId = `${warehouseId}_${item.productId}`;
+        const invRef = doc(db, "inventory", invId);
+        const invSnap = await getDoc(invRef);
+        
+        if (invSnap.exists()) {
+          updateDocumentNonBlocking(invRef, {
+            stock: (invSnap.data().stock || 0) + (item.quantity || 0),
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          await setDoc(invRef, {
+            id: invId,
+            warehouseId: warehouseId,
+            productId: item.productId,
+            stock: item.quantity,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+
+      toast({ title: "Muvaffaqiyatli", description: "Kirim amalga oshirildi va ombor balansi yangilandi." });
       setItems([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
       setDnNumber("");
       setSupplier("");
       setWarehouseId("");
     } catch (err) {
+      console.error(err);
       toast({ variant: "destructive", title: "Xatolik", description: "Saqlashda xato yuz berdi." });
     } finally {
       setLoading(false);

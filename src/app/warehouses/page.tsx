@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus, Loader2 } from "lucide-react";
+import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus, Loader2, Package } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -34,14 +34,12 @@ export default function WarehousesPage() {
 
   const isAdmin = role === "Super Admin" || role === "Admin";
 
-  // Role Guard
   useEffect(() => {
     if (!authLoading && role === "Omborchi") {
       router.push("/");
     }
   }, [role, authLoading, router]);
 
-  // Form state
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -53,6 +51,26 @@ export default function WarehousesPage() {
     return collection(db, "warehouses");
   }, [db, user]);
   const { data: warehouses, isLoading } = useCollection(warehousesQuery);
+
+  const inventoryQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "inventory");
+  }, [db, user]);
+  const { data: inventory } = useCollection(inventoryQuery);
+
+  const warehouseStats = useMemo(() => {
+    if (!warehouses || !inventory) return {};
+    const stats: Record<string, { totalStock: number, productCount: number }> = {};
+    
+    warehouses.forEach(w => {
+      const items = inventory.filter(inv => inv.warehouseId === w.id);
+      stats[w.id] = {
+        totalStock: items.reduce((acc, curr) => acc + (curr.stock || 0), 0),
+        productCount: items.filter(i => i.stock > 0).length
+      };
+    });
+    return stats;
+  }, [warehouses, inventory]);
 
   const handleSave = () => {
     if (!db || !user || !formData.name) return;
@@ -112,33 +130,33 @@ export default function WarehousesPage() {
                   <Plus className="w-4 h-4" /> {t.warehouses.addNew}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="rounded-[2rem] border-white/5 bg-black/90 backdrop-blur-2xl text-white">
+              <DialogContent className="rounded-[2rem] border-white/5 bg-card/90 backdrop-blur-2xl text-foreground">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black tracking-tight">{t.warehouses.addNew}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-6 py-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">{t.common.id} (Nomi)</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">{t.common.id} (Nomi)</Label>
                     <Input 
-                      className="h-12 rounded-2xl bg-white/5 border-white/10"
+                      className="h-12 rounded-2xl bg-background/50 border-border/40"
                       value={formData.name} 
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                       placeholder="Masalan: Asosiy Ombor Toshkent" 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Manzil</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Manzil</Label>
                     <Input 
-                      className="h-12 rounded-2xl bg-white/5 border-white/10"
+                      className="h-12 rounded-2xl bg-background/50 border-border/40"
                       value={formData.address} 
                       onChange={(e) => setFormData({...formData, address: e.target.value})}
                       placeholder="Ko'cha nomi, shahar" 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Telefon</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Telefon</Label>
                     <Input 
-                      className="h-12 rounded-2xl bg-white/5 border-white/10"
+                      className="h-12 rounded-2xl bg-background/50 border-border/40"
                       value={formData.phoneNumber} 
                       onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
                       placeholder="+998 90 123 45 67" 
@@ -169,49 +187,55 @@ export default function WarehousesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {warehouses && warehouses.map((w: any) => (
-              <Card key={w.id} className="border-none glass-card hover:-translate-y-1 transition-all duration-300">
-                <CardHeader className="flex flex-row items-start justify-between pb-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-xl font-headline font-black tracking-tight">{w.name}</CardTitle>
-                    <div className="flex items-center text-[10px] text-muted-foreground font-black uppercase tracking-widest gap-1.5 opacity-60">
-                      <MapPin className="w-3.5 h-3.5" /> {w.address}
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground rounded-xl">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="mt-4 space-y-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest opacity-60">
-                        <User className="w-4 h-4" /> <span>{t.warehouses.manager}:</span>
+            {warehouses && warehouses.map((w: any) => {
+              const stats = warehouseStats[w.id] || { totalStock: 0, productCount: 0 };
+              return (
+                <Card key={w.id} className="border-none glass-card hover:-translate-y-1 transition-all duration-300 rounded-[2.5rem] bg-card/40 backdrop-blur-xl">
+                  <CardHeader className="flex flex-row items-start justify-between pb-4">
+                    <div className="space-y-1">
+                      <CardTitle className="text-xl font-headline font-black tracking-tight">{w.name}</CardTitle>
+                      <div className="flex items-center text-[10px] text-muted-foreground font-black uppercase tracking-widest gap-1.5 opacity-60">
+                        <MapPin className="w-3.5 h-3.5" /> {w.address || 'Manzil belgilanmagan'}
                       </div>
-                      <span className="font-black truncate max-w-[120px] text-foreground">{w.responsibleUserId}</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest opacity-60">
-                        <Phone className="w-4 h-4" /> <span>{t.warehouses.contact}:</span>
-                      </div>
-                      <span className="font-black text-foreground">{w.phoneNumber}</span>
-                    </div>
-                    <div className="pt-6 border-t border-white/5 mt-6 flex justify-between items-center">
-                      <div className="space-y-2">
-                        <p className="text-[9px] text-muted-foreground uppercase font-black tracking-[0.2em] opacity-50">{t.warehouses.utilization}</p>
-                        <div className="w-32 h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full bg-primary shadow-sm shadow-primary/40"
-                            style={{ width: "0%" }} 
-                          />
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground rounded-xl">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mt-4 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                          <p className="text-[9px] font-black uppercase opacity-40 mb-1">Jami tovarlar</p>
+                          <p className="text-xl font-black flex items-center gap-2">
+                            <Package className="w-4 h-4 text-primary" /> {stats.totalStock}
+                          </p>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+                          <p className="text-[9px] font-black uppercase opacity-40 mb-1">SKU turlari</p>
+                          <p className="text-xl font-black text-emerald-600">{stats.productCount}</p>
                         </div>
                       </div>
-                      <Badge variant="secondary" className="font-black text-[10px] px-2.5 py-1 rounded-lg">0%</Badge>
+
+                      <div className="space-y-3 pt-4 border-t border-border/10">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest opacity-60">
+                            <User className="w-4 h-4" /> <span>{t.warehouses.manager}:</span>
+                          </div>
+                          <span className="font-black truncate max-w-[120px] text-foreground opacity-80">{w.responsibleUserId?.substring(0,8)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest opacity-60">
+                            <Phone className="w-4 h-4" /> <span>{t.warehouses.contact}:</span>
+                          </div>
+                          <span className="font-black text-foreground opacity-80">{w.phoneNumber || '---'}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
             {(!warehouses || warehouses.length === 0) && (
               <div className="col-span-full py-32 text-center border-2 border-dashed rounded-[2rem] border-muted/20">
                 <WarehouseIcon className="w-16 h-16 text-muted/5 mx-auto mb-4" />

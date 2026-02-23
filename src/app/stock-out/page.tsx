@@ -18,7 +18,7 @@ import { Trash2, Plus, Truck, User, Loader2, ArrowRight, ScanLine, Search, Packa
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, getDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
@@ -69,7 +69,6 @@ export default function StockOutPage() {
     setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
-  // Barcode Scanning logic
   useEffect(() => {
     if (isScannerOpen) {
       const scanner = new Html5QrcodeScanner(
@@ -112,7 +111,7 @@ export default function StockOutPage() {
     };
   }, [isScannerOpen, products, items]);
 
-  const handleDispatch = () => {
+  const handleDispatch = async () => {
     if (!orderNumber || !warehouseId || !recipient) {
       toast({ variant: "destructive", title: "Xatolik", description: "Barcha asosiy maydonlarni to'ldiring." });
       return;
@@ -124,7 +123,20 @@ export default function StockOutPage() {
 
     setLoading(true);
     try {
-      items.forEach((item) => {
+      for (const item of items) {
+        // 1. Check Warehouse Stock
+        const invId = `${warehouseId}_${item.productId}`;
+        const invRef = doc(db, "inventory", invId);
+        const invSnap = await getDoc(invRef);
+        const currentWhStock = invSnap.exists() ? (invSnap.data().stock || 0) : 0;
+
+        if (currentWhStock < (item.quantity || 0)) {
+          toast({ variant: "destructive", title: "Zaxira yetarli emas", description: `Ushbu omborda ${products?.find(p => p.id === item.productId)?.name} dan faqat ${currentWhStock} ta qolgan.` });
+          setLoading(false);
+          return;
+        }
+
+        // 2. Log Movement
         const movementData = {
           productId: item.productId,
           warehouseId: warehouseId,
@@ -137,6 +149,7 @@ export default function StockOutPage() {
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
+        // 3. Update Global Product Stock
         const product = products?.find(p => p.id === item.productId);
         if (product) {
           const productRef = doc(db, "products", item.productId);
@@ -145,14 +158,21 @@ export default function StockOutPage() {
             updatedAt: new Date().toISOString()
           });
         }
-      });
 
-      toast({ title: "Muvaffaqiyatli", description: "Tovarlar chiqarildi." });
+        // 4. Update Warehouse Inventory
+        updateDocumentNonBlocking(invRef, {
+          stock: currentWhStock - (item.quantity || 0),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      toast({ title: "Muvaffaqiyatli", description: "Tovarlar chiqarildi va ombor balansi yangilandi." });
       setItems([{ id: generateId(), productId: "", quantity: 1, searchQuery: "" }]);
       setOrderNumber("");
       setRecipient("");
       setWarehouseId("");
     } catch (err) {
+      console.error(err);
       toast({ variant: "destructive", title: "Xatolik", description: "Amalni bajarishda xato yuz berdi." });
     } finally {
       setLoading(false);

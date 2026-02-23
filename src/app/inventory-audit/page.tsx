@@ -17,10 +17,11 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { ClipboardCheck, Search, ScanLine, Loader2, Save, AlertTriangle, CheckCircle2, History } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClipboardCheck, Search, ScanLine, Loader2, Save, Warehouse } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc, getDoc } from "firebase/firestore";
 import { updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { Html5QrcodeScanner } from "html5-qrcode";
@@ -32,6 +33,7 @@ export default function InventoryAuditPage() {
   const db = useFirestore();
   const { user, role } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [auditData, setAuditData] = useState<Record<string, number>>({});
@@ -43,26 +45,46 @@ export default function InventoryAuditPage() {
     if (!db || !user) return null;
     return collection(db, "products");
   }, [db, user]);
-  const { data: products, isLoading } = useCollection(productsQuery);
+  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
+
+  const warehousesQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "warehouses");
+  }, [db, user]);
+  const { data: warehouses } = useCollection(warehousesQuery);
+
+  const inventoryQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "inventory");
+  }, [db, user]);
+  const { data: inventory, isLoading: invLoading } = useCollection(inventoryQuery);
 
   const filteredProducts = useMemo(() => {
-    return products?.filter(p => {
-      return p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-             p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    }) || [];
-  }, [products, searchQuery]);
+    if (!products || !selectedWarehouseId) return [];
+    
+    return products.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    }).map(p => {
+      const invItem = inventory?.find(inv => inv.warehouseId === selectedWarehouseId && inv.productId === p.id);
+      return { ...p, warehouseStock: invItem ? (invItem.stock || 0) : 0 };
+    });
+  }, [products, inventory, searchQuery, selectedWarehouseId]);
 
   const handleAuditChange = (productId: string, val: string) => {
     const num = parseInt(val) || 0;
     setAuditData(prev => ({ ...prev, [productId]: num }));
   };
 
-  const handleReconcile = (product: any) => {
-    if (!db || !user) return;
+  const handleReconcile = async (product: any) => {
+    if (!db || !user || !selectedWarehouseId) return;
     const physicalCount = auditData[product.id];
     if (physicalCount === undefined) return;
 
-    const discrepancy = physicalCount - (product.stock || 0);
+    const currentWhStock = product.warehouseStock;
+    const discrepancy = physicalCount - currentWhStock;
+    
     if (discrepancy === 0) {
       toast({ title: "Xabar", description: "Zaxira allaqachon to'g'ri." });
       return;
@@ -70,22 +92,29 @@ export default function InventoryAuditPage() {
 
     setIsSaving(true);
     try {
-      // 1. Log the adjustment movement
       const movementData = {
         productId: product.id,
-        warehouseId: "Central", // Ideally select warehouse
+        warehouseId: selectedWarehouseId,
         quantityChange: discrepancy,
         movementType: "Adjustment",
         movementDate: new Date().toISOString(),
         responsibleUserId: user.uid,
-        description: `Inventory Audit Adjustment. System: ${product.stock}, Physical: ${physicalCount}`
+        description: `Audit Adjustment. System: ${currentWhStock}, Physical: ${physicalCount}`
       };
       addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
-      // 2. Update product stock
+      // Update Warehouse Inventory
+      const invId = `${selectedWarehouseId}_${product.id}`;
+      const invRef = doc(db, "inventory", invId);
+      updateDocumentNonBlocking(invRef, {
+        stock: physicalCount,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Update Global Product Stock
       const productRef = doc(db, "products", product.id);
       updateDocumentNonBlocking(productRef, {
-        stock: physicalCount,
+        stock: (product.stock || 0) + discrepancy,
         updatedAt: new Date().toISOString()
       });
 
@@ -94,7 +123,6 @@ export default function InventoryAuditPage() {
         description: `${product.name} zaxirasi ${physicalCount} ga o'zgartirildi.`,
       });
 
-      // Clear local state for this product
       const newAuditData = { ...auditData };
       delete newAuditData[product.id];
       setAuditData(newAuditData);
@@ -103,13 +131,12 @@ export default function InventoryAuditPage() {
     }
   };
 
-  // Barcode Scanning logic
   useEffect(() => {
     if (isScannerOpen) {
       const scanner = new Html5QrcodeScanner(
         "reader-audit",
         { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
+        false
       );
       scannerRef.current = scanner;
 
@@ -125,7 +152,7 @@ export default function InventoryAuditPage() {
             toast({ variant: "destructive", title: "Xatolik", description: "Topilmadi: " + decodedText });
           }
         },
-        (error) => {}
+        () => {}
       );
     }
 
@@ -152,45 +179,71 @@ export default function InventoryAuditPage() {
             <p className="text-sm text-muted-foreground mt-1 font-medium">{t.inventoryAudit.description}</p>
           </div>
           
-          <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
-                <ScanLine className="w-4 h-4" /> {t.inventoryAudit.scanToAudit}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl">
-              <DialogHeader>
-                <DialogTitle>{t.inventoryAudit.scanToAudit}</DialogTitle>
-              </DialogHeader>
-              <div id="reader-audit" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-primary/20"></div>
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-3">
+            <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
+                  <ScanLine className="w-4 h-4" /> {t.inventoryAudit.scanToAudit}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle>{t.inventoryAudit.scanToAudit}</DialogTitle>
+                </DialogHeader>
+                <div id="reader-audit" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-primary/20"></div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </header>
 
-        <Card className="border-none glass-card mb-8 bg-card/40 backdrop-blur-xl">
-          <CardContent className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="border-none glass-card bg-card/40 backdrop-blur-xl p-4 md:col-span-1">
+            <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50 mb-2 block">Omborni tanlang</Label>
+            <Select onValueChange={setSelectedWarehouseId} value={selectedWarehouseId}>
+              <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
+                <div className="flex items-center gap-2">
+                  <Warehouse className="w-4 h-4 text-primary" />
+                  <SelectValue placeholder="Ombor..." />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                {warehouses?.map((w) => (
+                  <SelectItem key={w.id} value={w.id} className="font-bold">{w.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Card>
+
+          <Card className="border-none glass-card bg-card/40 backdrop-blur-xl p-4 md:col-span-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50 mb-2 block">Mahsulot qidiruvi</Label>
             <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 placeholder={t.products.search} 
-                className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-medium" 
+                className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={!selectedWarehouseId}
               />
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
 
-        {isLoading ? (
+        {(productsLoading || invLoading) ? (
           <div className="flex justify-center py-32">
             <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
+          </div>
+        ) : !selectedWarehouseId ? (
+          <div className="py-32 text-center opacity-20">
+            <Warehouse className="w-20 h-20 mx-auto mb-4" />
+            <p className="text-sm font-black uppercase tracking-[0.5em]">Avval omborni tanlang</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
             <AnimatePresence mode="popLayout">
               {filteredProducts.map((p: any, idx) => {
-                const physical = auditData[p.id] ?? p.stock;
-                const discrepancy = physical - (p.stock || 0);
+                const physical = auditData[p.id] ?? p.warehouseStock;
+                const discrepancy = physical - (p.warehouseStock || 0);
                 
                 return (
                   <motion.div
@@ -214,7 +267,7 @@ export default function InventoryAuditPage() {
                         <div className="flex flex-wrap items-center gap-8 w-full md:w-auto justify-between md:justify-end">
                           <div className="text-center md:text-right">
                             <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">{t.inventoryAudit.systemStock}</p>
-                            <p className="text-xl font-black font-headline">{p.stock || 0}</p>
+                            <p className="text-xl font-black font-headline">{p.warehouseStock || 0}</p>
                           </div>
 
                           <div className="w-32">
@@ -223,7 +276,7 @@ export default function InventoryAuditPage() {
                               type="number"
                               className="h-10 rounded-xl bg-background/50 border-border/40 font-black text-center"
                               value={auditData[p.id] ?? ""}
-                              placeholder={p.stock.toString()}
+                              placeholder={p.warehouseStock.toString()}
                               onChange={(e) => handleAuditChange(p.id, e.target.value)}
                             />
                           </div>
