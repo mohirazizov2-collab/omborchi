@@ -1,4 +1,3 @@
-
 import { genkit } from 'genkit';
 import { openAI } from 'genkitx-openai';
 
@@ -8,10 +7,6 @@ import { openAI } from 'genkitx-openai';
 
 const API_KEY = process.env.OPENAI_API_KEY || '';
 
-if (!API_KEY && process.env.NODE_ENV === 'production') {
-  console.warn('DIQQAT: OPENAI_API_KEY topilmadi. AI funksiyalari ishlamasligi mumkin.');
-}
-
 export const ai = genkit({
   plugins: [
     openAI({
@@ -20,5 +15,5 @@ export const ai = genkit({
   ],
 });
 
-// OpenAI ning eng samarali va arzon modeli
+// OpenAI gpt-4o-mini modeli
 export const model = 'openai/gpt-4o-mini';
