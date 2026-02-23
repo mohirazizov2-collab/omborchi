@@ -7,8 +7,8 @@ export const translations = {
       dashboard: "Dashboard",
       warehouses: "Omborlar",
       products: "Mahsulotlar",
-      stockIn: "Kirim",
-      stockOut: "Chiqim (Sotuv)",
+      stockIn: "Kirim Nakladnoyi",
+      stockOut: "Chiqim Nakladnoyi",
       transfers: "Transferlar",
       employees: "Ishchilar",
       history: "Harakatlar tarixi",
@@ -133,7 +133,7 @@ export const translations = {
       loadingProducts: "Mahsulotlar yuklanmoqda..."
     },
     stockIn: {
-      title: "Tovarlar Kirimi (Goods Receipt)",
+      title: "Kirim Nakladnoyi",
       description: "Yetkazib beruvchilardan kelgan tovarlarni qayd etish.",
       dnDetails: "Yuk xati tafsilotlari",
       dnNumber: "Yuk xati raqami (DN)",
@@ -146,7 +146,7 @@ export const translations = {
       scanBarcode: "Skanerlash"
     },
     stockOut: {
-      title: "Rasxod (Goods Issue / Sale)",
+      title: "Chiqim Nakladnoyi",
       description: "Ombordan tovarlarni chiqarish (mijozlarga yoki ichki ehtiyojlar uchun).",
       issueDetails: "Chiqim / Sotuv tafsilotlari",
       refNumber: "Hujjat / Buyurtma raqami",
@@ -244,8 +244,8 @@ export const translations = {
       dashboard: 'Дашборд',
       warehouses: 'Склады',
       products: 'Товары',
-      stockIn: 'Приход',
-      stockOut: 'Расход (Продажа)',
+      stockIn: 'Приходная Накладная',
+      stockOut: 'Расходная Накладная',
       transfers: 'Переводы',
       employees: 'Сотрудники',
       history: 'История операций',
@@ -370,7 +370,7 @@ export const translations = {
       loadingProducts: 'Загрузка товаров...'
     },
     stockIn: {
-      title: 'Приход товара (Stock In)',
+      title: 'Приходная Накладная',
       description: 'Регистрация входящих товаров по накладным.',
       dnDetails: 'Детали накладной',
       dnNumber: 'Номер накладной (DN)',
@@ -383,7 +383,7 @@ export const translations = {
       scanBarcode: 'Сканировать'
     },
     stockOut: {
-      title: 'Расход товара (Stock Out)',
+      title: 'Расходная Накладная',
       description: 'Выдача товаров со склада (клиентам или на внутренние нужды).',
       issueDetails: 'Детали расхода / продажи',
       refNumber: 'Номер документа / заказа',
@@ -481,8 +481,8 @@ export const translations = {
       dashboard: 'Dashboard',
       warehouses: 'Warehouses',
       products: 'Products',
-      stockIn: 'Stock In',
-      stockOut: 'Stock Out (Sale)',
+      stockIn: 'Stock In Invoice',
+      stockOut: 'Stock Out Invoice',
       transfers: 'Transfers',
       employees: 'Employees',
       history: 'Movement History',
@@ -607,7 +607,7 @@ export const translations = {
       loadingProducts: 'Loading products...'
     },
     stockIn: {
-      title: 'Stock In (Goods Receipt)',
+      title: 'Stock In Invoice',
       description: 'Record incoming inventory via delivery notes from suppliers.',
       dnDetails: 'Delivery Note Details',
       dnNumber: 'Delivery Note #',
@@ -620,7 +620,7 @@ export const translations = {
       scanBarcode: 'Scan'
     },
     stockOut: {
-      title: 'Stock Out (Goods Issue)',
+      title: 'Stock Out Invoice',
       description: 'Record items leaving the warehouse for customers or internal needs.',
       issueDetails: 'Issue / Sale Details',
       refNumber: 'Order / Reference #',

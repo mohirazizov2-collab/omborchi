@@ -8,7 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Trash2, Plus, Truck, User, Loader2, ArrowRight, Search, AlertCircle, Package, UserCheck } from "lucide-react";
+import { 
+  Trash2, 
+  Plus, 
+  User, 
+  Loader2, 
+  Search, 
+  Package, 
+  UserCheck, 
+  Download,
+  CheckCircle2,
+  ReceiptText
+} from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -18,6 +29,7 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/no
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
@@ -32,6 +44,8 @@ export default function StockOutPage() {
   const [warehouseId, setWarehouseId] = useState("");
   const [recipient, setRecipient] = useState("");
   const [clientType, setClientType] = useState<"internal" | "external">("external");
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [processedInvoice, setProcessedInvoice] = useState<any>(null);
 
   const productsQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -75,7 +89,8 @@ export default function StockOutPage() {
     const saleId = `SALE_${Date.now()}`;
 
     try {
-      // 1. First, validate stock for ALL items before processing any
+      const invoiceItems = [];
+      // 1. Validate stock
       for (const item of items) {
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
@@ -86,7 +101,7 @@ export default function StockOutPage() {
           const pName = products?.find(p => p.id === item.productId)?.name || "Noma'lum mahsulot";
           toast({ 
             variant: "destructive", 
-            title: t.stockOut.insufficientStock, 
+            title: "Zaxira yetarli emas!", 
             description: `${pName} omborda faqat ${currentWhStock} ta bor.` 
           });
           setLoading(false);
@@ -94,14 +109,22 @@ export default function StockOutPage() {
         }
       }
 
-      // 2. Process transactions (Safe stock deduction)
+      // 2. Process transactions
       for (const item of items) {
+        const product = products?.find(p => p.id === item.productId);
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
         const invSnap = await getDoc(invRef);
         const currentWhStock = invSnap.exists() ? (invSnap.data().stock || 0) : 0;
 
-        // Log Movement (Audit Trail)
+        invoiceItems.push({
+          name: product?.name || "Noma'lum",
+          quantity: item.quantity,
+          price: product?.salePrice || 0,
+          unit: product?.unit || "pcs"
+        });
+
+        // Log Movement
         const movementData = {
           productId: item.productId,
           warehouseId: warehouseId,
@@ -117,7 +140,6 @@ export default function StockOutPage() {
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
         // Update Global Product Stock
-        const product = products?.find(p => p.id === item.productId);
         if (product) {
           const productRef = doc(db, "products", item.productId);
           updateDocumentNonBlocking(productRef, {
@@ -126,18 +148,24 @@ export default function StockOutPage() {
           });
         }
 
-        // Update Warehouse Inventory (Specific Balance)
+        // Update Warehouse Inventory
         updateDocumentNonBlocking(invRef, {
           stock: currentWhStock - (item.quantity || 0),
           updatedAt: new Date().toISOString()
         });
       }
 
-      toast({ 
-        title: "Muvaffaqiyatli", 
-        description: `${recipient} uchun chiqim qilindi va balanslar yangilandi.` 
+      setProcessedInvoice({
+        orderNumber: orderNumber || saleId,
+        recipient,
+        clientType,
+        warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
+        date: new Date().toLocaleString(),
+        items: invoiceItems
       });
-      
+
+      toast({ title: "Muvaffaqiyatli", description: "Chiqim nakladnoyi saqlandi." });
+      setIsSuccessOpen(true);
       setItems([{ id: generateId(), productId: "", quantity: 1, searchQuery: "" }]);
       setOrderNumber("");
       setRecipient("");
@@ -150,14 +178,64 @@ export default function StockOutPage() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!processedInvoice) return;
+    
+    const jsPDFLib = (await import("jspdf")).default;
+    // @ts-ignore
+    await import("jspdf-autotable");
+    
+    const doc = new jsPDFLib();
+    
+    // Header
+    doc.setFillColor(225, 29, 72); // Rose-600
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text("CHIQIM NAKLADNOYI", 105, 25, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(40, 40, 40);
+    doc.text(`Hujjat #: ${processedInvoice.orderNumber}`, 20, 50);
+    doc.text(`Mijoz: ${processedInvoice.recipient} (${processedInvoice.clientType})`, 20, 57);
+    doc.text(`Chiqarilgan ombor: ${processedInvoice.warehouse}`, 20, 64);
+    doc.text(`Sana: ${processedInvoice.date}`, 140, 50);
+
+    const tableData = processedInvoice.items.map((it: any, i: number) => [
+      i + 1,
+      it.name,
+      it.quantity,
+      it.unit,
+      `${it.price.toLocaleString()} so'm`,
+      `${(it.quantity * it.price).toLocaleString()} so'm`
+    ]);
+
+    (doc as any).autoTable({
+      startY: 75,
+      head: [['#', 'Mahsulot nomi', 'Miqdor', 'Birlik', 'Narx', 'Jami']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [225, 29, 72] },
+      styles: { fontSize: 9 }
+    });
+
+    const total = processedInvoice.items.reduce((acc: number, it: any) => acc + (it.quantity * it.price), 0);
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`UMUMIY SUMMA: ${total.toLocaleString()} so'm`, 140, finalY);
+
+    doc.save(`Chiqim_Nakladnoy_${processedInvoice.orderNumber}.pdf`);
+  };
+
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
       <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-            <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.stockOut.title}</h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">{t.stockOut.description}</p>
+            <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">Chiqim Nakladnoyi</h1>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">Ombordan tovarlarni chiqarish (sotuv) va hujjatlashtirish.</p>
           </motion.div>
         </header>
 
@@ -166,13 +244,13 @@ export default function StockOutPage() {
             <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
               <CardHeader className="p-8">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
-                  <UserCheck className="w-6 h-6 text-primary" /> {t.stockOut.issueDetails}
+                  <UserCheck className="w-6 h-6 text-primary" /> Chiqim tafsilotlari
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-8 pt-0 space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.clientType}</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Mijoz turi</Label>
                     <RadioGroup 
                       value={clientType} 
                       onValueChange={(v: any) => setClientType(v)}
@@ -180,19 +258,19 @@ export default function StockOutPage() {
                     >
                       <div className="flex items-center space-x-2 bg-background/50 px-4 py-2 rounded-xl flex-1 cursor-pointer">
                         <RadioGroupItem value="external" id="external" />
-                        <Label htmlFor="external" className="cursor-pointer font-bold">{t.stockOut.external}</Label>
+                        <Label htmlFor="external" className="cursor-pointer font-bold">Tashqi mijoz</Label>
                       </div>
                       <div className="flex items-center space-x-2 bg-background/50 px-4 py-2 rounded-xl flex-1 cursor-pointer">
                         <RadioGroupItem value="internal" id="internal" />
-                        <Label htmlFor="internal" className="cursor-pointer font-bold">{t.stockOut.internal}</Label>
+                        <Label htmlFor="internal" className="cursor-pointer font-bold">Ichki mijoz</Label>
                       </div>
                     </RadioGroup>
                   </div>
                   <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.recipient}</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Mijoz / Qabul qiluvchi</Label>
                     <Input 
-                      placeholder={clientType === 'external' ? "Mijoz yoki korxona nomi" : "Bo'lim yoki ishchi nomi"} 
-                      className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-rose-500/40" 
+                      placeholder={clientType === 'external' ? "Mijoz nomi" : "Bo'lim nomi"} 
+                      className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
                       value={recipient} 
                       onChange={(e) => setRecipient(e.target.value)} 
                     />
@@ -201,7 +279,7 @@ export default function StockOutPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.sourceWarehouse}</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Chiqaruvchi ombor</Label>
                     <Select onValueChange={setWarehouseId} value={warehouseId}>
                       <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold">
                         <SelectValue placeholder="Omborni tanlang" />
@@ -214,9 +292,9 @@ export default function StockOutPage() {
                     </Select>
                   </div>
                   <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockOut.refNumber}</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Hujjat raqami</Label>
                     <Input 
-                      placeholder="SALE-2026-XXX (Ixtiyoriy)" 
+                      placeholder="SALE-2026-XXX" 
                       className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
                       value={orderNumber} 
                       onChange={(e) => setOrderNumber(e.target.value)} 
@@ -229,10 +307,10 @@ export default function StockOutPage() {
             <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
               <CardHeader className="p-8 flex flex-row items-center justify-between">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
-                  <Package className="w-6 h-6 text-primary" /> {t.common.totalItems}
+                  <Package className="w-6 h-6 text-primary" /> Mahsulotlar ro'yxati
                 </CardTitle>
                 <Button variant="outline" size="sm" onClick={addItem} className="gap-2 rounded-xl font-black uppercase text-[9px] tracking-widest h-9 px-4 border-rose-500/20 text-rose-600 hover:bg-rose-500/5">
-                  <Plus className="w-4 h-4" /> {t.actions.addItem}
+                  <Plus className="w-4 h-4" /> Yangi qator
                 </Button>
               </CardHeader>
               <CardContent className="p-8 pt-0 space-y-4">
@@ -252,14 +330,14 @@ export default function StockOutPage() {
                       >
                         <div className="flex-1 space-y-3">
                           <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
-                            {t.common.product}
+                            Mahsulot
                           </Label>
                           <Select 
                             onValueChange={(val) => updateItem(item.id, "productId", val)}
                             value={item.productId}
                           >
                             <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm">
-                              <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Mahsulotni tanlang..."} />
+                              <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Tanlang..."} />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl max-h-[400px]">
                               <div className="p-2 sticky top-0 bg-popover z-10">
@@ -289,7 +367,7 @@ export default function StockOutPage() {
                         </div>
                         <div className="w-full md:w-40 space-y-3">
                           <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
-                            {t.common.quantity} {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}
+                            Miqdor {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}
                           </Label>
                           <Input 
                             type="number" 
@@ -320,11 +398,11 @@ export default function StockOutPage() {
                 <Package className="w-32 h-32" />
               </div>
               <CardHeader className="p-8 pb-4 relative z-10">
-                <CardTitle className="font-headline font-black text-2xl tracking-tight">{t.common.summary}</CardTitle>
+                <CardTitle className="font-headline font-black text-2xl tracking-tight">Xulosa</CardTitle>
               </CardHeader>
               <CardContent className="p-8 pt-4 space-y-8 relative z-10">
                 <div className="flex justify-between items-center pb-6 border-b border-white/10">
-                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">Jami qatorlar</span>
+                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">Jami turlar</span>
                   <span className="text-4xl font-black">{items.filter(i => i.productId).length}</span>
                 </div>
                 <div className="space-y-4">
@@ -333,7 +411,7 @@ export default function StockOutPage() {
                          <User className="w-6 h-6" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase opacity-50 tracking-widest">{t.stockOut.recipient}</p>
+                        <p className="text-[10px] font-black uppercase opacity-50 tracking-widest">Mijoz</p>
                         <p className="font-bold text-sm truncate">{recipient || '---'}</p>
                       </div>
                    </div>
@@ -345,12 +423,39 @@ export default function StockOutPage() {
                   onClick={handleDispatch} 
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3 transition-transform group-hover:translate-x-1" /> {t.stockOut.dispatch}</>}
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-3 transition-transform group-hover:scale-110" /> Tasdiqlash va Yakunlash</>}
                 </Button>
               </CardFooter>
             </Card>
           </div>
         </div>
+
+        <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl text-center">
+            <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight mb-2">Chiqim bajarildi!</DialogTitle>
+              <p className="text-muted-foreground font-medium">Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi. PDF formatida yuklab olishingiz mumkin.</p>
+            </DialogHeader>
+            <DialogFooter className="mt-8 flex-col sm:flex-col gap-3">
+              <Button 
+                onClick={handleDownloadPDF}
+                className="w-full h-14 rounded-2xl bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-3 shadow-xl shadow-rose-600/20"
+              >
+                <Download className="w-4 h-4" /> PDF Nakladnoyni yuklab olish
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setIsSuccessOpen(false)}
+                className="w-full h-12 rounded-2xl font-bold"
+              >
+                Yopish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

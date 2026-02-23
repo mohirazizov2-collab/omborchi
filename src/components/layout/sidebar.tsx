@@ -19,6 +19,8 @@ import {
   UserRound,
   History,
   ClipboardCheck,
+  FileInput,
+  FileOutput,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -46,9 +48,8 @@ export function OmniSidebar() {
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
     { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
     { name: t.nav.products, href: "/products", icon: Package },
-    { name: t.nav.stockIn, href: "/stock-in", icon: Archive },
-    { name: t.nav.stockOut, href: "/stock-out", icon: Archive },
-    { name: t.nav.transfers, href: "/transfers", icon: ArrowRightLeft },
+    { name: t.nav.stockIn, href: "/stock-in", icon: FileInput },
+    { name: t.nav.stockOut, href: "/stock-out", icon: FileOutput },
     { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
     { name: t.nav.history, href: "/history", icon: History },
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },

@@ -7,17 +7,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, FileText, Loader2, ScanLine, Search, PackageSearch, ArrowRight, AlertCircle, ShoppingCart } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { 
+  Plus, 
+  Trash2, 
+  FileText, 
+  Loader2, 
+  Search, 
+  PackageSearch, 
+  ArrowRight, 
+  AlertCircle, 
+  ShoppingCart,
+  Download,
+  CheckCircle2
+} from "lucide-react";
+import { useState, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, getDoc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
-import { Html5QrcodeScanner } from "html5-qrcode";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
@@ -31,8 +43,8 @@ export default function StockInPage() {
   const [dnNumber, setDnNumber] = useState("");
   const [supplier, setSupplier] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [processedInvoice, setProcessedInvoice] = useState<any>(null);
 
   const productsQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -72,51 +84,9 @@ export default function StockInPage() {
     }));
   };
 
-  useEffect(() => {
-    if (isScannerOpen) {
-      const scanner = new Html5QrcodeScanner(
-        "reader-in-page",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      );
-      scannerRef.current = scanner;
-
-      scanner.render(
-        (decodedText) => {
-          const product = products?.find(p => p.id === decodedText);
-          if (product) {
-            const existingItem = items.find(i => i.productId === product.id);
-            if (existingItem) {
-              updateItem(existingItem.id, "quantity", (existingItem.quantity || 0) + 1);
-            } else {
-              const lastItem = items[items.length - 1];
-              if (!lastItem.productId) {
-                updateItem(lastItem.id, "productId", product.id);
-              } else {
-                setItems(prev => [...prev, { id: generateId(), productId: product.id, quantity: 1, price: product.salePrice || 0, searchQuery: "" }]);
-              }
-            }
-            toast({ title: "Mahsulot topildi", description: `${product.name} ro'yxatga qo'shildi.` });
-            scanner.clear();
-            setIsScannerOpen(false);
-          } else {
-            toast({ variant: "destructive", title: "Xatolik", description: "Mahsulot topilmadi: " + decodedText });
-          }
-        },
-        () => {}
-      );
-    }
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(e => console.error("Scanner clear error", e));
-      }
-    };
-  }, [isScannerOpen, products, items]);
-
   const handleProcess = async () => {
     if (!dnNumber || !supplier || !warehouseId) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Barcha asosiy maydonlarni (DN, Yetkazib beruvchi, Ombor) to'ldiring." });
+      toast({ variant: "destructive", title: "Xatolik", description: "Barcha asosiy maydonlarni (Nakladnoy #, Yetkazib beruvchi, Ombor) to'ldiring." });
       return;
     }
     if (items.some(i => !i.productId)) {
@@ -126,7 +96,16 @@ export default function StockInPage() {
 
     setLoading(true);
     try {
+      const invoiceItems = [];
       for (const item of items) {
+        const product = products?.find(p => p.id === item.productId);
+        invoiceItems.push({
+          name: product?.name || "Noma'lum",
+          quantity: item.quantity,
+          price: item.price,
+          unit: product?.unit || "pcs"
+        });
+
         // 1. Log Movement
         const movementData = {
           productId: item.productId,
@@ -143,7 +122,6 @@ export default function StockInPage() {
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
         // 2. Update Global Product Stock
-        const product = products?.find(p => p.id === item.productId);
         if (product) {
           const productRef = doc(db, "products", item.productId);
           updateDocumentNonBlocking(productRef, {
@@ -173,7 +151,16 @@ export default function StockInPage() {
         }
       }
 
-      toast({ title: "Muvaffaqiyatli", description: "Kirim amalga oshirildi va ombor balansi yangilandi." });
+      setProcessedInvoice({
+        dnNumber,
+        supplier,
+        warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
+        date: new Date().toLocaleString(),
+        items: invoiceItems
+      });
+
+      toast({ title: "Muvaffaqiyatli", description: "Kirim nakladnoyi saqlandi." });
+      setIsSuccessOpen(true);
       setItems([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
       setDnNumber("");
       setSupplier("");
@@ -186,6 +173,56 @@ export default function StockInPage() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!processedInvoice) return;
+    
+    const jsPDFLib = (await import("jspdf")).default;
+    // @ts-ignore
+    await import("jspdf-autotable");
+    
+    const doc = new jsPDFLib();
+    
+    // Header
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text("KIRIM NAKLADNOYI", 105, 25, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(40, 40, 40);
+    doc.text(`Nakladnoy #: ${processedInvoice.dnNumber}`, 20, 50);
+    doc.text(`Yetkazib beruvchi: ${processedInvoice.supplier}`, 20, 57);
+    doc.text(`Qabul qilgan ombor: ${processedInvoice.warehouse}`, 20, 64);
+    doc.text(`Sana: ${processedInvoice.date}`, 140, 50);
+
+    const tableData = processedInvoice.items.map((it: any, i: number) => [
+      i + 1,
+      it.name,
+      it.quantity,
+      it.unit,
+      `${it.price.toLocaleString()} so'm`,
+      `${(it.quantity * it.price).toLocaleString()} so'm`
+    ]);
+
+    (doc as any).autoTable({
+      startY: 75,
+      head: [['#', 'Mahsulot nomi', 'Miqdor', 'Birlik', 'Narx', 'Jami']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246] },
+      styles: { fontSize: 9 }
+    });
+
+    const total = processedInvoice.items.reduce((acc: number, it: any) => acc + (it.quantity * it.price), 0);
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`UMUMIY SUMMA: ${total.toLocaleString()} so'm`, 140, finalY);
+
+    doc.save(`Kirim_Nakladnoy_${processedInvoice.dnNumber}.pdf`);
+  };
+
   const totalValue = items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0);
 
   return (
@@ -194,8 +231,8 @@ export default function StockInPage() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-            <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.stockIn.title}</h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">{t.stockIn.description}</p>
+            <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">Kirim Nakladnoyi</h1>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">Yetkazib beruvchilardan kelgan tovarlarni qayd etish va hujjatlashtirish.</p>
           </motion.div>
           
           <div className="flex gap-3">
@@ -212,12 +249,12 @@ export default function StockInPage() {
             <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
               <CardHeader className="p-8">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
-                  <FileText className="w-6 h-6 text-primary" /> {t.stockIn.dnDetails}
+                  <FileText className="w-6 h-6 text-primary" /> Nakladnoy tafsilotlari
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-8 pt-0 grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.dnNumber}</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Nakladnoy raqami (DN)</Label>
                   <Input 
                     placeholder="DN-2026-XXX" 
                     className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 focus:border-primary/40 transition-all" 
@@ -226,16 +263,16 @@ export default function StockInPage() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.supplier}</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Yetkazib beruvchi</Label>
                   <Input 
-                    placeholder="Yetkazib beruvchi nomi" 
+                    placeholder="Kompaniya yoki shaxs nomi" 
                     className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 focus:border-primary/40 transition-all" 
                     value={supplier}
                     onChange={(e) => setSupplier(e.target.value)}
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.targetWarehouse}</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Qabul qiluvchi ombor</Label>
                   <Select onValueChange={setWarehouseId} value={warehouseId}>
                     <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all">
                       <SelectValue placeholder="Omborni tanlang" />
@@ -248,7 +285,7 @@ export default function StockInPage() {
                   </Select>
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">{t.stockIn.receiptDate}</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Sana</Label>
                   <Input type="date" className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" defaultValue={new Date().toISOString().split('T')[0]} />
                 </div>
               </CardContent>
@@ -257,10 +294,10 @@ export default function StockInPage() {
             <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
               <CardHeader className="p-8 flex flex-row items-center justify-between">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
-                  <ShoppingCart className="w-6 h-6 text-primary" /> {t.stockIn.productItems}
+                  <ShoppingCart className="w-6 h-6 text-primary" /> Tovarlar ro'yxati
                 </CardTitle>
                 <Button variant="outline" size="sm" onClick={addItem} className="gap-2 rounded-xl font-black uppercase text-[9px] tracking-widest h-9 px-4 border-primary/20 text-primary hover:bg-primary/5">
-                  <Plus className="w-4 h-4" /> {t.actions.addItem}
+                  <Plus className="w-4 h-4" /> Yangi qator
                 </Button>
               </CardHeader>
               <CardContent className="p-8 pt-0 space-y-4">
@@ -281,27 +318,26 @@ export default function StockInPage() {
                         <div className="flex-1 space-y-3">
                           <Label className={cn(
                             "text-[10px] font-black uppercase tracking-widest pl-2",
-                            !item.productId ? "text-rose-500 opacity-100 animate-pulse" : "opacity-40"
+                            !item.productId ? "text-rose-500 opacity-100" : "opacity-40"
                           )}>
-                            {t.common.product} {!item.productId && " (Tanlang)"}
+                            Mahsulot {!item.productId && "*"}
                           </Label>
                           <Select 
                             onValueChange={(val) => updateItem(item.id, "productId", val)}
                             value={item.productId}
                           >
                             <SelectTrigger className={cn(
-                              "h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm transition-all",
-                              !item.productId && "ring-2 ring-rose-500/20"
+                              "h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm transition-all"
                             )}>
-                              <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Mahsulotni qidiring..."} />
+                              <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Tanlang..."} />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl max-h-[400px] border-border/40 shadow-2xl p-2">
                               <div className="p-2 border-b border-border/10 sticky top-0 bg-popover z-10 mb-2">
                                  <div className="relative">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                     <Input 
-                                      placeholder="Nomi bo'yicha qidiruv..." 
-                                      className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none focus:ring-primary/30"
+                                      placeholder="Qidiruv..." 
+                                      className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none"
                                       value={item.searchQuery}
                                       onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
                                       onClick={(e) => e.stopPropagation()}
@@ -312,26 +348,17 @@ export default function StockInPage() {
                                 {products?.filter(p => 
                                   p.name.toLowerCase().includes(item.searchQuery.toLowerCase())
                                 ).map((p) => (
-                                  <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer hover:bg-primary/5">
+                                  <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer">
                                     <span className="font-bold text-sm">{p.name}</span>
                                   </SelectItem>
                                 ))}
-                                {(!products || products.length === 0) && (
-                                  <div className="p-10 text-center flex flex-col items-center gap-3">
-                                    <AlertCircle className="w-8 h-8 text-muted-foreground opacity-20" />
-                                    <p className="text-xs opacity-50 italic">Mahsulotlar topilmadi. Avval katalogga qo'shing.</p>
-                                    <Link href="/products">
-                                      <Button variant="link" className="text-primary font-black text-[10px] uppercase tracking-widest">Katalogga o'tish</Button>
-                                    </Link>
-                                  </div>
-                                )}
                               </div>
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="w-full md:w-32 space-y-3">
                           <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
-                            {t.common.quantity} {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}
+                            Miqdor {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}
                           </Label>
                           <Input 
                             type="number" 
@@ -341,7 +368,7 @@ export default function StockInPage() {
                           />
                         </div>
                         <div className="w-full md:w-40 space-y-3">
-                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">{t.common.price} (so'm)</Label>
+                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Kirim narxi (so'm)</Label>
                           <Input 
                             type="number" 
                             className="h-14 rounded-2xl bg-background/50 border-none font-black text-lg"
@@ -371,15 +398,15 @@ export default function StockInPage() {
                 <ShoppingCart className="w-32 h-32" />
               </div>
               <CardHeader className="p-8 pb-4 relative z-10">
-                <CardTitle className="font-headline font-black text-xl tracking-tight">{t.common.summary}</CardTitle>
+                <CardTitle className="font-headline font-black text-xl tracking-tight">Xulosa</CardTitle>
               </CardHeader>
               <CardContent className="p-8 pt-4 space-y-8 relative z-10">
                 <div className="flex justify-between items-center pb-6 border-b border-white/10">
-                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">{t.common.totalItems}</span>
+                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">Jami turlar</span>
                   <span className="text-4xl font-black">{items.filter(i => i.productId).length}</span>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Jami kirim qiymati</p>
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Jami qiymati</p>
                   <p className="text-4xl font-black font-headline tracking-tighter leading-none">{totalValue.toLocaleString()} <span className="text-lg opacity-60">so'm</span></p>
                 </div>
               </CardContent>
@@ -389,12 +416,39 @@ export default function StockInPage() {
                   onClick={handleProcess} 
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><ArrowRight className="w-5 h-5 mr-3 transition-transform group-hover:translate-x-1" /> {t.stockIn.process}</>}
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-3 transition-transform group-hover:scale-110" /> Saqlash va Yakunlash</>}
                 </Button>
               </CardFooter>
             </Card>
           </div>
         </div>
+
+        <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl text-center">
+            <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight mb-2">Muvaffaqiyatli saqlandi!</DialogTitle>
+              <p className="text-muted-foreground font-medium">Kirim nakladnoyi muvaffaqiyatli rasmiylashtirildi. PDF formatida yuklab olishingiz mumkin.</p>
+            </DialogHeader>
+            <DialogFooter className="mt-8 flex-col sm:flex-col gap-3">
+              <Button 
+                onClick={handleDownloadPDF}
+                className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px] gap-3 shadow-xl shadow-primary/20"
+              >
+                <Download className="w-4 h-4" /> PDF Nakladnoyni yuklab olish
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setIsSuccessOpen(false)}
+                className="w-full h-12 rounded-2xl font-bold"
+              >
+                Yopish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
