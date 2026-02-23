@@ -441,7 +441,7 @@ export default function StockOutPage() {
         </div>
 
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
-          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl text-center">
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-md p-8 shadow-2xl text-center">
             <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
               <CheckCircle2 className="w-10 h-10" />
             </div>

@@ -137,8 +137,8 @@ export default function ReportsPage() {
       "Nomi": p.name,
       "Kategoriya": p.categoryId || "Umumiy",
       "Zaxira": p.stock || 0,
-      "Narx (so'm)": p.salePrice || 0,
-      "Jami Qiymat": (p.stock || 0) * (p.salePrice || 0),
+      "Narx (so'm)": (p.salePrice || 0).toLocaleString(),
+      "Jami Qiymat": ((p.stock || 0) * (p.salePrice || 0)).toLocaleString(),
       "Holat": (p.stock || 0) > (p.lowStockThreshold || 10) ? "Mavjud" : "Kam qolgan"
     })));
     const workbook = XLSXLib.utils.book_new();
