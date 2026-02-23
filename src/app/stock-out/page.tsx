@@ -265,7 +265,7 @@ export default function StockOutPage() {
                         <Label htmlFor="internal" className="cursor-pointer font-bold text-xs uppercase">Ichki</Label>
                       </div>
                     </RadioGroup>
-                    <div className="flex-1 relative">
+                    <div className="flex-1-relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-600/40" />
                       <Input 
                         placeholder="Mijoz / Qabul qiluvchi nomi" 
@@ -441,7 +441,7 @@ export default function StockOutPage() {
         </div>
 
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
-          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-md p-8 shadow-2xl text-center">
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl text-center">
             <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
               <CheckCircle2 className="w-10 h-10" />
             </div>
