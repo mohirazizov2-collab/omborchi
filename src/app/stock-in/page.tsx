@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -116,7 +115,7 @@ export default function StockInPage() {
           movementType: "StockIn",
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
-          responsibleUserName: currentUserName, // Bajaruvchi ismini saqlash
+          responsibleUserName: currentUserName,
           dnNumber: dnNumber,
           supplier: supplier,
           unitPrice: item.price,
