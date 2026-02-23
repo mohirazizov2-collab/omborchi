@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -17,8 +16,7 @@ import {
   Package, 
   UserCheck, 
   Download,
-  CheckCircle2,
-  ReceiptText
+  CheckCircle2
 } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
@@ -28,7 +26,6 @@ import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
@@ -90,7 +87,6 @@ export default function StockOutPage() {
 
     try {
       const invoiceItems = [];
-      // 1. Validate stock
       for (const item of items) {
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
@@ -109,7 +105,6 @@ export default function StockOutPage() {
         }
       }
 
-      // 2. Process transactions
       for (const item of items) {
         const product = products?.find(p => p.id === item.productId);
         const invId = `${warehouseId}_${item.productId}`;
@@ -124,7 +119,6 @@ export default function StockOutPage() {
           unit: product?.unit || "pcs"
         });
 
-        // Log Movement
         const movementData = {
           productId: item.productId,
           warehouseId: warehouseId,
@@ -139,7 +133,6 @@ export default function StockOutPage() {
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
-        // Update Global Product Stock
         if (product) {
           const productRef = doc(db, "products", item.productId);
           updateDocumentNonBlocking(productRef, {
@@ -148,7 +141,6 @@ export default function StockOutPage() {
           });
         }
 
-        // Update Warehouse Inventory
         updateDocumentNonBlocking(invRef, {
           stock: currentWhStock - (item.quantity || 0),
           updatedAt: new Date().toISOString()
@@ -187,8 +179,7 @@ export default function StockOutPage() {
     
     const doc = new jsPDFLib();
     
-    // Header
-    doc.setFillColor(225, 29, 72); // Rose-600
+    doc.setFillColor(225, 29, 72); 
     doc.rect(0, 0, 210, 40, 'F');
     doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
@@ -235,13 +226,13 @@ export default function StockOutPage() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">Chiqim Nakladnoyi</h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">Ombordan tovarlarni chiqarish (sotuv) va hujjatlashtirish.</p>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">Ombordan tovarlarni chiqarish va hujjatlashtirish.</p>
           </motion.div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 space-y-8">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem]">
               <CardHeader className="p-8">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
                   <UserCheck className="w-6 h-6 text-primary" /> Chiqim tafsilotlari
@@ -269,7 +260,7 @@ export default function StockOutPage() {
                   <div className="space-y-3">
                     <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Mijoz / Qabul qiluvchi</Label>
                     <Input 
-                      placeholder={clientType === 'external' ? "Mijoz nomi" : "Bo'lim nomi"} 
+                      placeholder="Mijoz nomi" 
                       className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
                       value={recipient} 
                       onChange={(e) => setRecipient(e.target.value)} 
@@ -304,7 +295,7 @@ export default function StockOutPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem]">
               <CardHeader className="p-8 flex flex-row items-center justify-between">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
                   <Package className="w-6 h-6 text-primary" /> Mahsulotlar ro'yxati
@@ -324,41 +315,36 @@ export default function StockOutPage() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         className={cn(
-                          "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border transition-all relative group",
-                          !item.productId ? "border-rose-500/20 bg-rose-500/[0.02]" : "border-border/10"
+                          "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border border-border/10 transition-all"
                         )}
                       >
                         <div className="flex-1 space-y-3">
-                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
-                            Mahsulot
-                          </Label>
+                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Mahsulot</Label>
                           <Select 
                             onValueChange={(val) => updateItem(item.id, "productId", val)}
                             value={item.productId}
                           >
                             <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm">
-                              <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Tanlang..."} />
+                              <SelectValue placeholder="Tanlang..." />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl max-h-[400px]">
-                              <div className="p-2 sticky top-0 bg-popover z-10">
+                              <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
                                  <div className="relative">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                     <Input 
                                       placeholder="Qidirish..." 
-                                      className="h-10 pl-10 text-sm rounded-xl bg-background/50"
+                                      className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none"
                                       value={item.searchQuery}
                                       onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
                                       onClick={(e) => e.stopPropagation()}
                                     />
                                  </div>
                               </div>
-                              {products?.filter(p => 
-                                p.name.toLowerCase().includes(item.searchQuery.toLowerCase())
-                              ).map((p) => (
+                              {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
                                 <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl">
                                   <div className="flex flex-col">
                                     <span className="font-bold">{p.name}</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase">{p.stock || 0} {t.units[p.unit as keyof typeof t.units] || p.unit} mavjud</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase">{p.stock || 0} mavjud</span>
                                   </div>
                                 </SelectItem>
                               ))}
@@ -366,9 +352,7 @@ export default function StockOutPage() {
                           </Select>
                         </div>
                         <div className="w-full md:w-40 space-y-3">
-                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
-                            Miqdor {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}
-                          </Label>
+                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Miqdor {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}</Label>
                           <Input 
                             type="number" 
                             className="h-14 rounded-2xl bg-background/50 border-none font-black text-center text-lg"
@@ -392,7 +376,7 @@ export default function StockOutPage() {
             </Card>
           </div>
 
-          <div className="lg:col-span-4 space-y-8">
+          <div className="lg:col-span-4">
             <Card className="border-none glass-card bg-rose-600 text-white rounded-[3rem] shadow-2xl sticky top-8 overflow-hidden">
               <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
                 <Package className="w-32 h-32" />
@@ -419,11 +403,11 @@ export default function StockOutPage() {
               </CardContent>
               <CardFooter className="p-8 pt-0 relative z-10">
                 <Button 
-                  className="w-full h-16 rounded-[1.5rem] bg-white text-rose-600 hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button group" 
+                  className="w-full h-16 rounded-[1.5rem] bg-white text-rose-600 hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button" 
                   onClick={handleDispatch} 
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-3 transition-transform group-hover:scale-110" /> Tasdiqlash va Yakunlash</>}
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-3" /> Tasdiqlash va Yakunlash</>}
                 </Button>
               </CardFooter>
             </Card>
@@ -437,12 +421,12 @@ export default function StockOutPage() {
             </div>
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight mb-2">Chiqim bajarildi!</DialogTitle>
-              <p className="text-muted-foreground font-medium">Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi. PDF formatida yuklab olishingiz mumkin.</p>
+              <p className="text-muted-foreground font-medium">Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi.</p>
             </DialogHeader>
             <DialogFooter className="mt-8 flex-col sm:flex-col gap-3">
               <Button 
                 onClick={handleDownloadPDF}
-                className="w-full h-14 rounded-2xl bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-3 shadow-xl shadow-rose-600/20"
+                className="w-full h-14 rounded-2xl bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-3"
               >
                 <Download className="w-4 h-4" /> PDF Nakladnoyni yuklab olish
               </Button>

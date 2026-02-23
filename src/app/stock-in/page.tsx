@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -14,13 +13,11 @@ import {
   Loader2, 
   Search, 
   PackageSearch, 
-  ArrowRight, 
-  AlertCircle, 
   ShoppingCart,
   Download,
   CheckCircle2
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, getDoc, setDoc } from "firebase/firestore";
@@ -86,7 +83,7 @@ export default function StockInPage() {
 
   const handleProcess = async () => {
     if (!dnNumber || !supplier || !warehouseId) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Barcha asosiy maydonlarni (Nakladnoy #, Yetkazib beruvchi, Ombor) to'ldiring." });
+      toast({ variant: "destructive", title: "Xatolik", description: "Barcha asosiy maydonlarni to'ldiring." });
       return;
     }
     if (items.some(i => !i.productId)) {
@@ -182,7 +179,6 @@ export default function StockInPage() {
     
     const doc = new jsPDFLib();
     
-    // Header
     doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, 210, 40, 'F');
     doc.setFontSize(22);
@@ -232,7 +228,7 @@ export default function StockInPage() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">Kirim Nakladnoyi</h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">Yetkazib beruvchilardan kelgan tovarlarni qayd etish va hujjatlashtirish.</p>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">Yetkazib beruvchilardan kelgan tovarlarni qayd etish.</p>
           </motion.div>
           
           <div className="flex gap-3">
@@ -246,7 +242,7 @@ export default function StockInPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 space-y-8">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem]">
               <CardHeader className="p-8">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
                   <FileText className="w-6 h-6 text-primary" /> Nakladnoy tafsilotlari
@@ -257,7 +253,7 @@ export default function StockInPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Nakladnoy raqami (DN)</Label>
                   <Input 
                     placeholder="DN-2026-XXX" 
-                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 focus:border-primary/40 transition-all" 
+                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
                     value={dnNumber}
                     onChange={(e) => setDnNumber(e.target.value)}
                   />
@@ -265,8 +261,8 @@ export default function StockInPage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Yetkazib beruvchi</Label>
                   <Input 
-                    placeholder="Kompaniya yoki shaxs nomi" 
-                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 focus:border-primary/40 transition-all" 
+                    placeholder="Kompaniya nomi" 
+                    className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
                     value={supplier}
                     onChange={(e) => setSupplier(e.target.value)}
                   />
@@ -274,10 +270,10 @@ export default function StockInPage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Qabul qiluvchi ombor</Label>
                   <Select onValueChange={setWarehouseId} value={warehouseId}>
-                    <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold focus:ring-primary/40 transition-all">
+                    <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold">
                       <SelectValue placeholder="Omborni tanlang" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-border/40">
+                    <SelectContent className="rounded-2xl">
                       {warehouses?.map((w) => (
                         <SelectItem key={w.id} value={w.id} className="font-bold">{w.name}</SelectItem>
                       ))}
@@ -291,7 +287,7 @@ export default function StockInPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem] overflow-hidden">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem]">
               <CardHeader className="p-8 flex flex-row items-center justify-between">
                 <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
                   <ShoppingCart className="w-6 h-6 text-primary" /> Tovarlar ro'yxati
@@ -311,55 +307,41 @@ export default function StockInPage() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         className={cn(
-                          "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border transition-all relative group",
-                          !item.productId ? "border-rose-500/20 bg-rose-500/[0.02]" : "border-border/10"
+                          "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border border-border/10 group transition-all"
                         )}
                       >
                         <div className="flex-1 space-y-3">
-                          <Label className={cn(
-                            "text-[10px] font-black uppercase tracking-widest pl-2",
-                            !item.productId ? "text-rose-500 opacity-100" : "opacity-40"
-                          )}>
-                            Mahsulot {!item.productId && "*"}
-                          </Label>
+                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Mahsulot</Label>
                           <Select 
                             onValueChange={(val) => updateItem(item.id, "productId", val)}
                             value={item.productId}
                           >
-                            <SelectTrigger className={cn(
-                              "h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm transition-all"
-                            )}>
-                              <SelectValue placeholder={productsLoading ? "Yuklanmoqda..." : "Tanlang..."} />
+                            <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm">
+                              <SelectValue placeholder="Tanlang..." />
                             </SelectTrigger>
-                            <SelectContent className="rounded-2xl max-h-[400px] border-border/40 shadow-2xl p-2">
-                              <div className="p-2 border-b border-border/10 sticky top-0 bg-popover z-10 mb-2">
-                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                    <Input 
-                                      placeholder="Qidiruv..." 
-                                      className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none"
-                                      value={item.searchQuery}
-                                      onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
-                                 </div>
+                            <SelectContent className="rounded-2xl max-h-[400px]">
+                              <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input 
+                                    placeholder="Qidirish..." 
+                                    className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none"
+                                    value={item.searchQuery}
+                                    onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
                               </div>
-                              <div className="space-y-1">
-                                {products?.filter(p => 
-                                  p.name.toLowerCase().includes(item.searchQuery.toLowerCase())
-                                ).map((p) => (
-                                  <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer">
-                                    <span className="font-bold text-sm">{p.name}</span>
-                                  </SelectItem>
-                                ))}
-                              </div>
+                              {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
+                                <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl cursor-pointer">
+                                  <span className="font-bold">{p.name}</span>
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="w-full md:w-32 space-y-3">
-                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">
-                            Miqdor {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}
-                          </Label>
+                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Miqdor {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}</Label>
                           <Input 
                             type="number" 
                             className="h-14 rounded-2xl bg-background/50 border-none font-black text-center text-lg"
@@ -379,7 +361,7 @@ export default function StockInPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-14 w-14 rounded-2xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors shrink-0"
+                          className="h-14 w-14 rounded-2xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors"
                           onClick={() => removeItem(item.id)}
                         >
                           <Trash2 className="w-6 h-6" />
@@ -392,8 +374,8 @@ export default function StockInPage() {
             </Card>
           </div>
 
-          <div className="lg:col-span-4 space-y-8">
-            <Card className="border-none glass-card bg-primary text-white rounded-[3rem] shadow-2xl shadow-primary/30 sticky top-8 overflow-hidden">
+          <div className="lg:col-span-4">
+            <Card className="border-none glass-card bg-primary text-white rounded-[3rem] shadow-2xl sticky top-8 overflow-hidden">
               <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
                 <ShoppingCart className="w-32 h-32" />
               </div>
@@ -412,11 +394,11 @@ export default function StockInPage() {
               </CardContent>
               <CardFooter className="p-8 pt-0 relative z-10">
                 <Button 
-                  className="w-full h-16 rounded-[1.5rem] bg-white text-primary hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button group" 
+                  className="w-full h-16 rounded-[1.5rem] bg-white text-primary hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button" 
                   onClick={handleProcess} 
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-3 transition-transform group-hover:scale-110" /> Saqlash va Yakunlash</>}
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-3" /> Saqlash va Yakunlash</>}
                 </Button>
               </CardFooter>
             </Card>
@@ -430,12 +412,12 @@ export default function StockInPage() {
             </div>
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight mb-2">Muvaffaqiyatli saqlandi!</DialogTitle>
-              <p className="text-muted-foreground font-medium">Kirim nakladnoyi muvaffaqiyatli rasmiylashtirildi. PDF formatida yuklab olishingiz mumkin.</p>
+              <p className="text-muted-foreground font-medium">Kirim nakladnoyi muvaffaqiyatli rasmiylashtirildi.</p>
             </DialogHeader>
             <DialogFooter className="mt-8 flex-col sm:flex-col gap-3">
               <Button 
                 onClick={handleDownloadPDF}
-                className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px] gap-3 shadow-xl shadow-primary/20"
+                className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px] gap-3"
               >
                 <Download className="w-4 h-4" /> PDF Nakladnoyni yuklab olish
               </Button>
