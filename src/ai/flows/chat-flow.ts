@@ -1,20 +1,20 @@
 'use server';
 /**
  * @fileOverview Omborchi GPT - Aqlli yordamchi uchun Genkit flow.
- * Bu flow endi mahsulotlar va omborlar haqida real ma'lumotlarni olish uchun asboblarga (tools) ega.
+ * Bu flow mahsulotlar va omborlar haqida real ma'lumotlarni olish uchun asboblarga (tools) ega.
  */
 
 import { ai, model } from '@/ai/genkit';
 import { z } from 'genkit';
 import { initializeFirebase } from '@/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
 
 // --- AI ASBOBLARI (TOOLS) ---
 
 /** Mahsulot qoldig'ini tekshirish asbobi */
 const checkProductStock = ai.defineTool(
   {
-    name: 'checkProductStock',
+    name: "checkProductStock",
     description: "Ombordagi muayyan mahsulotning joriy qoldig'ini va narxini tekshiradi.",
     inputSchema: z.object({
       productName: z.string().describe("Mahsulot nomi (to'liq yoki qisman)"),
@@ -28,8 +28,7 @@ const checkProductStock = ai.defineTool(
   },
   async (input) => {
     const { firestore } = initializeFirebase();
-    const q = query(collection(firestore, 'products'));
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(collection(firestore, "products"));
     const results = snapshot.docs
       .map(doc => doc.data())
       .filter(p => p.name.toLowerCase().includes(input.productName.toLowerCase()))
@@ -37,7 +36,7 @@ const checkProductStock = ai.defineTool(
         name: p.name,
         stock: p.stock || 0,
         price: p.salePrice || 0,
-        unit: p.unit || 'dona'
+        unit: p.unit || "dona"
       }));
     return results;
   }
@@ -46,7 +45,7 @@ const checkProductStock = ai.defineTool(
 /** Omborlar ro'yxatini olish asbobi */
 const listWarehouses = ai.defineTool(
   {
-    name: 'listWarehouses',
+    name: "listWarehouses",
     description: "Tizimdagi barcha faol omborxonalar va ularning manzillarini ko'rsatadi.",
     inputSchema: z.object({}),
     outputSchema: z.array(z.object({
@@ -57,13 +56,13 @@ const listWarehouses = ai.defineTool(
   },
   async () => {
     const { firestore } = initializeFirebase();
-    const snapshot = await getDocs(collection(firestore, 'warehouses'));
+    const snapshot = await getDocs(collection(firestore, "warehouses"));
     return snapshot.docs.map(doc => {
       const d = doc.data();
       return {
         name: d.name,
-        address: d.address || 'Manzil yo\'q',
-        phone: d.phoneNumber || 'Telefon yo\'q'
+        address: d.address || "Manzil yo'q",
+        phone: d.phoneNumber || "Telefon yo'q"
       };
     });
   }
@@ -72,23 +71,23 @@ const listWarehouses = ai.defineTool(
 // --- FLOW DEFINITION ---
 
 const ChatInputSchema = z.object({
-  message: z.string().describe('Foydalanuvchi xabari'),
+  message: z.string().describe("Foydalanuvchi xabari"),
   history: z.array(z.object({
-    role: z.enum(['user', 'model']),
+    role: z.enum(["user", "model"]),
     content: z.string()
-  })).optional().describe('Suhbat tarixi'),
+  })).optional().describe("Suhbat tarixi"),
 });
 
 export type ChatInput = z.infer<typeof ChatInputSchema>;
 
 const ChatOutputSchema = z.object({
-  response: z.string().describe('AI javobi'),
+  response: z.string().describe("AI javobi"),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
 const chatPrompt = ai.definePrompt({
-  name: 'chatPrompt',
+  name: "chatPrompt",
   model: model,
   tools: [checkProductStock, listWarehouses],
   input: { schema: ChatInputSchema },
@@ -120,13 +119,13 @@ export async function chatWithAI(input: ChatInput): Promise<ChatOutput> {
 
 const chatWithAIFlow = ai.defineFlow(
   {
-    name: 'chatWithAIFlow',
+    name: "chatWithAIFlow",
     inputSchema: ChatInputSchema,
     outputSchema: ChatOutputSchema,
   },
   async (input) => {
     const { output } = await chatPrompt(input);
-    if (!output) throw new Error('Omborchi GPT hozirda javob bera olmaydi.');
+    if (!output) throw new Error("Omborchi GPT hozirda javob bera olmaydi.");
     return output;
   }
 );
