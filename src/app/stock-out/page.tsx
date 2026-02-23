@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -16,9 +17,12 @@ import {
   Package, 
   UserCheck, 
   Download,
-  CheckCircle2
+  CheckCircle2,
+  Calendar,
+  Warehouse,
+  FileOutput
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, getDoc } from "firebase/firestore";
@@ -48,7 +52,7 @@ export default function StockOutPage() {
     if (!db) return null;
     return collection(db, "products");
   }, [db]);
-  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
+  const { data: products } = useCollection(productsQuery);
 
   const warehousesQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -63,8 +67,6 @@ export default function StockOutPage() {
   const removeItem = (id: string) => {
     if (items.length > 1) {
       setItems(items.filter(item => item.id !== id));
-    } else {
-      setItems([{ id: generateId(), productId: "", quantity: 1, searchQuery: "" }]);
     }
   };
 
@@ -219,199 +221,221 @@ export default function StockOutPage() {
     doc.save(`Chiqim_Nakladnoy_${processedInvoice.orderNumber}.pdf`);
   };
 
+  const totalValue = useMemo(() => {
+    return items.reduce((acc, item) => {
+      const p = products?.find(prod => prod.id === item.productId);
+      return acc + ((item.quantity || 0) * (p?.salePrice || 0));
+    }, 0);
+  }, [items, products]);
+
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-            <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">Chiqim Nakladnoyi</h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">Ombordan tovarlarni chiqarish va hujjatlashtirish.</p>
-          </motion.div>
+      <main className="flex-1 p-6 md:p-8 overflow-y-auto page-transition">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+          <div>
+            <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground flex items-center gap-3">
+              <FileOutput className="w-8 h-8 text-rose-600" /> Chiqim Nakladnoyi
+            </h1>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">Ombordan tovarlarni chiqarish va sotuv.</p>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 space-y-8">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem]">
-              <CardHeader className="p-8">
-                <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
-                  <UserCheck className="w-6 h-6 text-primary" /> Chiqim tafsilotlari
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-8 pt-0 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Mijoz turi</Label>
+        <div className="space-y-6">
+          {/* Metadata Section */}
+          <Card className="border-none shadow-sm rounded-3xl bg-card/40 backdrop-blur-xl">
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mijoz turi va nomi</Label>
+                  <div className="flex flex-col md:flex-row gap-4">
                     <RadioGroup 
                       value={clientType} 
                       onValueChange={(v: any) => setClientType(v)}
-                      className="flex gap-4 p-2 bg-muted/20 rounded-2xl"
+                      className="flex gap-2 p-1.5 bg-muted/20 rounded-xl"
                     >
-                      <div className="flex items-center space-x-2 bg-background/50 px-4 py-2 rounded-xl flex-1 cursor-pointer">
+                      <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg cursor-pointer transition-all", clientType === 'external' ? "bg-background shadow-sm" : "opacity-50")}>
                         <RadioGroupItem value="external" id="external" />
-                        <Label htmlFor="external" className="cursor-pointer font-bold">Tashqi mijoz</Label>
+                        <Label htmlFor="external" className="cursor-pointer font-bold text-xs uppercase">Tashqi</Label>
                       </div>
-                      <div className="flex items-center space-x-2 bg-background/50 px-4 py-2 rounded-xl flex-1 cursor-pointer">
+                      <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg cursor-pointer transition-all", clientType === 'internal' ? "bg-background shadow-sm" : "opacity-50")}>
                         <RadioGroupItem value="internal" id="internal" />
-                        <Label htmlFor="internal" className="cursor-pointer font-bold">Ichki mijoz</Label>
+                        <Label htmlFor="internal" className="cursor-pointer font-bold text-xs uppercase">Ichki</Label>
                       </div>
                     </RadioGroup>
-                  </div>
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Mijoz / Qabul qiluvchi</Label>
-                    <Input 
-                      placeholder="Mijoz nomi" 
-                      className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
-                      value={recipient} 
-                      onChange={(e) => setRecipient(e.target.value)} 
-                    />
+                    <div className="flex-1 relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-600/40" />
+                      <Input 
+                        placeholder="Mijoz / Qabul qiluvchi nomi" 
+                        className="h-11 pl-10 rounded-xl bg-background/50 border-border/40 font-bold" 
+                        value={recipient} 
+                        onChange={(e) => setRecipient(e.target.value)} 
+                      />
+                    </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Chiqaruvchi ombor</Label>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Chiqaruvchi ombor</Label>
                     <Select onValueChange={setWarehouseId} value={warehouseId}>
-                      <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold">
-                        <SelectValue placeholder="Omborni tanlang" />
+                      <SelectTrigger className="h-11 rounded-xl bg-background/50 border-border/40 font-bold">
+                        <div className="flex items-center gap-2">
+                          <Warehouse className="w-4 h-4 text-rose-600/40" />
+                          <SelectValue placeholder="Tanlang" />
+                        </div>
                       </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-border/40">
+                      <SelectContent className="rounded-xl">
                         {warehouses?.map((w) => (
-                          <SelectItem key={w.id} value={w.id} className="font-bold">{w.name}</SelectItem>
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50">Hujjat raqami</Label>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Hujjat raqami</Label>
                     <Input 
-                      placeholder="SALE-2026-XXX" 
-                      className="h-14 rounded-2xl bg-background/50 border-border/40 font-bold" 
+                      placeholder="SALE-00001" 
+                      className="h-11 rounded-xl bg-background/50 border-border/40 font-bold" 
                       value={orderNumber} 
                       onChange={(e) => setOrderNumber(e.target.value)} 
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[3rem]">
-              <CardHeader className="p-8 flex flex-row items-center justify-between">
-                <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
-                  <Package className="w-6 h-6 text-primary" /> Mahsulotlar ro'yxati
-                </CardTitle>
-                <Button variant="outline" size="sm" onClick={addItem} className="gap-2 rounded-xl font-black uppercase text-[9px] tracking-widest h-9 px-4 border-rose-500/20 text-rose-600 hover:bg-rose-500/5">
-                  <Plus className="w-4 h-4" /> Yangi qator
-                </Button>
-              </CardHeader>
-              <CardContent className="p-8 pt-0 space-y-4">
-                <AnimatePresence mode="popLayout">
-                  {items.map((item) => {
-                    const selectedProduct = products?.find(p => p.id === item.productId);
-                    return (
-                      <motion.div 
-                        key={item.id} 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className={cn(
-                          "flex flex-col md:flex-row gap-4 p-6 rounded-[2.5rem] bg-muted/10 border border-border/10 transition-all"
-                        )}
-                      >
-                        <div className="flex-1 space-y-3">
-                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Mahsulot</Label>
-                          <Select 
-                            onValueChange={(val) => updateItem(item.id, "productId", val)}
-                            value={item.productId}
-                          >
-                            <SelectTrigger className="h-14 rounded-2xl bg-background/50 border-none font-bold shadow-sm">
-                              <SelectValue placeholder="Tanlang..." />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl max-h-[400px]">
-                              <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
-                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                    <Input 
-                                      placeholder="Qidirish..." 
-                                      className="h-10 pl-10 text-sm rounded-xl bg-background/50 border-none"
-                                      value={item.searchQuery}
-                                      onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
-                                 </div>
-                              </div>
-                              {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
-                                <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl">
-                                  <div className="flex flex-col">
-                                    <span className="font-bold">{p.name}</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase">{p.stock || 0} mavjud</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="w-full md:w-40 space-y-3">
-                          <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-40">Miqdor {selectedProduct && `(${t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit})`}</Label>
-                          <Input 
-                            type="number" 
-                            className="h-14 rounded-2xl bg-background/50 border-none font-black text-center text-lg"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
-                          />
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-14 w-14 rounded-2xl hover:bg-rose-500/10 text-rose-500 self-end md:self-center transition-colors"
-                          onClick={() => removeItem(item.id)}
-                        >
-                          <Trash2 className="w-6 h-6" />
-                        </Button>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-4">
-            <Card className="border-none glass-card bg-rose-600 text-white rounded-[3rem] shadow-2xl sticky top-8 overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
-                <Package className="w-32 h-32" />
               </div>
-              <CardHeader className="p-8 pb-4 relative z-10">
-                <CardTitle className="font-headline font-black text-2xl tracking-tight">Xulosa</CardTitle>
-              </CardHeader>
-              <CardContent className="p-8 pt-4 space-y-8 relative z-10">
-                <div className="flex justify-between items-center pb-6 border-b border-white/10">
-                  <span className="text-white/60 text-xs font-black uppercase tracking-widest">Jami turlar</span>
-                  <span className="text-4xl font-black">{items.filter(i => i.productId).length}</span>
+            </CardContent>
+          </Card>
+
+          {/* Items Table Section */}
+          <Card className="border-none shadow-sm rounded-3xl bg-card/40 backdrop-blur-xl overflow-hidden">
+            <div className="p-6 border-b border-border/10 flex justify-between items-center bg-muted/10">
+              <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
+                <Package className="w-4 h-4 text-rose-600" /> Mahsulotlar ro'yxati
+              </h3>
+              <Button onClick={addItem} size="sm" variant="outline" className="rounded-xl h-9 px-4 font-black uppercase text-[10px] tracking-widest border-rose-600/20 text-rose-600 hover:bg-rose-600/5">
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> Yangi qator
+              </Button>
+            </div>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-muted/30 text-[10px] uppercase font-black tracking-widest text-muted-foreground">
+                    <tr>
+                      <th className="px-6 py-4 w-12 text-center">№</th>
+                      <th className="px-4 py-4 min-w-[300px]">Mahsulot nomi</th>
+                      <th className="px-4 py-4 w-24">Birlik</th>
+                      <th className="px-4 py-4 w-32 text-center">Ombordagi qoldiq</th>
+                      <th className="px-4 py-4 w-32">Chiqim miqdori</th>
+                      <th className="px-4 py-4 w-40">Sotuv narxi</th>
+                      <th className="px-4 py-4 w-40">Jami summasi</th>
+                      <th className="px-6 py-4 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/10">
+                    <AnimatePresence mode="popLayout">
+                      {items.map((item, index) => {
+                        const p = products?.find(prod => prod.id === item.productId);
+                        const rowTotal = (item.quantity || 0) * (p?.salePrice || 0);
+                        return (
+                          <motion.tr 
+                            key={item.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="hover:bg-rose-600/[0.02] group"
+                          >
+                            <td className="px-6 py-3 text-center text-xs font-bold opacity-40">{index + 1}</td>
+                            <td className="px-4 py-3">
+                              <Select 
+                                onValueChange={(val) => updateItem(item.id, "productId", val)}
+                                value={item.productId}
+                              >
+                                <SelectTrigger className="h-10 rounded-lg bg-background/50 border-border/40 font-bold focus:ring-rose-600/20">
+                                  <SelectValue placeholder="Mahsulot tanlang..." />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl max-h-[300px]">
+                                  <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
+                                    <div className="relative">
+                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                                      <Input 
+                                        placeholder="Qidirish..." 
+                                        className="h-9 pl-9 text-xs rounded-lg bg-background/50 border-none"
+                                        value={item.searchQuery}
+                                        onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  </div>
+                                  {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
+                                    <SelectItem key={p.id} value={p.id} className="py-2.5 rounded-lg cursor-pointer font-bold">
+                                      {p.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs font-black uppercase text-muted-foreground">
+                                {p ? (t.units[p.unit as keyof typeof t.units] || p.unit) : '---'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={cn("text-xs font-black px-2 py-1 rounded-md", (p?.stock || 0) < 5 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600")}>
+                                {p?.stock || 0}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input 
+                                type="number" 
+                                className="h-10 rounded-lg bg-background/50 border-border/40 font-black text-center"
+                                value={item.quantity}
+                                onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-bold text-sm">
+                              {p?.salePrice.toLocaleString() || 0}
+                            </td>
+                            <td className="px-4 py-3 font-black text-sm text-rose-600">
+                              {rowTotal.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-3">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-lg hover:bg-rose-500/10 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removeItem(item.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+            <CardFooter className="p-6 bg-muted/10 border-t border-border/10 flex justify-between items-center">
+              <div className="flex gap-10">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Jami turlar</span>
+                  <span className="text-xl font-black">{items.filter(i => i.productId).length} ta</span>
                 </div>
-                <div className="space-y-4">
-                   <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/10 border border-white/5">
-                      <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-                         <User className="w-6 h-6" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase opacity-50 tracking-widest">Mijoz</p>
-                        <p className="font-bold text-sm truncate">{recipient || '---'}</p>
-                      </div>
-                   </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Umumiy Sotuv Summasi</span>
+                  <span className="text-2xl font-black text-rose-600">{totalValue.toLocaleString()} <span className="text-xs">so'm</span></span>
                 </div>
-              </CardContent>
-              <CardFooter className="p-8 pt-0 relative z-10">
-                <Button 
-                  className="w-full h-16 rounded-[1.5rem] bg-white text-rose-600 hover:bg-white/90 font-black uppercase tracking-[0.2em] text-[12px] shadow-2xl border-none premium-button" 
-                  onClick={handleDispatch} 
-                  disabled={loading}
-                >
-                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-3" /> Tasdiqlash va Yakunlash</>}
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
+              </div>
+              <Button 
+                className="h-14 rounded-2xl px-10 bg-rose-600 text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-rose-600/20 border-none premium-button" 
+                onClick={handleDispatch} 
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                Tasdiqlash va Chiqarish
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
 
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
