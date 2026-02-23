@@ -76,6 +76,8 @@ export default function EmployeesPage() {
   }, [db, user]);
   const { data: employees, isLoading } = useCollection(employeesQuery);
 
+  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+
   const filteredEmployees = useMemo(() => {
     return employees?.filter(e => {
       return e.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -186,19 +188,19 @@ export default function EmployeesPage() {
     doc.text(`Davr: ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`, 20, 54);
 
     doc.line(20, 60, 190, 60);
-    doc.text("Asosiy maosh:", 20, 70); doc.text(`${emp.baseSalary.toLocaleString()} so'm`, 140, 70);
-    doc.text("Ortiqcha ish haqi:", 20, 77); doc.text(`${((parseFloat(pData.overtimeHours) || 0) * (emp.overtimeHourlyRate || 0)).toLocaleString()} so'm`, 140, 77);
-    doc.text("Bonuslar:", 20, 84); doc.text(`${(parseFloat(pData.bonus) || 0).toLocaleString()} so'm`, 140, 84);
+    doc.text("Asosiy maosh:", 20, 70); doc.text(`${formatMoney(emp.baseSalary)} so'm`, 140, 70);
+    doc.text("Ortiqcha ish haqi:", 20, 77); doc.text(`${formatMoney((parseFloat(pData.overtimeHours) || 0) * (emp.overtimeHourlyRate || 0))} so'm`, 140, 77);
+    doc.text("Bonuslar:", 20, 84); doc.text(`${formatMoney(parseFloat(pData.bonus) || 0)} so'm`, 140, 84);
     doc.setFont("helvetica", "bold");
-    doc.text("BRUTTO JAMI:", 20, 94); doc.text(`${brutto.toLocaleString()} so'm`, 140, 94);
+    doc.text("BRUTTO JAMI:", 20, 94); doc.text(`${formatMoney(brutto)} so'm`, 140, 94);
     
     doc.setFont("helvetica", "normal");
-    doc.text(`Soliq (${emp.taxRate}%):`, 20, 104); doc.text(`- ${taxAmount.toLocaleString()} so'm`, 140, 104);
-    doc.text("Boshqa ayirmalar:", 20, 111); doc.text(`- ${(parseFloat(pData.deductions) || 0).toLocaleString()} so'm`, 140, 111);
+    doc.text(`Soliq (${emp.taxRate}%):`, 20, 104); doc.text(`- ${formatMoney(taxAmount)} so'm`, 140, 104);
+    doc.text("Boshqa ayirmalar:", 20, 111); doc.text(`- ${formatMoney(parseFloat(pData.deductions) || 0)} so'm`, 140, 111);
     
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("NETTO (QO'LGA):", 20, 125); doc.text(`${netto.toLocaleString()} so'm`, 140, 125);
+    doc.text("NETTO (QO'LGA):", 20, 125); doc.text(`${formatMoney(netto)} so'm`, 140, 125);
 
     doc.save(`Payroll_${emp.fullName}_${Date.now()}.pdf`);
   };
@@ -263,7 +265,7 @@ export default function EmployeesPage() {
                       <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">{t.employees.baseSalary}</Label>
                       <Input 
                         type="number"
-                        className="h-12 rounded-2xl bg-background/50"
+                        className="h-12 rounded-2xl bg-background/50 border-border/40 font-black"
                         value={formData.baseSalary} 
                         onChange={(e) => setFormData({...formData, baseSalary: e.target.value})}
                       />
@@ -376,8 +378,8 @@ export default function EmployeesPage() {
                           <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50 flex items-center gap-1.5">
                             <Wallet className="w-3 h-3" /> {t.employees.baseSalary}
                           </p>
-                          <p className="text-sm font-black text-primary">
-                            {(emp.baseSalary || 0).toLocaleString()}
+                          <p className="text-sm font-black text-primary font-headline">
+                            {formatMoney(emp.baseSalary || 0)}
                           </p>
                         </div>
                       </div>
@@ -462,20 +464,20 @@ export default function EmployeesPage() {
               <div className="bg-primary/5 rounded-[2rem] p-6 space-y-4 border border-primary/10">
                 <div className="space-y-1">
                   <p className="text-[10px] font-black uppercase opacity-40">{t.payroll.brutto}</p>
-                  <p className="text-xl font-black text-foreground">
-                    {calculatePayroll(selectedEmployee || {}, payrollData).brutto.toLocaleString()} so'm
+                  <p className="text-xl font-black text-foreground font-headline">
+                    {formatMoney(calculatePayroll(selectedEmployee || {}, payrollData).brutto)} so'm
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-black uppercase opacity-40">{t.payroll.tax} ({selectedEmployee?.taxRate}%)</p>
-                  <p className="text-lg font-bold text-rose-500">
-                    - {calculatePayroll(selectedEmployee || {}, payrollData).taxAmount.toLocaleString()} so'm
+                  <p className="text-lg font-bold text-rose-500 font-headline">
+                    - {formatMoney(calculatePayroll(selectedEmployee || {}, payrollData).taxAmount)} so'm
                   </p>
                 </div>
                 <div className="pt-4 border-t border-primary/10">
                   <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">{t.payroll.netto}</p>
                   <p className="text-3xl font-black text-primary font-headline">
-                    {calculatePayroll(selectedEmployee || {}, payrollData).netto.toLocaleString()}
+                    {formatMoney(calculatePayroll(selectedEmployee || {}, payrollData).netto)}
                   </p>
                   <p className="text-[10px] font-bold text-primary/60 uppercase">so'm (UZS)</p>
                 </div>

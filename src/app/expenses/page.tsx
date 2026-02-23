@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -63,6 +62,8 @@ export default function ExpensesPage() {
     return collection(db, "expenses");
   }, [db, user]);
   const { data: expenses, isLoading } = useCollection(expensesQuery);
+
+  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
   const filteredExpenses = useMemo(() => {
     return expenses?.filter(e => {
@@ -208,7 +209,7 @@ export default function ExpensesPage() {
               <WalletCards className="w-24 h-24 rotate-12" />
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">{t.expenses.total}</p>
-            <p className="text-3xl font-black font-headline tracking-tighter">{totalAmount.toLocaleString()} <span className="text-xs opacity-60">so'm</span></p>
+            <p className="text-3xl font-black font-headline tracking-tighter">{formatMoney(totalAmount)} <span className="text-xs opacity-60">so'm</span></p>
           </Card>
 
           <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] p-4 md:col-span-3 flex flex-col md:flex-row items-center gap-4">
@@ -281,9 +282,11 @@ export default function ExpensesPage() {
                       </div>
 
                       <div className="space-y-4">
-                        <div className="p-4 rounded-2xl bg-muted/20">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">{t.expenses.amount}</p>
-                          <p className="text-2xl font-black text-rose-500">{exp.amount.toLocaleString()} <span className="text-xs">so'm</span></p>
+                        <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1 flex items-center gap-2">
+                            <TrendingDown className="w-3 h-3 text-rose-500" /> {t.expenses.amount}
+                          </p>
+                          <p className="text-2xl font-black text-rose-500 font-headline tracking-tight">{formatMoney(exp.amount)} <span className="text-xs">so'm</span></p>
                         </div>
 
                         {exp.description && (

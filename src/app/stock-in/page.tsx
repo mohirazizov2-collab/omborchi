@@ -58,6 +58,8 @@ export default function StockInPage() {
   }, [db]);
   const { data: warehouses } = useCollection(warehousesQuery);
 
+  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+
   const addItem = () => {
     setItems([...items, { id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
   };
@@ -171,7 +173,7 @@ export default function StockInPage() {
       console.error(err);
       toast({ variant: "destructive", title: "Xatolik", description: "Saqlashda xato yuz berdi." });
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
     }
   };
 
@@ -203,8 +205,8 @@ export default function StockInPage() {
       it.name,
       it.quantity,
       t.units[it.unit as keyof typeof t.units] || it.unit,
-      `${it.price.toLocaleString()} so'm`,
-      `${(it.quantity * it.price).toLocaleString()} so'm`
+      `${formatMoney(it.price)} so'm`,
+      `${formatMoney(it.quantity * it.price)} so'm`
     ]);
 
     (doc as any).autoTable({
@@ -220,7 +222,7 @@ export default function StockInPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`UMUMIY SUMMA: ${total.toLocaleString()} so'm`, 140, finalY);
+    doc.text(`UMUMIY SUMMA: ${formatMoney(total)} so'm`, 140, finalY);
 
     doc.save(`Kirim_Nakladnoy_${processedInvoice.dnNumber}.pdf`);
   };
@@ -389,8 +391,8 @@ export default function StockInPage() {
                                 {unitLabel && <p className="text-[9px] font-black text-muted-foreground uppercase opacity-50">1 {unitLabel} uchun</p>}
                               </div>
                             </td>
-                            <td className="px-4 py-3 font-black text-sm text-primary">
-                              {rowTotal.toLocaleString()}
+                            <td className="px-4 py-3 font-black text-sm text-primary font-headline">
+                              {formatMoney(rowTotal)}
                             </td>
                             <td className="px-6 py-3">
                               <Button 
@@ -418,7 +420,7 @@ export default function StockInPage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Umumiy Summa</span>
-                  <span className="text-2xl font-black text-primary">{totalValue.toLocaleString()} <span className="text-xs">so'm</span></span>
+                  <span className="text-2xl font-black text-primary font-headline">{formatMoney(totalValue)} <span className="text-xs">so'm</span></span>
                 </div>
               </div>
               <Button 

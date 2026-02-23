@@ -70,6 +70,8 @@ export default function StockOutPage() {
   }, [db]);
   const { data: inventory } = useCollection(inventoryQuery);
 
+  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+
   const getStockForProduct = (pId: string) => {
     if (!warehouseId || !pId || !inventory) return 0;
     const invItem = inventory.find(i => i.warehouseId === warehouseId && i.productId === pId);
@@ -217,7 +219,7 @@ export default function StockOutPage() {
       console.error(err);
       toast({ variant: "destructive", title: "Xatolik", description: "Saqlashda xato yuz berdi." });
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
     }
   };
 
@@ -245,8 +247,8 @@ export default function StockOutPage() {
       it.name,
       it.quantity,
       t.units[it.unit as keyof typeof t.units] || it.unit,
-      `${it.price.toLocaleString()} so'm`,
-      `${(it.quantity * it.price).toLocaleString()} so'm`
+      `${formatMoney(it.price)} so'm`,
+      `${formatMoney(it.quantity * it.price)} so'm`
     ]);
 
     (doc as any).autoTable({
@@ -262,7 +264,7 @@ export default function StockOutPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`UMUMIY SUMMA: ${total.toLocaleString()} so'm`, 140, finalY);
+    doc.text(`UMUMIY SUMMA: ${formatMoney(total)} so'm`, 140, finalY);
 
     doc.save(`Chiqim_Nakladnoy_${processedInvoice.orderNumber}.pdf`);
   };
@@ -457,10 +459,10 @@ export default function StockOutPage() {
                               </div>
                             </td>
                             <td className={cn(
-                              "px-4 py-3 font-black text-sm",
+                              "px-4 py-3 font-black text-sm font-headline",
                               item.quantity > stock ? "text-rose-600" : "text-foreground"
                             )}>
-                              {rowTotal.toLocaleString()}
+                              {formatMoney(rowTotal)}
                             </td>
                             <td className="px-6 py-3">
                               <Button 
@@ -488,8 +490,8 @@ export default function StockOutPage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Umumiy Sotuv Summasi</span>
-                  <span className={cn("text-2xl font-black", validation.isValid ? "text-rose-600" : "text-muted-foreground opacity-50")}>
-                    {totalValue.toLocaleString()} <span className="text-xs">so'm</span>
+                  <span className={cn("text-2xl font-black font-headline", validation.isValid ? "text-rose-600" : "text-muted-foreground opacity-50")}>
+                    {formatMoney(totalValue)} <span className="text-xs">so'm</span>
                   </span>
                 </div>
               </div>
@@ -532,7 +534,7 @@ export default function StockOutPage() {
                 </div>
                 <div className="flex justify-between items-center pt-1">
                   <span className="text-rose-600 font-black uppercase text-[10px] tracking-widest">Umumiy Summa</span>
-                  <span className="text-xl font-black text-rose-600">{totalValue.toLocaleString()} so'm</span>
+                  <span className="text-xl font-black text-rose-600 font-headline">{formatMoney(totalValue)} so'm</span>
                 </div>
               </div>
               

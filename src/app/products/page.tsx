@@ -64,6 +64,8 @@ export default function ProductsPage() {
     return Array.from(cats);
   }, [products]);
 
+  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+
   const handleSave = () => {
     if (!db || !user || !formData.name) return;
     
@@ -295,7 +297,7 @@ export default function ProductsPage() {
                             {t.units[p.unit as keyof typeof t.units] || p.unit || '---'}
                           </span>
                         </td>
-                        <td className="px-6 py-5 font-black text-sm">{p.salePrice.toLocaleString()} so'm</td>
+                        <td className="px-6 py-5 font-black text-sm">{formatMoney(p.salePrice)} so'm</td>
                         <td className="px-6 py-5">
                           <Badge 
                             variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}
