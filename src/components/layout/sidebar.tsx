@@ -49,21 +49,32 @@ export function OmniSidebar() {
   const isAdmin = role === "Admin" || isSuperAdmin;
   const isOmborchi = role === "Omborchi";
 
-  const navigation = useMemo(() => [
+  // Analitika Guruhi
+  const analyticsNavigation = useMemo(() => [
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
-    { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
-    { name: t.nav.products, href: "/products", icon: Package },
-    { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
     { name: t.nav.history, href: "/history", icon: History },
-    { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
-  ], [t, isAdmin, isSuperAdmin, isOmborchi]);
+  ], [t, isOmborchi]);
 
+  // Operatsiyalar Guruhi (Nakladnolar)
   const invoiceNavigation = useMemo(() => [
     { name: t.nav.stockIn, href: "/stock-in", icon: FileInput },
     { name: t.nav.stockOut, href: "/stock-out", icon: FileOutput },
   ], [t]);
 
+  // Inventar Boshqaruvi Guruhi
+  const inventoryNavigation = useMemo(() => [
+    { name: t.nav.products, href: "/products", icon: Package },
+    { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
+    { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
+  ], [t, isAdmin, isOmborchi]);
+
+  // HR Guruhi
+  const hrNavigation = useMemo(() => [
+    { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
+  ], [t, isAdmin]);
+
+  // Ma'muriyat Guruhi
   const adminNavigation = useMemo(() => [
     { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isSuperAdmin },
     { name: t.nav.settings, href: "/settings", icon: Settings, hide: !isAdmin },
@@ -74,6 +85,28 @@ export function OmniSidebar() {
     : (user?.email ? user.email[0].toUpperCase() : 'U'), [user]);
 
   const isInvoiceActive = pathname === "/stock-in" || pathname === "/stock-out";
+
+  const renderLinks = (items: any[]) => {
+    return items.filter(item => !item.hide).map((item) => {
+      const isActive = pathname === item.href;
+      return (
+        <Link
+          key={item.name}
+          href={item.href}
+          className={cn(
+            "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 group",
+            isActive ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <item.icon className={cn("w-4 h-4", isActive ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
+            {item.name}
+          </div>
+          {isActive && <ChevronRight className="w-3 h-3 opacity-50" />}
+        </Link>
+      );
+    });
+  };
 
   return (
     <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
@@ -108,81 +141,71 @@ export function OmniSidebar() {
           <ThemeToggle />
         </div>
 
-        <nav className="space-y-1">
-          {navigation.filter(item => !item.hide).map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 group",
-                  isActive ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon className={cn("w-4 h-4", isActive ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
-                  {item.name}
-                </div>
-                {isActive && <ChevronRight className="w-3 h-3 opacity-50" />}
-              </Link>
-            );
-          })}
-
-          <Accordion type="single" collapsible defaultValue={isInvoiceActive ? "invoices" : ""}>
-            <AccordionItem value="invoices" className="border-none">
-              <AccordionTrigger className={cn(
-                "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 hover:no-underline hover:bg-muted group",
-                isInvoiceActive ? "text-primary" : "text-muted-foreground"
-              )}>
-                <div className="flex items-center gap-3">
-                  <FileText className={cn("w-4 h-4", isInvoiceActive ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
-                  {t.nav.invoices}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pb-0 pt-1 pl-4 space-y-1">
-                {invoiceNavigation.map((subItem) => {
-                  const isSubActive = pathname === subItem.href;
-                  return (
-                    <Link
-                      key={subItem.name}
-                      href={subItem.href}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-200",
-                        isSubActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <subItem.icon className="w-3.5 h-3.5" />
-                      {subItem.name}
-                    </Link>
-                  );
-                })}
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </nav>
-
-        {(isAdmin || isSuperAdmin) && (
-          <div className="pt-4 border-t space-y-1">
-            <p className="px-3 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">Admin</p>
-            {adminNavigation.filter(item => !item.hide).map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 group",
-                    isActive ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <item.icon className={cn("w-4 h-4", isActive ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
-                  {item.name}
-                </Link>
-              );
-            })}
+        <nav className="space-y-6">
+          {/* Analitika Guruhi */}
+          <div className="space-y-1">
+            <p className="px-3 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">{t.nav.analyticsGroup}</p>
+            {renderLinks(analyticsNavigation)}
           </div>
-        )}
+
+          {/* Operatsiyalar Guruhi */}
+          <div className="space-y-1">
+            <p className="px-3 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">{t.nav.operationsGroup}</p>
+            <Accordion type="single" collapsible defaultValue={isInvoiceActive ? "invoices" : ""}>
+              <AccordionItem value="invoices" className="border-none">
+                <AccordionTrigger className={cn(
+                  "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 hover:no-underline hover:bg-muted group",
+                  isInvoiceActive ? "text-primary" : "text-muted-foreground"
+                )}>
+                  <div className="flex items-center gap-3">
+                    <FileText className={cn("w-4 h-4", isInvoiceActive ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
+                    {t.nav.invoices}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pb-0 pt-1 pl-4 space-y-1">
+                  {invoiceNavigation.map((subItem) => {
+                    const isSubActive = pathname === subItem.href;
+                    return (
+                      <Link
+                        key={subItem.name}
+                        href={subItem.href}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-200",
+                          isSubActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <subItem.icon className="w-3.5 h-3.5" />
+                        {subItem.name}
+                      </Link>
+                    );
+                  })}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+
+          {/* Inventar Guruhi */}
+          <div className="space-y-1">
+            <p className="px-3 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">{t.nav.inventoryGroup}</p>
+            {renderLinks(inventoryNavigation)}
+          </div>
+
+          {/* HR Guruhi */}
+          {(isAdmin) && (
+            <div className="space-y-1">
+              <p className="px-3 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">{t.nav.hrGroup}</p>
+              {renderLinks(hrNavigation)}
+            </div>
+          )}
+
+          {/* Ma'muriyat Guruhi */}
+          {(isAdmin || isSuperAdmin) && (
+            <div className="pt-4 border-t space-y-1">
+              <p className="px-3 mb-2 text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50">{t.nav.systemGroup}</p>
+              {renderLinks(adminNavigation)}
+            </div>
+          )}
+        </nav>
       </div>
 
       <div className="p-4 border-t shrink-0">

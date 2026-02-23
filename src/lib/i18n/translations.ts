@@ -20,7 +20,13 @@ export const translations = {
       menu: "Menyu",
       administration: "Administratsiya",
       profile: "Profil",
-      inventoryAudit: "Inventarizatsiya"
+      inventoryAudit: "Inventarizatsiya",
+      // Guruh nomlari
+      analyticsGroup: "Analitika",
+      operationsGroup: "Operatsiyalar",
+      inventoryGroup: "Inventar boshqaruvi",
+      hrGroup: "Kadrlar",
+      systemGroup: "Tizim ma'muriyati"
     },
     units: {
       label: "O'lcham birligi",
@@ -258,7 +264,12 @@ export const translations = {
       menu: 'Меню',
       administration: 'Администрирование',
       profile: 'Профиль',
-      inventoryAudit: 'Инвентаризация'
+      inventoryAudit: 'Инвентаризация',
+      analyticsGroup: "Аналитика",
+      operationsGroup: "Операции",
+      inventoryGroup: "Управление запасами",
+      hrGroup: "Кадры",
+      systemGroup: "Администрирование"
     },
     units: {
       label: "Ед. измерения",
@@ -496,7 +507,12 @@ export const translations = {
       menu: 'Menu',
       administration: 'Administration',
       profile: 'Profile',
-      inventoryAudit: 'Stock Audit'
+      inventoryAudit: 'Stock Audit',
+      analyticsGroup: "Analytics",
+      operationsGroup: "Operations",
+      inventoryGroup: "Inventory Management",
+      hrGroup: "HR",
+      systemGroup: "Administration"
     },
     units: {
       label: "Unit",
