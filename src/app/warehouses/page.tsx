@@ -17,10 +17,11 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Warehouse as WarehouseIcon, MapPin, Phone, User, MoreVertical, Plus, Loader2, Package } from "lucide-react";
+import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
+import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
@@ -66,7 +67,7 @@ export default function WarehousesPage() {
       const items = inventory.filter(inv => inv.warehouseId === w.id);
       stats[w.id] = {
         totalStock: items.reduce((acc, curr) => acc + (curr.stock || 0), 0),
-        productCount: items.filter(i => i.stock > 0).length
+        productCount: items.filter(i => (i.stock || 0) > 0).length
       };
     });
     return stats;
@@ -103,6 +104,12 @@ export default function WarehousesPage() {
         }));
       })
       .finally(() => setIsSaving(false));
+  };
+
+  const handleDelete = (id: string) => {
+    if (!db || !confirm("Haqiqatdan ham ushbu omborni o'chirmoqchimisiz?")) return;
+    const ref = doc(db, "warehouses", id);
+    deleteDocumentNonBlocking(ref);
   };
 
   if (authLoading || role === "Omborchi") {
@@ -190,7 +197,7 @@ export default function WarehousesPage() {
             {warehouses && warehouses.map((w: any) => {
               const stats = warehouseStats[w.id] || { totalStock: 0, productCount: 0 };
               return (
-                <Card key={w.id} className="border-none glass-card hover:-translate-y-1 transition-all duration-300 rounded-[2.5rem] bg-card/40 backdrop-blur-xl">
+                <Card key={w.id} className="border-none glass-card hover:-translate-y-1 transition-all duration-300 rounded-[2.5rem] bg-card/40 backdrop-blur-xl group">
                   <CardHeader className="flex flex-row items-start justify-between pb-4">
                     <div className="space-y-1">
                       <CardTitle className="text-xl font-headline font-black tracking-tight">{w.name}</CardTitle>
@@ -198,9 +205,16 @@ export default function WarehousesPage() {
                         <MapPin className="w-3.5 h-3.5" /> {w.address || 'Manzil belgilanmagan'}
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground rounded-xl">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
+                    {isAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-9 w-9 text-rose-500 hover:bg-rose-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleDelete(w.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="mt-4 space-y-4">
