@@ -27,14 +27,12 @@ service cloud.firestore {
     }
 
     // --- Omborxonalar ---
-    // AI yordamchisi o'qiy olishi uchun ommaviy o'qish ruxsatini beramiz
     match /warehouses/{warehouseId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
     // --- Mahsulotlar ---
-    // AI yordamchisi katalog ma'lumotlarini olishi uchun ommaviy o'qish
     match /products/{productId} {
       allow read: if true;
       allow write: if isSignedIn();
@@ -46,6 +44,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // --- Xarajatlar ---
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
     // --- Zaxira harakatlari (Audit Trail) ---
     match /stockMovements/{movementId} {
       allow read: if isSignedIn();
@@ -54,7 +59,6 @@ service cloud.firestore {
     }
 
     // --- Inventar (Ombordagi qoldiqlar) ---
-    // AI yordamchisi qoldiqlarni tekshirishi uchun ommaviy o'qish
     match /inventory/{inventoryId} {
       allow read: if true;
       allow write: if isSignedIn();

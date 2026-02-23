@@ -18,7 +18,9 @@ import {
   FileOutput,
   FileText,
   Globe,
-  ChevronDown
+  ChevronDown,
+  WalletCards,
+  Coins
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -68,8 +70,9 @@ export function OmniSidebar() {
     { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
   ], [t, isAdmin, isOmborchi]);
 
-  // HR Guruhi
-  const hrNavigation = useMemo(() => [
+  // Moliya Guruhi
+  const financeNavigation = useMemo(() => [
+    { name: t.nav.expenses, href: "/expenses", icon: WalletCards },
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
   ], [t, isAdmin]);
 
@@ -88,10 +91,10 @@ export function OmniSidebar() {
     if (analyticsNavigation.some(i => pathname === i.href)) return "analytics";
     if (invoiceNavigation.some(i => pathname === i.href)) return "invoices";
     if (inventoryNavigation.some(i => pathname === i.href)) return "inventory";
-    if (hrNavigation.some(i => pathname === i.href)) return "hr";
+    if (financeNavigation.some(i => pathname === i.href)) return "finance";
     if (adminNavigation.some(i => pathname === i.href)) return "admin";
     return "";
-  }, [pathname, analyticsNavigation, invoiceNavigation, inventoryNavigation, hrNavigation, adminNavigation]);
+  }, [pathname, analyticsNavigation, invoiceNavigation, inventoryNavigation, financeNavigation, adminNavigation]);
 
   const renderAccordionItem = (value: string, label: string, icon: any, items: any[]) => {
     const visibleItems = items.filter(i => !i.hide);
@@ -178,8 +181,8 @@ export function OmniSidebar() {
           {/* Inventar */}
           {renderAccordionItem("inventory", t.nav.inventoryGroup, Package, inventoryNavigation)}
 
-          {/* HR */}
-          {renderAccordionItem("hr", t.nav.hrGroup, UserRound, hrNavigation)}
+          {/* Moliya */}
+          {renderAccordionItem("finance", t.nav.financeGroup, Coins, financeNavigation)}
 
           {/* Ma'muriyat */}
           {renderAccordionItem("admin", t.nav.systemGroup, Settings, adminNavigation)}

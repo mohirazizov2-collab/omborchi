@@ -95,6 +95,21 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
+    "Expense": {
+      "title": "Expense",
+      "description": "Biznes xarajatlari (ijara, kommunal, transport va h.k.).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "responsibleUserId": { "type": "string" },
+        "responsibleUserName": { "type": "string" }
+      },
+      "required": ["id", "category", "amount", "date"]
+    },
     "AdminRole": {
       "title": "AdminRole",
       "description": "Super Admin huquqiga ega foydalanuvchilar UID ro'yxati.",
@@ -133,6 +148,10 @@
     "/payrolls/{payrollId}": {
       "schema": "#/entities/Payroll",
       "description": "Maosh hisoblari."
+    },
+    "/expenses/{expenseId}": {
+      "schema": "#/entities/Expense",
+      "description": "Biznes xarajatlari."
     },
     "/users/{userId}": {
       "schema": { "type": "object" },

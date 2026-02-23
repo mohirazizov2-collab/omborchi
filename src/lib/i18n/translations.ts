@@ -25,7 +25,9 @@ export const translations = {
       operationsGroup: "Operatsiyalar",
       inventoryGroup: "Inventar boshqaruvi",
       hrGroup: "Kadrlar",
-      systemGroup: "Tizim ma'muriyati"
+      systemGroup: "Tizim ma'muriyati",
+      financeGroup: "Moliya",
+      expenses: "Xarajatlar"
     },
     units: {
       label: "O'lcham birligi",
@@ -42,6 +44,28 @@ export const translations = {
       bag: "Qop",
       box: "Karobka",
       pack: "Pachka"
+    },
+    expenses: {
+      title: "Xarajatlar nazorati",
+      description: "Biznesingizdagi barcha pul chiqimlarini qayd eting va tahlil qiling.",
+      addNew: "Yangi xarajat",
+      category: "Toifa",
+      amount: "Summa",
+      date: "Sana",
+      description_label: "Tafsilotlar",
+      total: "Jami xarajatlar",
+      categories: {
+        rent: "Ijara",
+        utilities: "Kommunal",
+        salary: "Oylik maosh",
+        transport: "Transport",
+        marketing: "Marketing",
+        tax: "Soliqlar",
+        inventory: "Inventar xaridi",
+        other: "Boshqa"
+      },
+      success: "Xarajat muvaffaqiyatli saqlandi",
+      empty: "Hozircha xarajatlar yo'q."
     },
     payroll: {
       title: "Maosh hisoblash",
@@ -285,7 +309,9 @@ export const translations = {
       operationsGroup: "Операции",
       inventoryGroup: "Управление запасами",
       hrGroup: "Кадры",
-      systemGroup: "Администрирование"
+      systemGroup: "Администрирование",
+      financeGroup: "Финансы",
+      expenses: "Расходы"
     },
     units: {
       label: "Ед. измерения",
@@ -302,6 +328,28 @@ export const translations = {
       bag: "Мешок",
       box: "Коробка",
       pack: "Пачка"
+    },
+    expenses: {
+      title: "Контроль расходов",
+      description: "Записывайте и анализируйте все финансовые оттоки вашего бизнеса.",
+      addNew: "Новый расход",
+      category: "Категория",
+      amount: "Сумма",
+      date: "Дата",
+      description_label: "Детали",
+      total: "Итого расходов",
+      categories: {
+        rent: "Аренда",
+        utilities: "Коммунальные",
+        salary: "Зарплата",
+        transport: "Транспорт",
+        marketing: "Маркетинг",
+        tax: "Налоги",
+        inventory: "Закупка инвентаря",
+        other: "Прочее"
+      },
+      success: "Расход успешно сохранен",
+      empty: "Расходов пока нет."
     },
     payroll: {
       title: "Расчет зарплаты",
@@ -426,7 +474,7 @@ export const translations = {
       productItems: 'Список товаров',
       process: 'Завершить приход',
       saveDraft: 'Сохранить черновик',
-      scanBarcode: 'Сканировать'
+      scanBarcode: 'Загрузка...'
     },
     stockOut: {
       title: 'Расходная Накладная',
@@ -545,7 +593,9 @@ export const translations = {
       operationsGroup: "Operations",
       inventoryGroup: "Inventory Management",
       hrGroup: "HR",
-      systemGroup: "Administration"
+      systemGroup: "Administration",
+      financeGroup: "Finance",
+      expenses: "Expenses"
     },
     units: {
       label: "Unit",
@@ -562,6 +612,28 @@ export const translations = {
       bag: "Bag",
       box: "Box",
       pack: "Pack"
+    },
+    expenses: {
+      title: "Expense Control",
+      description: "Record and analyze all financial outflows of your business.",
+      addNew: "New Expense",
+      category: "Category",
+      amount: "Amount",
+      date: "Date",
+      description_label: "Details",
+      total: "Total Expenses",
+      categories: {
+        rent: "Rent",
+        utilities: "Utilities",
+        salary: "Salary",
+        transport: "Transport",
+        marketing: "Marketing",
+        tax: "Taxes",
+        inventory: "Inventory Purchase",
+        other: "Other"
+      },
+      success: "Expense saved successfully",
+      empty: "No expenses recorded yet."
     },
     payroll: {
       title: "Payroll Calculation",
