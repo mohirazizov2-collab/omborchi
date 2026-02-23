@@ -120,6 +120,7 @@ export default function StockInPage() {
           supplier: supplier,
           unitPrice: item.price,
           totalPrice: (item.quantity || 0) * (item.price || 0),
+          unit: product?.unit || "pcs"
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
@@ -201,7 +202,7 @@ export default function StockInPage() {
       i + 1,
       it.name,
       it.quantity,
-      it.unit,
+      t.units[it.unit as keyof typeof t.units] || it.unit,
       `${it.price.toLocaleString()} so'm`,
       `${(it.quantity * it.price).toLocaleString()} so'm`
     ]);
@@ -315,7 +316,6 @@ export default function StockInPage() {
                     <tr>
                       <th className="px-6 py-4 w-12 text-center">№</th>
                       <th className="px-4 py-4 min-w-[300px]">Mahsulot nomi</th>
-                      <th className="px-4 py-4 w-24">Birlik</th>
                       <th className="px-4 py-4 w-32">Miqdor</th>
                       <th className="px-4 py-4 w-40">Narx (so'm)</th>
                       <th className="px-4 py-4 w-40">Jami (so'm)</th>
@@ -327,6 +327,8 @@ export default function StockInPage() {
                       {items.map((item, index) => {
                         const selectedProduct = products?.find(p => p.id === item.productId);
                         const rowTotal = (item.quantity || 0) * (item.price || 0);
+                        const unitLabel = selectedProduct ? (t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit) : '';
+                        
                         return (
                           <motion.tr 
                             key={item.id}
@@ -366,25 +368,26 @@ export default function StockInPage() {
                               </Select>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="text-xs font-black uppercase text-muted-foreground">
-                                {selectedProduct ? (t.units[selectedProduct.unit as keyof typeof t.units] || selectedProduct.unit) : '---'}
-                              </span>
+                              <div className="space-y-1">
+                                <Input 
+                                  type="number" 
+                                  className="h-10 rounded-lg bg-background/50 border-border/40 font-black text-center"
+                                  value={item.quantity}
+                                  onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
+                                />
+                                {unitLabel && <p className="text-[9px] font-black text-primary uppercase text-center">{unitLabel}</p>}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
-                              <Input 
-                                type="number" 
-                                className="h-10 rounded-lg bg-background/50 border-border/40 font-black text-center"
-                                value={item.quantity}
-                                onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Input 
-                                type="number" 
-                                className="h-10 rounded-lg bg-background/50 border-border/40 font-black"
-                                value={item.price}
-                                onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
-                              />
+                              <div className="space-y-1">
+                                <Input 
+                                  type="number" 
+                                  className="h-10 rounded-lg bg-background/50 border-border/40 font-black"
+                                  value={item.price}
+                                  onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
+                                />
+                                {unitLabel && <p className="text-[9px] font-black text-muted-foreground uppercase opacity-50">1 {unitLabel} uchun</p>}
+                              </div>
                             </td>
                             <td className="px-4 py-3 font-black text-sm text-primary">
                               {rowTotal.toLocaleString()}

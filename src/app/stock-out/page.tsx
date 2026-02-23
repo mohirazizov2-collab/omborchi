@@ -1,4 +1,3 @@
-
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -180,7 +179,8 @@ export default function StockOutPage() {
           clientType: clientType,
           saleId: saleId,
           unitPrice: item.price,
-          totalPrice: (item.quantity || 0) * (item.price || 0)
+          totalPrice: (item.quantity || 0) * (item.price || 0),
+          unit: product?.unit || "pcs"
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
@@ -359,9 +359,8 @@ export default function StockOutPage() {
                     <tr>
                       <th className="px-6 py-4 w-12 text-center">№</th>
                       <th className="px-4 py-4 min-w-[250px]">Mahsulot nomi</th>
-                      <th className="px-4 py-4 w-24">Birlik</th>
-                      <th className="px-4 py-4 w-32 text-center">Ombordagi qoldiq</th>
-                      <th className="px-4 py-4 w-32">Chiqim miqdori</th>
+                      <th className="px-4 py-4 w-32 text-center">Qoldiq</th>
+                      <th className="px-4 py-4 w-32">Miqdor</th>
                       <th className="px-4 py-4 w-40">Sotuv narxi (so'm)</th>
                       <th className="px-4 py-4 w-40">Jami summasi</th>
                       <th className="px-6 py-4 w-12"></th>
@@ -374,6 +373,7 @@ export default function StockOutPage() {
                         const stock = getStockForProduct(item.productId);
                         const rowTotal = (item.quantity || 0) * (item.price || 0);
                         const hasError = validation.itemErrors[item.id];
+                        const unitLabel = p ? (t.units[p.unit as keyof typeof t.units] || p.unit) : '';
 
                         return (
                           <motion.tr 
@@ -422,38 +422,39 @@ export default function StockOutPage() {
                                 {hasError && <p className="text-[9px] font-black text-rose-600 uppercase flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {hasError}</p>}
                               </div>
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="text-xs font-black uppercase text-muted-foreground">
-                                {p ? (t.units[p.unit as keyof typeof t.units] || p.unit) : '---'}
-                              </span>
-                            </td>
                             <td className="px-4 py-3 text-center">
                               <div className={cn(
-                                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase",
+                                "inline-flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase",
                                 stock <= 0 ? "bg-rose-500/10 text-rose-600" : stock < 10 ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"
                               )}>
-                                {stock <= 0 && <AlertTriangle className="w-3 h-3" />}
-                                {stock}
+                                <span className="flex items-center gap-1">{stock <= 0 && <AlertTriangle className="w-3 h-3" />}{stock}</span>
+                                {unitLabel && <span className="opacity-50 text-[8px]">{unitLabel}</span>}
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <Input 
-                                type="number" 
-                                className={cn(
-                                  "h-10 rounded-lg bg-background/50 border-border/40 font-black text-center",
-                                  item.quantity > stock && "border-rose-600 text-rose-600"
-                                )}
-                                value={item.quantity}
-                                onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
-                              />
+                              <div className="space-y-1">
+                                <Input 
+                                  type="number" 
+                                  className={cn(
+                                    "h-10 rounded-lg bg-background/50 border-border/40 font-black text-center",
+                                    item.quantity > stock && "border-rose-600 text-rose-600"
+                                  )}
+                                  value={item.quantity}
+                                  onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
+                                />
+                                {unitLabel && <p className="text-[9px] font-black text-primary uppercase text-center">{unitLabel}</p>}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
-                              <Input 
-                                type="number" 
-                                className="h-10 rounded-lg bg-background/50 border-border/40 font-black"
-                                value={item.price}
-                                onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
-                              />
+                              <div className="space-y-1">
+                                <Input 
+                                  type="number" 
+                                  className="h-10 rounded-lg bg-background/50 border-border/40 font-black"
+                                  value={item.price}
+                                  onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
+                                />
+                                {unitLabel && <p className="text-[9px] font-black text-muted-foreground uppercase opacity-50">1 {unitLabel} uchun</p>}
+                              </div>
                             </td>
                             <td className={cn(
                               "px-4 py-3 font-black text-sm",
@@ -557,7 +558,7 @@ export default function StockOutPage() {
 
         {/* Success Modal */}
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
-          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-md p-8 shadow-2xl text-center">
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-md p-8 shadow-2xl text-center">
             <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
               <CheckCircle2 className="w-10 h-10" />
             </div>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -60,7 +59,7 @@ export default function InventoryAuditPage() {
   }, [products, inventory, searchQuery, selectedWarehouseId]);
 
   const handleAuditChange = (productId: string, val: string) => {
-    const num = parseInt(val) || 0;
+    const num = parseFloat(val) || 0;
     setAuditData(prev => ({ ...prev, [productId]: num }));
   };
 
@@ -86,7 +85,9 @@ export default function InventoryAuditPage() {
         movementType: "Adjustment",
         movementDate: new Date().toISOString(),
         responsibleUserId: user.uid,
-        description: `Audit Adjustment. System: ${currentWhStock}, Physical: ${physicalCount}`
+        responsibleUserName: user.displayName || user.email || "Noma'lum",
+        description: `Audit Adjustment. System: ${currentWhStock}, Physical: ${physicalCount}`,
+        unit: product.unit || "pcs"
       };
       addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
@@ -212,13 +213,16 @@ export default function InventoryAuditPage() {
 
                           <div className="w-32">
                             <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">{t.inventoryAudit.physicalStock}</p>
-                            <Input 
-                              type="number"
-                              className="h-10 rounded-xl bg-background/50 border-border/40 font-black text-center"
-                              value={auditData[p.id] ?? ""}
-                              placeholder={p.warehouseStock.toString()}
-                              onChange={(e) => handleAuditChange(p.id, e.target.value)}
-                            />
+                            <div className="relative">
+                              <Input 
+                                type="number"
+                                className="h-10 rounded-xl bg-background/50 border-border/40 font-black text-center"
+                                value={auditData[p.id] ?? ""}
+                                placeholder={p.warehouseStock.toString()}
+                                onChange={(e) => handleAuditChange(p.id, e.target.value)}
+                              />
+                              <span className="absolute -bottom-4 left-0 w-full text-center text-[8px] font-black uppercase text-primary/40">{unitLabel}</span>
+                            </div>
                           </div>
 
                           <div className="text-center md:text-right min-w-[80px]">
