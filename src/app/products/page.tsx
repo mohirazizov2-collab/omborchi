@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -17,7 +18,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, Search, Plus, Filter, Loader2, Trash2, Edit2 } from "lucide-react";
+import { Package, Search, Plus, Filter, Loader2, Trash2, Edit2, Hash } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -33,7 +34,6 @@ export default function ProductsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
 
   const canEdit = role === "Super Admin" || role === "Admin";
 
@@ -41,7 +41,7 @@ export default function ProductsPage() {
     name: "",
     price: "0",
     stock: "0",
-    category: "general",
+    sku: "",
     unit: "pcs"
   });
 
@@ -53,16 +53,12 @@ export default function ProductsPage() {
 
   const filteredProducts = useMemo(() => {
     return products?.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = categoryFilter === "all" || p.categoryId === categoryFilter;
-      return matchesSearch && matchesCategory;
+      const matchesSearch = 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesSearch;
     }) || [];
-  }, [products, searchQuery, categoryFilter]);
-
-  const categories = useMemo(() => {
-    const cats = new Set((products || []).map(p => p.categoryId || "general"));
-    return Array.from(cats);
-  }, [products]);
+  }, [products, searchQuery]);
 
   const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
@@ -78,7 +74,7 @@ export default function ProductsPage() {
       name: formData.name,
       salePrice: parseFloat(formData.price),
       stock: parseInt(formData.stock),
-      categoryId: formData.category,
+      sku: formData.sku,
       unit: formData.unit,
       lowStockThreshold: 10,
       isDeleted: false,
@@ -89,7 +85,7 @@ export default function ProductsPage() {
     setDoc(productRef, newProduct)
       .then(() => {
         setIsDialogOpen(false);
-        setFormData({ name: "", price: "0", stock: "0", category: "general", unit: "pcs" });
+        setFormData({ name: "", price: "0", stock: "0", sku: "", unit: "pcs" });
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -103,6 +99,7 @@ export default function ProductsPage() {
 
   const handleDelete = (id: string) => {
     if (!db) return;
+    if (!confirm("Haqiqatdan ham ushbu mahsulotni o'chirmoqchimisiz?")) return;
     const ref = doc(db, "products", id);
     deleteDocumentNonBlocking(ref);
   };
@@ -138,7 +135,7 @@ export default function ProductsPage() {
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Mahsulot nomi</Label>
                     <Input 
-                      className="h-12 rounded-2xl bg-white/5 border-white/10 text-white placeholder:text-white/20"
+                      className="h-12 rounded-2xl bg-white/5 border-white/10 text-white placeholder:text-white/20 font-bold"
                       value={formData.name} 
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                       placeholder="Masalan: Stol" 
@@ -146,23 +143,18 @@ export default function ProductsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Kategoriya</Label>
-                      <Select value={formData.category} onValueChange={(val) => setFormData({...formData, category: val})}>
-                        <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10">
-                          <SelectValue placeholder="Tanlang" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl border-white/10 bg-black text-white">
-                          <SelectItem value="general">Umumiy</SelectItem>
-                          <SelectItem value="electronics">Elektronika</SelectItem>
-                          <SelectItem value="furniture">Mebel</SelectItem>
-                          <SelectItem value="parts">Ehtiyot qismlar</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">{t.products.sku}</Label>
+                      <Input 
+                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white placeholder:text-white/20 font-bold"
+                        value={formData.sku} 
+                        onChange={(e) => setFormData({...formData, sku: e.target.value})}
+                        placeholder="Masalan: 1-chi tavar" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">{t.units.label}</Label>
                       <Select value={formData.unit} onValueChange={(val) => setFormData({...formData, unit: val})}>
-                        <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10">
+                        <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10 font-bold">
                           <SelectValue placeholder="Tanlang" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-white/10 bg-black text-white max-h-[300px]">
@@ -188,7 +180,7 @@ export default function ProductsPage() {
                       <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Boshlang'ich zaxira</Label>
                       <Input 
                         type="number"
-                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
+                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-black"
                         value={formData.stock} 
                         onChange={(e) => setFormData({...formData, stock: e.target.value})}
                       />
@@ -197,7 +189,7 @@ export default function ProductsPage() {
                       <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Sotuv narxi (so'm)</Label>
                       <Input 
                         type="number"
-                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white"
+                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-black"
                         value={formData.price} 
                         onChange={(e) => setFormData({...formData, price: e.target.value})}
                       />
@@ -226,22 +218,6 @@ export default function ProductsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex gap-2">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="h-12 w-[160px] rounded-2xl bg-background/50 border-border/40 font-bold uppercase text-[10px] tracking-widest">
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-3 h-3" />
-                    <SelectValue placeholder="Kategoriya" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="all">Barcha kategoriyalar</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </CardContent>
         </Card>
 
@@ -256,7 +232,7 @@ export default function ProductsPage() {
                 <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.2em]">
                   <tr>
                     <th className="px-8 py-6">{t.products.productInfo}</th>
-                    <th className="px-6 py-6">{t.products.category}</th>
+                    <th className="px-6 py-6">{t.products.sku}</th>
                     <th className="px-6 py-6">{t.products.stock}</th>
                     <th className="px-6 py-6">{t.units.label}</th>
                     <th className="px-6 py-6">{t.products.price}</th>
@@ -287,9 +263,9 @@ export default function ProductsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-5">
-                          <Badge variant="outline" className="rounded-lg font-black text-[9px] uppercase tracking-widest bg-muted/30 border-none px-2 py-0.5 opacity-60">
-                            {p.categoryId || 'Umumiy'}
-                          </Badge>
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase opacity-60">
+                            <Hash className="w-3 h-3" /> {p.sku || '---'}
+                          </div>
                         </td>
                         <td className="px-6 py-5 font-black text-sm">{p.stock || 0}</td>
                         <td className="px-6 py-5">
