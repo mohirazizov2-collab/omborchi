@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -39,8 +38,6 @@ export default function ProductsPage() {
 
   const [formData, setFormData] = useState({
     name: "",
-    price: "0",
-    stock: "0",
     sku: "",
     unit: "pcs"
   });
@@ -72,8 +69,8 @@ export default function ProductsPage() {
     const newProduct = {
       id: productId,
       name: formData.name,
-      salePrice: parseFloat(formData.price),
-      stock: parseInt(formData.stock),
+      salePrice: 0, // Narx nakladnoy orqali kiradi
+      stock: 0,     // Zaxira nakladnoy orqali kiradi
       sku: formData.sku,
       unit: formData.unit,
       lowStockThreshold: 10,
@@ -85,7 +82,7 @@ export default function ProductsPage() {
     setDoc(productRef, newProduct)
       .then(() => {
         setIsDialogOpen(false);
-        setFormData({ name: "", price: "0", stock: "0", sku: "", unit: "pcs" });
+        setFormData({ name: "", sku: "", unit: "pcs" });
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -175,26 +172,9 @@ export default function ProductsPage() {
                       </Select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Boshlang'ich zaxira</Label>
-                      <Input 
-                        type="number"
-                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-black"
-                        value={formData.stock} 
-                        onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Sotuv narxi (so'm)</Label>
-                      <Input 
-                        type="number"
-                        className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-black"
-                        value={formData.price} 
-                        onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      />
-                    </div>
-                  </div>
+                  <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest bg-white/5 p-4 rounded-xl border border-white/5">
+                    * Narx va zaxira miqdori Nakladnoy orqali avtomatik shakllanadi.
+                  </p>
                 </div>
                 <DialogFooter className="mt-10 gap-2">
                   <Button variant="ghost" className="rounded-2xl h-12 hover:bg-white/5 text-white/60" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
@@ -273,7 +253,7 @@ export default function ProductsPage() {
                             {t.units[p.unit as keyof typeof t.units] || p.unit || '---'}
                           </span>
                         </td>
-                        <td className="px-6 py-5 font-black text-sm">{formatMoney(p.salePrice)} so'm</td>
+                        <td className="px-6 py-5 font-black text-sm">{formatMoney(p.salePrice || 0)} so'm</td>
                         <td className="px-6 py-5">
                           <Badge 
                             variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}
