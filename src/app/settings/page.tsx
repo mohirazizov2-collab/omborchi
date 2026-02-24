@@ -28,10 +28,12 @@ import {
   RefreshCw,
   Rocket,
   Settings as SettingsIcon,
-  ShieldCheck
+  ShieldCheck,
+  PackagePlus
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
-import { useUser } from "@/firebase";
+import { useFirestore, useUser } from "@/firebase";
+import { collection, doc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { generateDatabaseSchema } from "@/ai/flows/generate-database-schema";
 import { generateBackendProjectStructure } from "@/ai/flows/generate-backend-project-structure";
@@ -39,11 +41,68 @@ import { generateBackendApiBoilerplate } from "@/ai/flows/generate-backend-api-b
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
+// Rasmda ko'rsatilgan mahsulotlar ro'yxati (0020 dan boshlab)
+const PREDEFINED_PRODUCTS = [
+  { name: "Truba PN20 20mm", sku: "0020", unit: "m" },
+  { name: "Truba PN20 25mm", sku: "0021", unit: "m" },
+  { name: "Truba PN20 32mm", sku: "0022", unit: "m" },
+  { name: "Truba PN20 40mm", sku: "0023", unit: "m" },
+  { name: "Truba PN20 50mm", sku: "0024", unit: "m" },
+  { name: "Truba PN20 63mm", sku: "0025", unit: "m" },
+  { name: "Ugolnik 20mm 90°", sku: "0026", unit: "pcs" },
+  { name: "Ugolnik 25mm 90°", sku: "0027", unit: "pcs" },
+  { name: "Ugolnik 32mm 90°", sku: "0028", unit: "pcs" },
+  { name: "Ugolnik 40mm 90°", sku: "0029", unit: "pcs" },
+  { name: "Ugolnik 50mm 90°", sku: "0030", unit: "pcs" },
+  { name: "Ugolnik 63mm 90°", sku: "0031", unit: "pcs" },
+  { name: "Ugolnik 20mm 45°", sku: "0032", unit: "pcs" },
+  { name: "Ugolnik 25mm 45°", sku: "0033", unit: "pcs" },
+  { name: "Ugolnik 32mm 45°", sku: "0034", unit: "pcs" },
+  { name: "Mufta 20mm", sku: "0035", unit: "pcs" },
+  { name: "Mufta 25mm", sku: "0036", unit: "pcs" },
+  { name: "Mufta 32mm", sku: "0037", unit: "pcs" },
+  { name: "Mufta 40mm", sku: "0038", unit: "pcs" },
+  { name: "Mufta 50mm", sku: "0039", unit: "pcs" },
+  { name: "Mufta 63mm", sku: "0040", unit: "pcs" },
+  { name: "Troynik 20mm", sku: "0041", unit: "pcs" },
+  { name: "Troynik 25mm", sku: "0042", unit: "pcs" },
+  { name: "Troynik 32mm", sku: "0043", unit: "pcs" },
+  { name: "Troynik 40mm", sku: "0044", unit: "pcs" },
+  { name: "Troynik 50mm", sku: "0045", unit: "pcs" },
+  { name: "Troynik 63mm", sku: "0046", unit: "pcs" },
+  { name: "Reduktsiya 25x20", sku: "0047", unit: "pcs" },
+  { name: "Reduktsiya 32x20", sku: "0048", unit: "pcs" },
+  { name: "Reduktsiya 32x25", sku: "0049", unit: "pcs" },
+  { name: "Amerika 20x1/2 NR", sku: "0050", unit: "pcs" },
+  { name: "Amerika 25x3/4 NR", sku: "0051", unit: "pcs" },
+  { name: "Amerika 32x1 NR", sku: "0052", unit: "pcs" },
+  { name: "Amerika 20x1/2 VR", sku: "0053", unit: "pcs" },
+  { name: "Amerika 25x3/4 VR", sku: "0054", unit: "pcs" },
+  { name: "Amerika 32x1 VR", sku: "0055", unit: "pcs" },
+  { name: "Klapan 20mm", sku: "0056", unit: "pcs" },
+  { name: "Klapan 25mm", sku: "0057", unit: "pcs" },
+  { name: "Klapan 32mm", sku: "0058", unit: "pcs" },
+  { name: "Filtr 20mm", sku: "0059", unit: "pcs" },
+  { name: "Filtr 25mm", sku: "0060", unit: "pcs" },
+  { name: "Zaglushka 20mm", sku: "0061", unit: "pcs" },
+  { name: "Zaglushka 25mm", sku: "0062", unit: "pcs" },
+  { name: "Obxod 20mm", sku: "0063", unit: "pcs" },
+  { name: "Obxod 25mm", sku: "0064", unit: "pcs" },
+  { name: "Mufta VR 20x1/2", sku: "0065", unit: "pcs" },
+  { name: "Mufta VR 25x3/4", sku: "0066", unit: "pcs" },
+  { name: "Mufta NR 20x1/2", sku: "0067", unit: "pcs" },
+  { name: "Mufta NR 25x3/4", sku: "0068", unit: "pcs" },
+  { name: "Ugolnik VR 20x1/2", sku: "0069", unit: "pcs" },
+  { name: "Ugolnik NR 20x1/2", sku: "0070", unit: "pcs" },
+];
+
 export default function SettingsPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { role } = useUser();
+  const db = useFirestore();
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   
   // AI System Gen States
   const [genLoading, setGenLoading] = useState(false);
@@ -64,6 +123,38 @@ export default function SettingsPage() {
         description: "Sozlamalar saqlandi.",
       });
     }, 800);
+  };
+
+  const handleImportProducts = async () => {
+    if (!db) return;
+    setImporting(true);
+    try {
+      for (const product of PREDEFINED_PRODUCTS) {
+        const productId = doc(collection(db, "products")).id;
+        const productRef = doc(db, "products", productId);
+        await setDoc(productRef, {
+          id: productId,
+          name: product.name,
+          sku: product.sku,
+          unit: product.unit,
+          stock: 0,
+          salePrice: 0,
+          lowStockThreshold: 10,
+          isDeleted: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+      toast({
+        title: "Import yakunlandi",
+        description: `${PREDEFINED_PRODUCTS.length} ta mahsulot muvaffaqiyatli qo'shildi.`,
+      });
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "Xatolik", description: "Mahsulotlarni yuklashda xato." });
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -130,6 +221,9 @@ export default function SettingsPage() {
             <TabsTrigger value="general" className="rounded-xl px-8 font-black uppercase text-[10px] tracking-widest h-10 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               {t.settings.general}
             </TabsTrigger>
+            <TabsTrigger value="data" className="rounded-xl px-8 font-black uppercase text-[10px] tracking-widest h-10 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              Ma'lumotlar Importi
+            </TabsTrigger>
             {isSuperAdmin && (
               <TabsTrigger value="systemgen" className="rounded-xl px-8 font-black uppercase text-[10px] tracking-widest h-10 data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
                 <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" /> {t.systemGen.title}
@@ -187,6 +281,42 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="data" className="space-y-6">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden max-w-2xl">
+              <CardHeader className="p-8">
+                <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
+                  <PackagePlus className="text-primary w-6 h-6" />
+                  Ommaviy mahsulot yuklash
+                </CardTitle>
+                <CardDescription>
+                  Rasmda taqdim etilgan santexnika mahsulotlarini (truba, ugolnik va h.k.) avtomatik ravishda katalogga qo'shish. 
+                  Kodlar <b>0020</b> dan boshlanadi.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-8 pb-8">
+                <div className="p-6 rounded-2xl bg-primary/5 border border-primary/10 mb-6">
+                  <p className="text-xs font-bold text-foreground/70 mb-4 uppercase tracking-widest">Import qilinadigan mahsulotlar namunasi:</p>
+                  <ul className="grid grid-cols-2 gap-2">
+                    {PREDEFINED_PRODUCTS.slice(0, 6).map(p => (
+                      <li key={p.sku} className="text-[11px] font-black text-primary/60">
+                        #{p.sku} - {p.name} ({p.unit})
+                      </li>
+                    ))}
+                    <li className="text-[11px] font-black text-primary/40 italic">... va yana {PREDEFINED_PRODUCTS.length - 6} ta mahsulot</li>
+                  </ul>
+                </div>
+                <Button 
+                  className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20"
+                  onClick={handleImportProducts}
+                  disabled={importing}
+                >
+                  {importing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Download className="w-5 h-5 mr-2" />}
+                  Importni boshlash ({PREDEFINED_PRODUCTS.length} ta tavar)
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {isSuperAdmin && (
