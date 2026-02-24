@@ -41,7 +41,7 @@ import { generateBackendApiBoilerplate } from "@/ai/flows/generate-backend-api-b
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
-// Santexnika mahsulotlari ro'yxati (SKU 0020 dan boshlab)
+// Mahsulotlar ro'yxati (Santexnika + Filtrlar)
 const PREDEFINED_PRODUCTS = [
   { name: "Truba PN20 20mm", sku: "0020", unit: "m" },
   { name: "Truba PN20 25mm", sku: "0021", unit: "m" },
@@ -94,6 +94,19 @@ const PREDEFINED_PRODUCTS = [
   { name: "Mufta NR 25x3/4", sku: "0068", unit: "pcs" },
   { name: "Ugolnik VR 20x1/2", sku: "0069", unit: "pcs" },
   { name: "Ugolnik NR 20x1/2", sku: "0070", unit: "pcs" },
+  // Yangi filtrlar ro'yxati (Rasm asosida)
+  { name: "Ламинированный 950 верхный фильтр", sku: "0071", unit: "pcs" },
+  { name: "Ламинированный 500 боковой фильтр", sku: "0072", unit: "pcs" },
+  { name: "Ламинированный 650 боковой фильтр", sku: "0073", unit: "pcs" },
+  { name: "Лам. песочный фильтр MTP 760 (прозр. крышка)", sku: "0074", unit: "pcs" },
+  { name: "Лам. песочный фильтр MTP 800 (прозр. крышка)", sku: "0075", unit: "pcs" },
+  { name: "Лам. песочный фильтр MTP 950 (прозр. крышка)", sku: "0076", unit: "pcs" },
+  { name: "Пластмасса 620 верхный фильтр", sku: "0077", unit: "pcs" },
+  { name: "Пластмасса 760 верхный фильтр", sku: "0078", unit: "pcs" },
+  { name: "Пластмасса 920 upper filter", sku: "0079", unit: "pcs" },
+  { name: "Пластмасса 620 боковой фильтр", sku: "0080", unit: "pcs" },
+  { name: "Пластмасса 760 боковой фильтр", sku: "0081", unit: "pcs" },
+  { name: "Пластмасса 920 боковой фильтр", sku: "0082", unit: "pcs" },
 ];
 
 export default function SettingsPage() {
@@ -291,7 +304,7 @@ export default function SettingsPage() {
                   Ommaviy mahsulot yuklash
                 </CardTitle>
                 <CardDescription>
-                  Rasmda taqdim etilgan santexnika mahsulotlarini (truba, ugolnik va h.k.) avtomatik ravishda katalogga qo'shish. 
+                  Rasmda taqdim etilgan santexnika va basseyn filtrlarini avtomatik ravishda katalogga qo'shish. 
                   Kodlar <b>0020</b> dan boshlanadi.
                 </CardDescription>
               </CardHeader>
@@ -299,12 +312,17 @@ export default function SettingsPage() {
                 <div className="p-6 rounded-2xl bg-primary/5 border border-primary/10 mb-6">
                   <p className="text-xs font-bold text-foreground/70 mb-4 uppercase tracking-widest">Import qilinadigan mahsulotlar namunasi:</p>
                   <ul className="grid grid-cols-2 gap-2">
-                    {PREDEFINED_PRODUCTS.slice(0, 6).map(p => (
+                    {PREDEFINED_PRODUCTS.slice(0, 4).map(p => (
                       <li key={p.sku} className="text-[11px] font-black text-primary/60">
-                        #{p.sku} - {p.name} ({p.unit})
+                        #{p.sku} - {p.name}
                       </li>
                     ))}
-                    <li className="text-[11px] font-black text-primary/40 italic">... va yana {PREDEFINED_PRODUCTS.length - 6} ta mahsulot</li>
+                    <li className="text-[11px] font-black text-primary/40 italic">...</li>
+                    {PREDEFINED_PRODUCTS.slice(-4).map(p => (
+                      <li key={p.sku} className="text-[11px] font-black text-primary/60">
+                        #{p.sku} - {p.name}
+                      </li>
+                    ))}
                   </ul>
                 </div>
                 <Button 
