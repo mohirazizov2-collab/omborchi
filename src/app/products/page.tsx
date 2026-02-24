@@ -32,6 +32,7 @@ export default function ProductsPage() {
   const { user, role, isUserLoading: authLoading } = useUser();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const canEdit = role === "Super Admin" || role === "Admin";
@@ -63,35 +64,53 @@ export default function ProductsPage() {
     if (!db || !user || !formData.name) return;
     
     setIsSaving(true);
-    const productId = doc(collection(db, "products")).id;
+    const productId = editingProduct ? editingProduct.id : doc(collection(db, "products")).id;
     const productRef = doc(db, "products", productId);
     
-    const newProduct = {
+    const productData: any = {
       id: productId,
       name: formData.name,
-      salePrice: 0, // Narx nakladnoy orqali kiradi
-      stock: 0,     // Zaxira nakladnoy orqali kiradi
       sku: formData.sku,
       unit: formData.unit,
-      lowStockThreshold: 10,
-      isDeleted: false,
-      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    setDoc(productRef, newProduct)
+    if (!editingProduct) {
+      productData.salePrice = 0;
+      productData.stock = 0;
+      productData.lowStockThreshold = 10;
+      productData.isDeleted = false;
+      productData.createdAt = new Date().toISOString();
+    }
+
+    setDoc(productRef, productData, { merge: true })
       .then(() => {
-        setIsDialogOpen(false);
-        setFormData({ name: "", sku: "", unit: "pcs" });
+        handleCloseDialog();
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: productRef.path,
-          operation: 'create',
-          requestResourceData: newProduct
+          operation: editingProduct ? 'update' : 'create',
+          requestResourceData: productData
         }));
       })
       .finally(() => setIsSaving(false));
+  };
+
+  const handleEditClick = (p: any) => {
+    setEditingProduct(p);
+    setFormData({
+      name: p.name,
+      sku: p.sku || "",
+      unit: p.unit || "pcs"
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingProduct(null);
+    setFormData({ name: "", sku: "", unit: "pcs" });
   };
 
   const handleDelete = (id: string) => {
@@ -116,16 +135,16 @@ export default function ProductsPage() {
           </div>
           
           {canEdit && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
               <DialogTrigger asChild>
-                <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
+                <Button onClick={() => setIsDialogOpen(true)} className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
                   <Plus className="w-4 h-4" /> {t.products.addNew}
                 </Button>
               </DialogTrigger>
               <DialogContent className="rounded-[2.5rem] border-white/5 bg-black/90 backdrop-blur-3xl text-white max-w-lg p-8">
                 <DialogHeader className="mb-6">
                   <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
-                    <Package className="text-primary w-6 h-6" /> {t.products.addNew}
+                    <Package className="text-primary w-6 h-6" /> {editingProduct ? t.actions.edit : t.products.addNew}
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-6">
@@ -172,12 +191,14 @@ export default function ProductsPage() {
                       </Select>
                     </div>
                   </div>
-                  <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest bg-white/5 p-4 rounded-xl border border-white/5">
-                    * Narx va zaxira miqdori Nakladnoy orqali avtomatik shakllanadi.
-                  </p>
+                  {!editingProduct && (
+                    <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest bg-white/5 p-4 rounded-xl border border-white/5">
+                      * Narx va zaxira miqdori Nakladnoy orqali avtomatik shakllanadi.
+                    </p>
+                  )}
                 </div>
                 <DialogFooter className="mt-10 gap-2">
-                  <Button variant="ghost" className="rounded-2xl h-12 hover:bg-white/5 text-white/60" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
+                  <Button variant="ghost" className="rounded-2xl h-12 hover:bg-white/5 text-white/60" onClick={handleCloseDialog}>{t.actions.cancel}</Button>
                   <Button className="rounded-2xl h-12 px-8 bg-primary text-white font-black uppercase tracking-widest text-[10px] border-none shadow-xl shadow-primary/20" onClick={handleSave} disabled={isSaving}>
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t.actions.save}
                   </Button>
@@ -268,7 +289,15 @@ export default function ProductsPage() {
                         {canEdit && (
                           <td className="px-6 py-5 text-right">
                             <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditClick(p);
+                                }}
+                              >
                                 <Edit2 className="w-4 h-4" />
                               </Button>
                               <Button 
