@@ -41,7 +41,7 @@ import { generateBackendApiBoilerplate } from "@/ai/flows/generate-backend-api-b
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
-// Rasmda ko'rsatilgan mahsulotlar ro'yxati (0020 dan boshlab)
+// Santexnika mahsulotlari ro'yxati (SKU 0020 dan boshlab)
 const PREDEFINED_PRODUCTS = [
   { name: "Truba PN20 20mm", sku: "0020", unit: "m" },
   { name: "Truba PN20 25mm", sku: "0021", unit: "m" },
