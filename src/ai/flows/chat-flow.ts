@@ -61,8 +61,8 @@ const listWarehouses = ai.defineTool(
       const d = doc.data();
       return {
         name: d.name,
-        address: d.address || "Manzil yo'q",
-        phone: d.phoneNumber || "Telefon yo'q"
+        address: d.address || "Manzil ko'rsatilmagan",
+        phone: d.phoneNumber || "Telefon ko'rsatilmagan"
       };
     });
   }
@@ -101,7 +101,7 @@ Sizda quyidagi imkoniyatlar bor:
 
 Qoidalar:
 - Javoblaringiz qisqa, aniq va professional bo'lsin.
-- O'zbek tilida muloqot qiling.
+- O'zbek tilida muloqot qiling. "o'" va "g'" harflarini to'g'ri ishlating.
 - Agar foydalanuvchi mahsulot qoldig'ini so'rasa, albatta asbobdan foydalaning.
 - Pul summalarini '100 000 so'm' formatida ko'rsating.
 
