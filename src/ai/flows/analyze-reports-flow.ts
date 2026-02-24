@@ -23,9 +23,9 @@ const AnalyzeReportsInputSchema = z.object({
 export type AnalyzeReportsInput = z.infer<typeof AnalyzeReportsInputSchema>;
 
 const AnalyzeReportsOutputSchema = z.object({
-  summary: z.string().describe('Hisobotning qisqacha mazmuni.'),
-  analysis: z.string().describe('Batafsil tahlil va muammolar.'),
-  recommendations: z.array(z.string()).describe('Biznes uchun tavsiyalar ro\'yxati.'),
+  summary: z.string().describe("Hisobotning qisqacha mazmuni."),
+  analysis: z.string().describe("Batafsil tahlil va muammolar."),
+  recommendations: z.array(z.string()).describe("Biznes uchun tavsiyalar ro'yxati."),
 });
 
 export type AnalyzeReportsOutput = z.infer<typeof AnalyzeReportsOutputSchema>;
