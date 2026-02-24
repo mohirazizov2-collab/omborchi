@@ -50,7 +50,9 @@ export default function InventoryAuditPage() {
     if (!products || !selectedWarehouseId) return [];
     
     return products.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesSearch;
     }).map(p => {
       const invItem = inventory?.find(inv => inv.warehouseId === selectedWarehouseId && inv.productId === p.id);
@@ -201,7 +203,10 @@ export default function InventoryAuditPage() {
                           </div>
                           <div className="min-w-0">
                             <h3 className="font-black text-lg tracking-tight truncate max-w-[250px]">{p.name}</h3>
-                            <p className="text-[10px] font-black uppercase text-muted-foreground opacity-50">{unitLabel}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[10px] font-black uppercase text-muted-foreground opacity-50">{unitLabel}</p>
+                              {p.sku && <p className="text-[10px] font-black uppercase text-primary/60">#{p.sku}</p>}
+                            </div>
                           </div>
                         </div>
 

@@ -353,7 +353,7 @@ export default function StockInPage() {
                                     <div className="relative">
                                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                                       <Input 
-                                        placeholder="Qidirish..." 
+                                        placeholder="Nomi yoki kodi bo'yicha..." 
                                         className="h-9 pl-9 text-xs rounded-lg bg-background/50 border-none"
                                         value={item.searchQuery}
                                         onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
@@ -361,9 +361,12 @@ export default function StockInPage() {
                                       />
                                     </div>
                                   </div>
-                                  {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
+                                  {products?.filter(p => 
+                                    p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) ||
+                                    (p.sku && p.sku.toLowerCase().includes(item.searchQuery.toLowerCase()))
+                                  ).map((p) => (
                                     <SelectItem key={p.id} value={p.id} className="py-2.5 rounded-lg cursor-pointer font-bold">
-                                      {p.name}
+                                      {p.name} {p.sku ? `(${p.sku})` : ''}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>

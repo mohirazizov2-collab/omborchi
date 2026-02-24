@@ -307,7 +307,7 @@ export default function StockOutPage() {
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-600/40" />
                       <Input 
                         placeholder="Mijoz / Qabul qiluvchi nomi" 
-                        className="h-11 pl-10 rounded-xl bg-background/50 border-border/40 font-bold" 
+                        className="h-11 rounded-xl bg-background/50 border-border/40 font-bold pl-10" 
                         value={recipient} 
                         onChange={(e) => setRecipient(e.target.value)} 
                       />
@@ -406,7 +406,7 @@ export default function StockOutPage() {
                                       <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                                         <Input 
-                                          placeholder="Qidirish..." 
+                                          placeholder="Nomi yoki kodi bo'yicha..." 
                                           className="h-9 pl-9 text-xs rounded-lg bg-background/50 border-none"
                                           value={item.searchQuery}
                                           onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
@@ -414,9 +414,12 @@ export default function StockOutPage() {
                                         />
                                       </div>
                                     </div>
-                                    {products?.filter(p => p.name.toLowerCase().includes(item.searchQuery.toLowerCase())).map((p) => (
+                                    {products?.filter(p => 
+                                      p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) ||
+                                      (p.sku && p.sku.toLowerCase().includes(item.searchQuery.toLowerCase()))
+                                    ).map((p) => (
                                       <SelectItem key={p.id} value={p.id} className="py-2.5 rounded-lg cursor-pointer font-bold">
-                                        {p.name}
+                                        {p.name} {p.sku ? `(${p.sku})` : ''}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
