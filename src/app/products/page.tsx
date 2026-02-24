@@ -50,12 +50,29 @@ export default function ProductsPage() {
   const { data: products, isLoading } = useCollection(productsQuery);
 
   const filteredProducts = useMemo(() => {
-    return products?.filter(p => {
-      const matchesSearch = 
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesSearch;
-    }) || [];
+    if (!products) return [];
+    
+    return products
+      .filter(p => {
+        const matchesSearch = 
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+          (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchesSearch;
+      })
+      .sort((a, b) => {
+        // SKU bo'yicha son tartibida saralash (1, 2, 10...)
+        const skuA = a.sku || "";
+        const skuB = b.sku || "";
+        
+        const numA = parseInt(skuA, 10);
+        const numB = parseInt(skuB, 10);
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        
+        return skuA.localeCompare(skuB);
+      });
   }, [products, searchQuery]);
 
   const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
