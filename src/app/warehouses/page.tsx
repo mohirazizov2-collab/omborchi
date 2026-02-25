@@ -17,7 +17,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package, Edit2, Eye, Hash } from "lucide-react";
+import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package, Edit2, Eye, Hash, Search } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -185,11 +185,11 @@ export default function WarehousesPage() {
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
               <DialogTrigger asChild>
-                <Button onClick={() => setIsDialogOpen(true)} className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white">
+                <Button onClick={() => setIsDialogOpen(true)} className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
                   <Plus className="w-4 h-4" /> {t.warehouses.addNew}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="rounded-[2rem] border-white/5 bg-card/90 backdrop-blur-2xl text-foreground">
+              <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
                     <WarehouseIcon className="text-primary w-6 h-6" />
@@ -238,7 +238,7 @@ export default function WarehousesPage() {
                 </div>
                 <DialogFooter className="gap-2">
                   <Button variant="ghost" className="rounded-2xl h-12" onClick={handleCloseDialog}>{t.actions.cancel}</Button>
-                  <Button className="rounded-2xl h-12 px-8 bg-primary text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20" onClick={handleSave} disabled={isSaving}>
+                  <Button className="rounded-2xl h-12 px-8 bg-primary text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 border-none" onClick={handleSave} disabled={isSaving}>
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     {t.actions.save}
                   </Button>
@@ -338,65 +338,83 @@ export default function WarehousesPage() {
           </div>
         )}
 
-        {/* View Stock Dialog */}
+        {/* Improved View Stock Dialog */}
         <Dialog open={!!viewStockWarehouse} onOpenChange={(open) => !open && setViewStockWarehouse(null)}>
           <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-4xl p-8 shadow-2xl">
             <DialogHeader className="mb-6">
-              <DialogTitle className="text-2xl font-black tracking-tight flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <Package className="text-primary w-6 h-6" /> {viewStockWarehouse?.name} - Tavar qoldig'i
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                    <Package className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-2xl font-black tracking-tight">{viewStockWarehouse?.name}</DialogTitle>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Ombordagi mavjud mahsulotlar</p>
+                  </div>
                 </div>
-                <Badge variant="outline" className="font-black uppercase text-[10px] py-1 border-primary/20 text-primary">{filteredWarehouseStock.length} tur</Badge>
-              </DialogTitle>
+                <Badge variant="outline" className="h-8 px-4 rounded-xl font-black uppercase text-[10px] border-primary/20 text-primary bg-primary/5 shadow-sm">
+                  {filteredWarehouseStock.length} ta mahsulot turi
+                </Badge>
+              </div>
             </DialogHeader>
             
-            <div className="mb-6">
-              <div className="relative group">
-                <Eye className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Nomi yoki tavar kodi bo'yicha qidirish..." 
-                  className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40"
-                  value={stockSearch}
-                  onChange={(e) => setStockSearch(e.target.value)}
-                />
-              </div>
+            <div className="mb-8 relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input 
+                placeholder="Nomi yoki tavar kodi bo'yicha qidirish..." 
+                className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-bold text-sm shadow-inner"
+                value={stockSearch}
+                onChange={(e) => setStockSearch(e.target.value)}
+              />
             </div>
 
-            <ScrollArea className="h-[450px] pr-4">
-              <div className="space-y-3">
+            <ScrollArea className="h-[450px] pr-4 custom-scrollbar">
+              <div className="grid grid-cols-1 gap-3">
                 {filteredWarehouseStock.map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between p-5 rounded-2xl bg-muted/20 border border-white/5 group hover:bg-muted/30 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                        <Package className="w-5 h-5" />
+                  <div key={item.id} className="flex items-center justify-between p-5 rounded-3xl bg-muted/20 border border-white/5 group hover:bg-card/60 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+                    <div className="flex items-center gap-5">
+                      <div className="w-12 h-12 rounded-[1.25rem] bg-background/50 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-sm">
+                        <Package className="w-6 h-6" />
                       </div>
-                      <div className="space-y-0.5">
-                        <h4 className="font-black text-sm tracking-tight">{item.productName}</h4>
-                        <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground uppercase opacity-60">
-                          <span className="flex items-center gap-1"><Hash className="w-3 h-3" /> {item.sku}</span>
-                          <span>{formatMoney(item.price)} so'm</span>
+                      <div className="space-y-1">
+                        <h4 className="font-black text-base tracking-tight text-foreground">{item.productName}</h4>
+                        <div className="flex flex-wrap items-center gap-4">
+                          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary/60 bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10">
+                            <Hash className="w-3 h-3" /> {item.sku}
+                          </span>
+                          <span className="text-[10px] font-black uppercase text-muted-foreground/40 tracking-widest">
+                            {formatMoney(item.price)} so'm
+                          </span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[9px] font-black uppercase text-muted-foreground opacity-40 tracking-widest mb-0.5">Ombordagi qoldiq</p>
-                      <p className="text-lg font-black font-headline text-primary">
-                        {item.stock} <span className="text-[10px] opacity-50 uppercase">{item.unit}</span>
-                      </p>
+                      <p className="text-[9px] font-black uppercase text-muted-foreground/40 tracking-widest mb-1">Mavjud qoldiq</p>
+                      <div className="flex items-baseline justify-end gap-1.5">
+                        <span className={cn(
+                          "text-2xl font-black font-headline tracking-tighter",
+                          item.stock > 10 ? "text-primary" : item.stock > 0 ? "text-amber-500" : "text-rose-500"
+                        )}>
+                          {item.stock}
+                        </span>
+                        <span className="text-[10px] font-black uppercase opacity-40">{t.units[item.unit as keyof typeof t.units] || item.unit}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
                 {filteredWarehouseStock.length === 0 && (
-                  <div className="py-20 text-center opacity-20">
-                    <Package className="w-16 h-16 mx-auto mb-4" />
-                    <p className="font-black uppercase tracking-widest text-xs">Mahsulotlar topilmadi</p>
+                  <div className="py-24 text-center opacity-10 flex flex-col items-center">
+                    <Package className="w-20 h-20 mb-4" />
+                    <p className="font-black uppercase tracking-[0.4em] text-xs">Mahsulotlar topilmadi</p>
                   </div>
                 )}
               </div>
             </ScrollArea>
 
-            <DialogFooter className="mt-8">
-              <Button onClick={() => setViewStockWarehouse(null)} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] bg-primary text-white">Yopish</Button>
+            <DialogFooter className="mt-8 pt-6 border-t border-white/5">
+              <Button onClick={() => setViewStockWarehouse(null)} className="rounded-2xl h-14 px-12 font-black uppercase tracking-widest text-[11px] bg-primary text-white border-none shadow-2xl shadow-primary/20 hover:translate-y-[-2px] transition-all">
+                Yopish
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
