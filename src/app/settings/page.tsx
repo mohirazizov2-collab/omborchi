@@ -40,74 +40,7 @@ import { generateBackendProjectStructure } from "@/ai/flows/generate-backend-pro
 import { generateBackendApiBoilerplate } from "@/ai/flows/generate-backend-api-boilerplate";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-
-// Mahsulotlar ro'yxati (Santexnika + Filtrlar)
-const PREDEFINED_PRODUCTS = [
-  { name: "Truba PN20 20mm", sku: "0020", unit: "m" },
-  { name: "Truba PN20 25mm", sku: "0021", unit: "m" },
-  { name: "Truba PN20 32mm", sku: "0022", unit: "m" },
-  { name: "Truba PN20 40mm", sku: "0023", unit: "m" },
-  { name: "Truba PN20 50mm", sku: "0024", unit: "m" },
-  { name: "Truba PN20 63mm", sku: "0025", unit: "m" },
-  { name: "Ugolnik 20mm 90°", sku: "0026", unit: "pcs" },
-  { name: "Ugolnik 25mm 90°", sku: "0027", unit: "pcs" },
-  { name: "Ugolnik 32mm 90°", sku: "0028", unit: "pcs" },
-  { name: "Ugolnik 40mm 90°", sku: "0029", unit: "pcs" },
-  { name: "Ugolnik 50mm 90°", sku: "0030", unit: "pcs" },
-  { name: "Ugolnik 63mm 90°", sku: "0031", unit: "pcs" },
-  { name: "Ugolnik 20mm 45°", sku: "0032", unit: "pcs" },
-  { name: "Ugolnik 25mm 45°", sku: "0033", unit: "pcs" },
-  { name: "Ugolnik 32mm 45°", sku: "0034", unit: "pcs" },
-  { name: "Mufta 20mm", sku: "0035", unit: "pcs" },
-  { name: "Mufta 25mm", sku: "0036", unit: "pcs" },
-  { name: "Mufta 32mm", sku: "0037", unit: "pcs" },
-  { name: "Mufta 40mm", sku: "0038", unit: "pcs" },
-  { name: "Mufta 50mm", sku: "0039", unit: "pcs" },
-  { name: "Mufta 63mm", sku: "0040", unit: "pcs" },
-  { name: "Troynik 20mm", sku: "0041", unit: "pcs" },
-  { name: "Troynik 25mm", sku: "0042", unit: "pcs" },
-  { name: "Troynik 32mm", sku: "0043", unit: "pcs" },
-  { name: "Troynik 40mm", sku: "0044", unit: "pcs" },
-  { name: "Troynik 50mm", sku: "0045", unit: "pcs" },
-  { name: "Troynik 63mm", sku: "0046", unit: "pcs" },
-  { name: "Reduktsiya 25x20", sku: "0047", unit: "pcs" },
-  { name: "Reduktsiya 32x20", sku: "0048", unit: "pcs" },
-  { name: "Reduktsiya 32x25", sku: "0049", unit: "pcs" },
-  { name: "Amerika 20x1/2 NR", sku: "0050", unit: "pcs" },
-  { name: "Amerika 25x3/4 NR", sku: "0051", unit: "pcs" },
-  { name: "Amerika 32x1 NR", sku: "0052", unit: "pcs" },
-  { name: "Amerika 20x1/2 VR", sku: "0053", unit: "pcs" },
-  { name: "Amerika 25x3/4 VR", sku: "0054", unit: "pcs" },
-  { name: "Amerika 32x1 VR", sku: "0055", unit: "pcs" },
-  { name: "Klapan 20mm", sku: "0056", unit: "pcs" },
-  { name: "Klapan 25mm", sku: "0057", unit: "pcs" },
-  { name: "Klapan 32mm", sku: "0058", unit: "pcs" },
-  { name: "Filtr 20mm", sku: "0059", unit: "pcs" },
-  { name: "Filtr 25mm", sku: "0060", unit: "pcs" },
-  { name: "Zaglushka 20mm", sku: "0061", unit: "pcs" },
-  { name: "Zaglushka 25mm", sku: "0062", unit: "pcs" },
-  { name: "Obxod 20mm", sku: "0063", unit: "pcs" },
-  { name: "Obxod 25mm", sku: "0064", unit: "pcs" },
-  { name: "Mufta VR 20x1/2", sku: "0065", unit: "pcs" },
-  { name: "Mufta VR 25x3/4", sku: "0066", unit: "pcs" },
-  { name: "Mufta NR 20x1/2", sku: "0067", unit: "pcs" },
-  { name: "Mufta NR 25x3/4", sku: "0068", unit: "pcs" },
-  { name: "Ugolnik VR 20x1/2", sku: "0069", unit: "pcs" },
-  { name: "Ugolnik NR 20x1/2", sku: "0070", unit: "pcs" },
-  // Yangi filtrlar ro'yxati (Rasm asosida)
-  { name: "Ламинированный 950 верхный фильтр", sku: "0071", unit: "pcs" },
-  { name: "Ламинированный 500 боковой фильтр", sku: "0072", unit: "pcs" },
-  { name: "Ламинированный 650 боковой фильтр", sku: "0073", unit: "pcs" },
-  { name: "Лам. песочный фильтр MTP 760 (прозр. крышка)", sku: "0074", unit: "pcs" },
-  { name: "Лам. песочный фильтр MTP 800 (прозр. крышка)", sku: "0075", unit: "pcs" },
-  { name: "Лам. песочный фильтр MTP 950 (прозр. крышка)", sku: "0076", unit: "pcs" },
-  { name: "Пластмасса 620 верхный фильтр", sku: "0077", unit: "pcs" },
-  { name: "Пластмасса 760 верхный фильтр", sku: "0078", unit: "pcs" },
-  { name: "Пластмасса 920 upper filter", sku: "0079", unit: "pcs" },
-  { name: "Пластмасса 620 боковой фильтр", sku: "0080", unit: "pcs" },
-  { name: "Пластмасса 760 боковой фильтр", sku: "0081", unit: "pcs" },
-  { name: "Пластмасса 920 боковой фильтр", sku: "0082", unit: "pcs" },
-];
+import { PREDEFINED_PRODUCTS } from "@/lib/predefined-products";
 
 export default function SettingsPage() {
   const { t } = useLanguage();
@@ -142,6 +75,7 @@ export default function SettingsPage() {
     if (!db) return;
     setImporting(true);
     try {
+      // Barcha mahsulotlarni parallel yuklash uchun chunking yoki for loop
       for (const product of PREDEFINED_PRODUCTS) {
         const productId = doc(collection(db, "products")).id;
         const productRef = doc(db, "products", productId);
@@ -304,8 +238,7 @@ export default function SettingsPage() {
                   Ommaviy mahsulot yuklash
                 </CardTitle>
                 <CardDescription>
-                  Rasmda taqdim etilgan santexnika va basseyn filtrlarini avtomatik ravishda katalogga qo'shish. 
-                  Kodlar <b>0020</b> dan boshlanadi.
+                  Tizimda oldindan tayyorlangan {PREDEFINED_PRODUCTS.length} ta mahsulotni (santexnika, isitish va filtrlar) avtomatik ravishda katalogga qo'shish.
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-8 pb-8">
@@ -318,7 +251,7 @@ export default function SettingsPage() {
                       </li>
                     ))}
                     <li className="text-[11px] font-black text-primary/40 italic">...</li>
-                    {PREDEFINED_PRODUCTS.slice(-4).map(p => (
+                    {PREDEFINED_PRODUCTS.slice(119, 123).map(p => (
                       <li key={p.sku} className="text-[11px] font-black text-primary/60">
                         #{p.sku} - {p.name}
                       </li>
