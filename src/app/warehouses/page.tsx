@@ -17,21 +17,24 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package } from "lucide-react";
+import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package, Edit2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import { useToast } from "@/hooks/use-toast";
 
 export default function WarehousesPage() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const db = useFirestore();
   const { user, role, isUserLoading: authLoading } = useUser();
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
 
   const isAdmin = role === "Super Admin" || role === "Admin";
 
@@ -44,7 +47,8 @@ export default function WarehousesPage() {
   const [formData, setFormData] = useState({
     name: "",
     address: "",
-    phoneNumber: ""
+    phoneNumber: "",
+    managerName: ""
   });
 
   const warehousesQuery = useMemoFirebase(() => {
@@ -77,33 +81,54 @@ export default function WarehousesPage() {
     if (!db || !user || !formData.name) return;
     
     setIsSaving(true);
-    const warehouseId = doc(collection(db, "warehouses")).id;
+    const warehouseId = editingWarehouse ? editingWarehouse.id : doc(collection(db, "warehouses")).id;
     const warehouseRef = doc(db, "warehouses", warehouseId);
     
-    const newWarehouse = {
+    const warehouseData = {
       id: warehouseId,
       name: formData.name,
       address: formData.address,
       phoneNumber: formData.phoneNumber,
+      managerName: formData.managerName,
       responsibleUserId: user.uid,
       isDeleted: false,
-      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    setDoc(warehouseRef, newWarehouse)
+    if (!editingWarehouse) {
+      (warehouseData as any).createdAt = new Date().toISOString();
+    }
+
+    setDoc(warehouseRef, warehouseData, { merge: true })
       .then(() => {
-        setIsDialogOpen(false);
-        setFormData({ name: "", address: "", phoneNumber: "" });
+        handleCloseDialog();
+        toast({ title: "Muvaffaqiyatli", description: editingWarehouse ? "Ombor ma'lumotlari yangilandi." : "Yangi ombor qo'shildi." });
       })
       .catch(async (error) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: warehouseRef.path,
-          operation: 'create',
-          requestResourceData: newWarehouse
+          operation: editingWarehouse ? 'update' : 'create',
+          requestResourceData: warehouseData
         }));
       })
       .finally(() => setIsSaving(false));
+  };
+
+  const handleEditClick = (w: any) => {
+    setEditingWarehouse(w);
+    setFormData({
+      name: w.name || "",
+      address: w.address || "",
+      phoneNumber: w.phoneNumber || "",
+      managerName: w.managerName || ""
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingWarehouse(null);
+    setFormData({ name: "", address: "", phoneNumber: "", managerName: "" });
   };
 
   const handleDelete = (id: string) => {
@@ -131,49 +156,64 @@ export default function WarehousesPage() {
           </div>
           
           {isAdmin && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
               <DialogTrigger asChild>
-                <Button className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white">
+                <Button onClick={() => setIsDialogOpen(true)} className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white">
                   <Plus className="w-4 h-4" /> {t.warehouses.addNew}
                 </Button>
               </DialogTrigger>
               <DialogContent className="rounded-[2rem] border-white/5 bg-card/90 backdrop-blur-2xl text-foreground">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-black tracking-tight">{t.warehouses.addNew}</DialogTitle>
+                  <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+                    <WarehouseIcon className="text-primary w-6 h-6" />
+                    {editingWarehouse ? "Omborni tahrirlash" : t.warehouses.addNew}
+                  </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-6 py-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">{t.common.id} (Nomi)</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Ombor nomi</Label>
                     <Input 
-                      className="h-12 rounded-2xl bg-background/50 border-border/40"
+                      className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold"
                       value={formData.name} 
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                       placeholder="Masalan: Asosiy Ombor Toshkent" 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Manzil</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Menejer (Mas'ul shaxs)</Label>
                     <Input 
-                      className="h-12 rounded-2xl bg-background/50 border-border/40"
-                      value={formData.address} 
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
-                      placeholder="Ko'cha nomi, shahar" 
+                      className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold"
+                      value={formData.managerName} 
+                      onChange={(e) => setFormData({...formData, managerName: e.target.value})}
+                      placeholder="Ism va familiya" 
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Telefon</Label>
-                    <Input 
-                      className="h-12 rounded-2xl bg-background/50 border-border/40"
-                      value={formData.phoneNumber} 
-                      onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-                      placeholder="+998 90 123 45 67" 
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Manzil</Label>
+                      <Input 
+                        className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold"
+                        value={formData.address} 
+                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        placeholder="Ko'cha nomi, shahar" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Telefon</Label>
+                      <Input 
+                        className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold"
+                        value={formData.phoneNumber} 
+                        onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                        placeholder="+998 90 123 45 67" 
+                      />
+                    </div>
                   </div>
                 </div>
                 <DialogFooter className="gap-2">
-                  <Button variant="ghost" className="rounded-2xl h-12" onClick={() => setIsDialogOpen(false)}>{t.actions.cancel}</Button>
-                  <Button className="rounded-2xl h-12 px-8 bg-primary text-white font-black uppercase tracking-widest text-[10px]" onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t.actions.save}
+                  <Button variant="ghost" className="rounded-2xl h-12" onClick={handleCloseDialog}>{t.actions.cancel}</Button>
+                  <Button className="rounded-2xl h-12 px-8 bg-primary text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20" onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    {t.actions.save}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -206,14 +246,24 @@ export default function WarehousesPage() {
                       </div>
                     </div>
                     {isAdmin && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-9 w-9 text-rose-500 hover:bg-rose-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => handleDelete(w.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-9 w-9 text-primary hover:bg-primary/10 rounded-xl"
+                          onClick={() => handleEditClick(w)}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-9 w-9 text-rose-500 hover:bg-rose-500/10 rounded-xl"
+                          onClick={() => handleDelete(w.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     )}
                   </CardHeader>
                   <CardContent>
@@ -236,7 +286,9 @@ export default function WarehousesPage() {
                           <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest opacity-60">
                             <User className="w-4 h-4" /> <span>{t.warehouses.manager}:</span>
                           </div>
-                          <span className="font-black truncate max-w-[120px] text-foreground opacity-80">{w.responsibleUserId?.substring(0,8)}</span>
+                          <span className="font-black truncate max-w-[120px] text-foreground opacity-80">
+                            {w.managerName || w.responsibleUserId?.substring(0,8)}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2 text-muted-foreground font-black uppercase tracking-widest opacity-60">
