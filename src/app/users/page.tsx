@@ -19,10 +19,10 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { UserPlus, MoreHorizontal, ShieldCheck, Loader2, UserX, Mail, User, Lock, Eye, EyeOff } from "lucide-react";
+import { UserPlus, Trash2, ShieldCheck, Loader2, UserX, Mail, User, Lock, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
@@ -38,6 +38,7 @@ export default function UsersPage() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     displayName: "",
@@ -85,12 +86,10 @@ export default function UsersPage() {
     let secondaryApp;
     
     try {
-      // Admin sessiyasini saqlab qolish uchun vaqtinchalik Firebase App instance yaratamiz
       const secondaryAppName = `SecondaryApp_${Date.now()}`;
       secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
       const secondaryAuth = getAuth(secondaryApp);
 
-      // 1. Authentication akkauntini ochish
       const userCredential = await createUserWithEmailAndPassword(
         secondaryAuth, 
         formData.email, 
@@ -99,7 +98,6 @@ export default function UsersPage() {
       
       const newUid = userCredential.user.uid;
 
-      // 2. Firestore-da profil yaratish
       const userData = {
         id: newUid,
         displayName: formData.displayName,
@@ -110,8 +108,6 @@ export default function UsersPage() {
       };
 
       await setDoc(doc(db, "users", newUid), userData);
-
-      // 3. Vaqtinchalik sessiyadan chiqish
       await signOut(secondaryAuth);
 
       toast({
@@ -123,26 +119,25 @@ export default function UsersPage() {
       setFormData({ displayName: "", email: "", password: "", role: "Omborchi" });
     } catch (error: any) {
       let message = "Foydalanuvchini yaratishda xatolik yuz berdi.";
-      
-      if (error.code === 'auth/email-already-in-use') {
-        message = "Ushbu elektron pochta manzili allaqachon ro'yxatdan o'tgan.";
-      } else if (error.code === 'auth/invalid-email') {
-        message = "Elektron pochta manzili noto'g'ri formatda.";
-      } else if (error.code === 'auth/weak-password') {
-        message = "Parol juda zaif.";
-      }
-
-      toast({
-        variant: "destructive",
-        title: "Xatolik",
-        description: message,
-      });
+      if (error.code === 'auth/email-already-in-use') message = "Ushbu elektron pochta manzili allaqachon ro'yxatdan o'tgan.";
+      toast({ variant: "destructive", title: "Xatolik", description: message });
     } finally {
-      // Vaqtinchalik app instance-ni o'chirib tashlash (Cleaning up)
-      if (secondaryApp) {
-        deleteApp(secondaryApp).catch(() => {});
-      }
+      if (secondaryApp) deleteApp(secondaryApp).catch(() => {});
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!db || !confirm("Ushbu foydalanuvchi profilini o'chirishni tasdiqlaysizmi? (Eslatma: Bu faqat Firestore profilini o'chiradi)")) return;
+    
+    setIsDeleting(userId);
+    try {
+      await deleteDoc(doc(db, "users", userId));
+      toast({ title: "O'chirildi", description: "Foydalanuvchi profili muvaffaqiyatli o'chirildi." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Xatolik", description: "O'chirishda xato yuz berdi." });
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -303,8 +298,14 @@ export default function UsersPage() {
                           </Badge>
                         </td>
                         <td className="px-10 py-6 text-right">
-                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-muted/50">
-                            <MoreHorizontal className="w-5 h-5" />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-10 w-10 rounded-xl opacity-0 group-hover:opacity-100 transition-all text-rose-500 hover:bg-rose-500/10"
+                            onClick={() => handleDeleteUser(u.id)}
+                            disabled={isDeleting === u.id}
+                          >
+                            {isDeleting === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                           </Button>
                         </td>
                       </tr>
