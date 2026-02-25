@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -8,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardCheck, Search, Loader2, Save, Warehouse } from "lucide-react";
+import { ClipboardCheck, Search, Loader2, Save, Warehouse, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
-import { updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,7 @@ export default function InventoryAuditPage() {
   const { user, role } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState<string | null>(null);
   const [auditData, setAuditData] = useState<Record<string, number>>({});
 
   const isAdmin = role === "Super Admin" || role === "Admin";
@@ -57,12 +58,22 @@ export default function InventoryAuditPage() {
     }).map(p => {
       const invItem = inventory?.find(inv => inv.warehouseId === selectedWarehouseId && inv.productId === p.id);
       return { ...p, warehouseStock: invItem ? (invItem.stock || 0) : 0 };
+    }).sort((a, b) => {
+      const numA = parseInt(a.sku || "0", 10);
+      const numB = parseInt(b.sku || "0", 10);
+      return isNaN(numA) || isNaN(numB) ? (a.sku || "").localeCompare(b.sku || "") : numA - numB;
     });
   }, [products, inventory, searchQuery, selectedWarehouseId]);
 
   const handleAuditChange = (productId: string, val: string) => {
-    const num = parseFloat(val) || 0;
-    setAuditData(prev => ({ ...prev, [productId]: num }));
+    const num = parseFloat(val);
+    if (isNaN(num)) {
+      const newData = { ...auditData };
+      delete newData[productId];
+      setAuditData(newData);
+    } else {
+      setAuditData(prev => ({ ...prev, [productId]: num }));
+    }
   };
 
   const handleReconcile = async (product: any) => {
@@ -74,34 +85,43 @@ export default function InventoryAuditPage() {
     const discrepancy = physicalCount - currentWhStock;
     
     if (discrepancy === 0) {
-      toast({ title: "Xabar", description: "Zaxira allaqachon to'g'ri." });
+      toast({ title: "Xabar", description: "Zaxira miqdori allaqachon to'g'ri." });
       return;
     }
 
-    setIsSaving(true);
+    setIsSaving(product.id);
     try {
+      const selectedWhName = warehouses?.find(w => w.id === selectedWarehouseId)?.name || "Noma'lum";
+      
       const movementData = {
         productId: product.id,
+        productName: product.name,
         warehouseId: selectedWarehouseId,
+        warehouseName: selectedWhName,
         quantityChange: discrepancy,
         movementType: "Adjustment",
         movementDate: new Date().toISOString(),
         responsibleUserId: user.uid,
         responsibleUserName: user.displayName || user.email || "Noma'lum",
-        description: `Audit Adjustment. System: ${currentWhStock}, Physical: ${physicalCount}`,
+        description: `Inventarizatsiya: Tizimda ${currentWhStock}, Haqiqatda ${physicalCount}`,
         unit: product.unit || "pcs"
       };
+      
+      // 1. Tarixga yozish
       addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
-      // Update Warehouse Inventory
+      // 2. Ombor qoldig'ini yangilash (Mavjud bo'lmasa yaratadi)
       const invId = `${selectedWarehouseId}_${product.id}`;
       const invRef = doc(db, "inventory", invId);
-      updateDocumentNonBlocking(invRef, {
+      setDocumentNonBlocking(invRef, {
+        id: invId,
+        warehouseId: selectedWarehouseId,
+        productId: product.id,
         stock: physicalCount,
         updatedAt: new Date().toISOString()
-      });
+      }, { merge: true });
 
-      // Update Global Product Stock
+      // 3. Umumiy katalog zaxirasini yangilash
       const productRef = doc(db, "products", product.id);
       updateDocumentNonBlocking(productRef, {
         stock: (product.stock || 0) + discrepancy,
@@ -109,15 +129,19 @@ export default function InventoryAuditPage() {
       });
 
       toast({
-        title: t.inventoryAudit.success,
-        description: `${product.name} zaxirasi ${physicalCount} ${t.units[product.unit as keyof typeof t.units] || product.unit} ga o'zgartirildi.`,
+        title: "Muvaffaqiyatli",
+        description: `${product.name} zaxirasi ${physicalCount} ga to'g'irlandi.`,
       });
 
+      // Formani tozalash
       const newAuditData = { ...auditData };
       delete newAuditData[product.id];
       setAuditData(newAuditData);
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "Xatolik", description: "Zaxirani yangilashda xatolik yuz berdi." });
     } finally {
-      setIsSaving(false);
+      setIsSaving(null);
     }
   };
 
@@ -139,7 +163,7 @@ export default function InventoryAuditPage() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="border-none glass-card bg-card/40 backdrop-blur-xl p-4 md:col-span-1">
+          <Card className="border-none glass-card bg-card/40 backdrop-blur-xl p-4 md:col-span-1 shadow-sm">
             <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50 mb-2 block">Omborni tanlang</Label>
             <Select onValueChange={setSelectedWarehouseId} value={selectedWarehouseId}>
               <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
@@ -156,12 +180,12 @@ export default function InventoryAuditPage() {
             </Select>
           </Card>
 
-          <Card className="border-none glass-card bg-card/40 backdrop-blur-xl p-4 md:col-span-2">
+          <Card className="border-none glass-card bg-card/40 backdrop-blur-xl p-4 md:col-span-2 shadow-sm">
             <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50 mb-2 block">Mahsulot qidiruvi</Label>
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
-                placeholder={t.products.search} 
+                placeholder="Nomi yoki tavar kodi bo'yicha..." 
                 className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -187,6 +211,7 @@ export default function InventoryAuditPage() {
                 const physical = auditData[p.id] ?? p.warehouseStock;
                 const discrepancy = physical - (p.warehouseStock || 0);
                 const unitLabel = t.units[p.unit as keyof typeof t.units] || p.unit || '';
+                const isItemSaving = isSaving === p.id;
                 
                 return (
                   <motion.div
@@ -195,14 +220,14 @@ export default function InventoryAuditPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.02 }}
                   >
-                    <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[2rem] hover:bg-card/60 transition-all group overflow-hidden">
+                    <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[2rem] hover:bg-card/60 transition-all group overflow-hidden shadow-sm">
                       <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-6 w-full md:w-auto">
                           <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                             <ClipboardCheck className="w-6 h-6" />
                           </div>
                           <div className="min-w-0">
-                            <h3 className="font-black text-lg tracking-tight truncate max-w-[250px]">{p.name}</h3>
+                            <h3 className="font-black text-lg tracking-tight truncate max-w-[300px]">{p.name}</h3>
                             <div className="flex items-center gap-2">
                               <p className="text-[10px] font-black uppercase text-muted-foreground opacity-50">{unitLabel}</p>
                               {p.sku && <p className="text-[10px] font-black uppercase text-primary/60">#{p.sku}</p>}
@@ -212,16 +237,16 @@ export default function InventoryAuditPage() {
 
                         <div className="flex flex-wrap items-center gap-8 w-full md:w-auto justify-between md:justify-end">
                           <div className="text-center md:text-right">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">{t.inventoryAudit.systemStock}</p>
+                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">Tizimda</p>
                             <p className="text-xl font-black font-headline">{p.warehouseStock || 0} <span className="text-[10px] opacity-40 uppercase">{unitLabel}</span></p>
                           </div>
 
                           <div className="w-32">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">{t.inventoryAudit.physicalStock}</p>
+                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">Amalda (Haqiqiy)</p>
                             <div className="relative">
                               <Input 
                                 type="number"
-                                className="h-10 rounded-xl bg-background/50 border-border/40 font-black text-center"
+                                className="h-10 rounded-xl bg-background/50 border-border/40 font-black text-center focus:ring-primary/20"
                                 value={auditData[p.id] ?? ""}
                                 placeholder={p.warehouseStock.toString()}
                                 onChange={(e) => handleAuditChange(p.id, e.target.value)}
@@ -231,24 +256,24 @@ export default function InventoryAuditPage() {
                           </div>
 
                           <div className="text-center md:text-right min-w-[80px]">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">{t.inventoryAudit.discrepancy}</p>
+                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">Farqi</p>
                             <p className={cn(
                               "text-xl font-black font-headline",
                               discrepancy > 0 ? "text-emerald-500" : discrepancy < 0 ? "text-rose-500" : "text-muted-foreground opacity-30"
                             )}>
-                              {discrepancy > 0 ? `+${discrepancy}` : discrepancy}
+                              {discrepancy > 0 ? `+${discrepancy}` : discrepancy === 0 ? "0" : discrepancy}
                             </p>
                           </div>
 
                           <Button 
                             onClick={() => handleReconcile(p)}
-                            disabled={discrepancy === 0 || isSaving}
+                            disabled={discrepancy === 0 || isItemSaving}
                             className={cn(
                               "rounded-xl h-12 px-6 font-black uppercase tracking-widest text-[10px] transition-all",
                               discrepancy !== 0 ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-muted text-muted-foreground opacity-20"
                             )}
                           >
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> {t.inventoryAudit.reconcile}</>}
+                            {isItemSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> To'g'irlash</>}
                           </Button>
                         </div>
                       </CardContent>
@@ -260,7 +285,7 @@ export default function InventoryAuditPage() {
 
             {filteredProducts.length === 0 && (
               <div className="py-32 text-center opacity-10">
-                <ClipboardCheck className="w-20 h-20 mx-auto mb-4" />
+                <Search className="w-20 h-20 mx-auto mb-4" />
                 <p className="text-sm font-black uppercase tracking-[0.5em]">Mahsulotlar topilmadi</p>
               </div>
             )}
