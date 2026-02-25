@@ -66,15 +66,15 @@ export function OmniSidebar() {
   // Inventar Boshqaruvi Guruhi
   const inventoryNavigation = useMemo(() => [
     { name: t.nav.products, href: "/products", icon: Package },
-    { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse, hide: isOmborchi },
+    { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse },
     { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
-  ], [t, isAdmin, isOmborchi]);
-
-  // Moliya Guruhi
-  const financeNavigation = useMemo(() => [
-    { name: t.nav.expenses, href: "/expenses", icon: WalletCards },
-    { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
   ], [t, isAdmin]);
+
+  // Moliya Guruhi (Omborchi uchun butunlay yashiriladi)
+  const financeNavigation = useMemo(() => [
+    { name: t.nav.expenses, href: "/expenses", icon: WalletCards, hide: isOmborchi },
+    { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
+  ], [t, isAdmin, isOmborchi]);
 
   // Ma'muriyat Guruhi
   const adminNavigation = useMemo(() => [
@@ -104,7 +104,7 @@ export function OmniSidebar() {
     const isGroupActive = activeGroup === value;
 
     return (
-      <AccordionItem value={value} className="border-none">
+      <AccordionItem key={value} value={value} className="border-none">
         <AccordionTrigger className={cn(
           "flex items-center justify-between px-3 py-3 rounded-xl text-sm font-bold transition-all duration-200 hover:no-underline hover:bg-muted group mb-1",
           isGroupActive ? "text-primary bg-primary/5" : "text-muted-foreground"
@@ -172,19 +172,10 @@ export function OmniSidebar() {
         </div>
 
         <Accordion type="multiple" defaultValue={[activeGroup]} className="space-y-2">
-          {/* Analitika */}
           {renderAccordionItem("analytics", t.nav.analyticsGroup, BarChart3, analyticsNavigation)}
-
-          {/* Nakladnolar */}
           {renderAccordionItem("invoices", t.nav.invoices, FileText, invoiceNavigation)}
-
-          {/* Inventar */}
           {renderAccordionItem("inventory", t.nav.inventoryGroup, Package, inventoryNavigation)}
-
-          {/* Moliya */}
           {renderAccordionItem("finance", t.nav.financeGroup, Coins, financeNavigation)}
-
-          {/* Ma'muriyat */}
           {renderAccordionItem("admin", t.nav.systemGroup, Settings, adminNavigation)}
         </Accordion>
       </div>

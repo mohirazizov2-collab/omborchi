@@ -1,6 +1,8 @@
+
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,13 +44,21 @@ export default function ExpensesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role } = useUser();
+  const { user, role, isUserLoading } = useUser();
+  const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const isAdmin = role === "Super Admin" || role === "Admin";
+  const isOmborchi = role === "Omborchi";
+
+  useEffect(() => {
+    if (!isUserLoading && isOmborchi) {
+      router.push("/");
+    }
+  }, [isOmborchi, isUserLoading, router]);
 
   const [formData, setFormData] = useState({
     category: "rent",
@@ -115,6 +125,14 @@ export default function ExpensesPage() {
     if (!confirm("Xarajatni o'chirishni tasdiqlaysizmi?")) return;
     deleteDocumentNonBlocking(doc(db, "expenses", id));
   };
+
+  if (isUserLoading || isOmborchi) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const categories = Object.entries(t.expenses.categories);
 

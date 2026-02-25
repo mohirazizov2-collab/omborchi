@@ -1,8 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,8 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package, Edit2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package, Edit2, Eye, Hash } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -25,24 +25,20 @@ import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function WarehousesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, isUserLoading: authLoading } = useUser();
-  const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
+  const [viewStockWarehouse, setViewStockWarehouse] = useState<any>(null);
+  const [stockSearch, setStockSearch] = useState("");
 
   const isAdmin = role === "Super Admin" || role === "Admin";
-
-  useEffect(() => {
-    if (!authLoading && role === "Omborchi") {
-      router.push("/");
-    }
-  }, [role, authLoading, router]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -63,6 +59,12 @@ export default function WarehousesPage() {
   }, [db, user]);
   const { data: inventory } = useCollection(inventoryQuery);
 
+  const productsQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "products");
+  }, [db, user]);
+  const { data: products } = useCollection(productsQuery);
+
   const warehouseStats = useMemo(() => {
     if (!warehouses || !inventory) return {};
     const stats: Record<string, { totalStock: number, productCount: number }> = {};
@@ -76,6 +78,29 @@ export default function WarehousesPage() {
     });
     return stats;
   }, [warehouses, inventory]);
+
+  const filteredWarehouseStock = useMemo(() => {
+    if (!viewStockWarehouse || !inventory || !products) return [];
+    
+    const warehouseInventory = inventory.filter(inv => inv.warehouseId === viewStockWarehouse.id);
+    
+    return warehouseInventory
+      .map(inv => {
+        const product = products.find(p => p.id === inv.productId);
+        return {
+          ...inv,
+          productName: product?.name || "Noma'lum",
+          sku: product?.sku || "---",
+          price: product?.salePrice || 0,
+          unit: product?.unit || "pcs"
+        };
+      })
+      .filter(item => 
+        item.productName.toLowerCase().includes(stockSearch.toLowerCase()) || 
+        item.sku.toLowerCase().includes(stockSearch.toLowerCase())
+      )
+      .sort((a, b) => a.productName.localeCompare(b.productName));
+  }, [viewStockWarehouse, inventory, products, stockSearch]);
 
   const handleSave = () => {
     if (!db || !user || !formData.name) return;
@@ -137,7 +162,7 @@ export default function WarehousesPage() {
     deleteDocumentNonBlocking(ref);
   };
 
-  if (authLoading || role === "Omborchi") {
+  if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -145,10 +170,12 @@ export default function WarehousesPage() {
     );
   }
 
+  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+
   return (
     <div className="flex min-h-screen bg-background">
       <OmniSidebar />
-      <main className="flex-1 p-10 overflow-y-auto page-transition">
+      <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
         <header className="flex justify-between items-center mb-12">
           <div>
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.warehouses.title}</h1>
@@ -221,13 +248,6 @@ export default function WarehousesPage() {
           )}
         </header>
 
-        <div className="mb-8 flex gap-4">
-          <Input placeholder={t.warehouses.search} className="max-w-md h-12 rounded-2xl bg-card border-none shadow-sm px-6" />
-          <Button variant="outline" className="h-12 rounded-2xl px-6 border-none bg-card shadow-sm font-black uppercase tracking-widest text-[10px]">
-            {t.actions.filter}
-          </Button>
-        </div>
-
         {(isLoading || authLoading) ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
@@ -237,7 +257,7 @@ export default function WarehousesPage() {
             {warehouses && warehouses.map((w: any) => {
               const stats = warehouseStats[w.id] || { totalStock: 0, productCount: 0 };
               return (
-                <Card key={w.id} className="border-none glass-card hover:-translate-y-1 transition-all duration-300 rounded-[2.5rem] bg-card/40 backdrop-blur-xl group">
+                <Card key={w.id} className="border-none glass-card hover:-translate-y-1 transition-all duration-300 rounded-[2.5rem] bg-card/40 backdrop-blur-xl group relative overflow-hidden">
                   <CardHeader className="flex flex-row items-start justify-between pb-4">
                     <div className="space-y-1">
                       <CardTitle className="text-xl font-headline font-black tracking-tight">{w.name}</CardTitle>
@@ -287,7 +307,7 @@ export default function WarehousesPage() {
                             <User className="w-4 h-4" /> <span>{t.warehouses.manager}:</span>
                           </div>
                           <span className="font-black truncate max-w-[120px] text-foreground opacity-80">
-                            {w.managerName || w.responsibleUserId?.substring(0,8)}
+                            {w.managerName || 'Belgilanmagan'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
@@ -297,6 +317,13 @@ export default function WarehousesPage() {
                           <span className="font-black text-foreground opacity-80">{w.phoneNumber || '---'}</span>
                         </div>
                       </div>
+
+                      <Button 
+                        onClick={() => setViewStockWarehouse(w)}
+                        className="w-full h-11 mt-4 rounded-xl font-black uppercase tracking-widest text-[9px] bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all gap-2"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Zaxirani ko'rish
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -310,6 +337,69 @@ export default function WarehousesPage() {
             )}
           </div>
         )}
+
+        {/* View Stock Dialog */}
+        <Dialog open={!!viewStockWarehouse} onOpenChange={(open) => !open && setViewStockWarehouse(null)}>
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-4xl p-8 shadow-2xl">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-2xl font-black tracking-tight flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Package className="text-primary w-6 h-6" /> {viewStockWarehouse?.name} - Tavar qoldig'i
+                </div>
+                <Badge variant="outline" className="font-black uppercase text-[10px] py-1 border-primary/20 text-primary">{filteredWarehouseStock.length} tur</Badge>
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="mb-6">
+              <div className="relative group">
+                <Eye className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Nomi yoki tavar kodi bo'yicha qidirish..." 
+                  className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40"
+                  value={stockSearch}
+                  onChange={(e) => setStockSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <ScrollArea className="h-[450px] pr-4">
+              <div className="space-y-3">
+                {filteredWarehouseStock.map((item: any) => (
+                  <div key={item.id} className="flex items-center justify-between p-5 rounded-2xl bg-muted/20 border border-white/5 group hover:bg-muted/30 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <Package className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h4 className="font-black text-sm tracking-tight">{item.productName}</h4>
+                        <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground uppercase opacity-60">
+                          <span className="flex items-center gap-1"><Hash className="w-3 h-3" /> {item.sku}</span>
+                          <span>{formatMoney(item.price)} so'm</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black uppercase text-muted-foreground opacity-40 tracking-widest mb-0.5">Ombordagi qoldiq</p>
+                      <p className="text-lg font-black font-headline text-primary">
+                        {item.stock} <span className="text-[10px] opacity-50 uppercase">{item.unit}</span>
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {filteredWarehouseStock.length === 0 && (
+                  <div className="py-20 text-center opacity-20">
+                    <Package className="w-16 h-16 mx-auto mb-4" />
+                    <p className="font-black uppercase tracking-widest text-xs">Mahsulotlar topilmadi</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            <DialogFooter className="mt-8">
+              <Button onClick={() => setViewStockWarehouse(null)} className="rounded-2xl h-12 px-10 font-black uppercase tracking-widest text-[10px] bg-primary text-white">Yopish</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
