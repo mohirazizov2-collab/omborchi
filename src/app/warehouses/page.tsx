@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,24 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Warehouse as WarehouseIcon, MapPin, Phone, User, Trash2, Plus, Loader2, Package, Edit2, Eye, Hash, Search } from "lucide-react";
+import { 
+  Warehouse as WarehouseIcon, 
+  MapPin, 
+  Phone, 
+  User, 
+  Trash2, 
+  Plus, 
+  Loader2, 
+  Package, 
+  Edit2, 
+  Eye, 
+  Hash, 
+  Search,
+  ArrowRight,
+  TrendingUp,
+  AlertTriangle,
+  LayoutGrid
+} from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -99,7 +117,12 @@ export default function WarehousesPage() {
         item.productName.toLowerCase().includes(stockSearch.toLowerCase()) || 
         item.sku.toLowerCase().includes(stockSearch.toLowerCase())
       )
-      .sort((a, b) => a.productName.localeCompare(b.productName));
+      .sort((a, b) => {
+        const numA = parseInt(a.sku, 10);
+        const numB = parseInt(b.sku, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.productName.localeCompare(b.productName);
+      });
   }, [viewStockWarehouse, inventory, products, stockSearch]);
 
   const handleSave = () => {
@@ -173,13 +196,13 @@ export default function WarehousesPage() {
   const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
       <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
-        <header className="flex justify-between items-center mb-12">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
           <div>
             <h1 className="text-4xl font-black font-headline tracking-tighter text-foreground">{t.warehouses.title}</h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">{t.warehouses.description}</p>
+            <p className="text-sm text-muted-foreground mt-1 font-medium">{t.warehouses.description}</p>
           </div>
           
           {isAdmin && (
@@ -338,84 +361,137 @@ export default function WarehousesPage() {
           </div>
         )}
 
-        {/* Improved View Stock Dialog */}
+        {/* View Stock Dialog - Redesigned for eye comfort and aesthetics */}
         <Dialog open={!!viewStockWarehouse} onOpenChange={(open) => !open && setViewStockWarehouse(null)}>
-          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-4xl p-8 shadow-2xl">
-            <DialogHeader className="mb-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                    <Package className="w-8 h-8" />
+          <DialogContent className="rounded-[3rem] border-white/5 bg-background/60 backdrop-blur-[40px] text-foreground max-w-5xl p-0 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] overflow-hidden">
+            <div className="flex flex-col h-[85vh]">
+              {/* Soft Header */}
+              <div className="p-10 pb-6 bg-primary/[0.03] border-b border-white/5">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 rounded-[2rem] bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                      <LayoutGrid className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-3xl font-black tracking-tighter font-headline mb-1">{viewStockWarehouse?.name}</DialogTitle>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span className="text-xs font-bold uppercase tracking-widest opacity-60">{viewStockWarehouse?.address || "Toshkent shahar"}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <DialogTitle className="text-2xl font-black tracking-tight">{viewStockWarehouse?.name}</DialogTitle>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Ombordagi mavjud mahsulotlar</p>
+                  
+                  <div className="flex gap-4">
+                    <div className="px-6 py-3 rounded-2xl bg-white/5 border border-white/5 shadow-sm">
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-0.5">Jami turlar</p>
+                      <p className="text-xl font-black font-headline text-primary">{filteredWarehouseStock.length} SKU</p>
+                    </div>
+                    <div className="px-6 py-3 rounded-2xl bg-white/5 border border-white/5 shadow-sm">
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-0.5">Menejer</p>
+                      <p className="text-xl font-black font-headline opacity-80">{viewStockWarehouse?.managerName?.split(' ')[0] || "Aziz"}</p>
+                    </div>
                   </div>
                 </div>
-                <Badge variant="outline" className="h-8 px-4 rounded-xl font-black uppercase text-[10px] border-primary/20 text-primary bg-primary/5 shadow-sm">
-                  {filteredWarehouseStock.length} ta mahsulot turi
-                </Badge>
-              </div>
-            </DialogHeader>
-            
-            <div className="mb-8 relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-              <Input 
-                placeholder="Nomi yoki tavar kodi bo'yicha qidirish..." 
-                className="pl-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-bold text-sm shadow-inner"
-                value={stockSearch}
-                onChange={(e) => setStockSearch(e.target.value)}
-              />
-            </div>
 
-            <ScrollArea className="h-[450px] pr-4 custom-scrollbar">
-              <div className="grid grid-cols-1 gap-3">
-                {filteredWarehouseStock.map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between p-5 rounded-3xl bg-muted/20 border border-white/5 group hover:bg-card/60 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
-                    <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 rounded-[1.25rem] bg-background/50 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-sm">
-                        <Package className="w-6 h-6" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="font-black text-base tracking-tight text-foreground">{item.productName}</h4>
-                        <div className="flex flex-wrap items-center gap-4">
-                          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary/60 bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10">
-                            <Hash className="w-3 h-3" /> {item.sku}
-                          </span>
-                          <span className="text-[10px] font-black uppercase text-muted-foreground/40 tracking-widest">
-                            {formatMoney(item.price)} so'm
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-black uppercase text-muted-foreground/40 tracking-widest mb-1">Mavjud qoldiq</p>
-                      <div className="flex items-baseline justify-end gap-1.5">
-                        <span className={cn(
-                          "text-2xl font-black font-headline tracking-tighter",
-                          item.stock > 10 ? "text-primary" : item.stock > 0 ? "text-amber-500" : "text-rose-500"
-                        )}>
-                          {item.stock}
-                        </span>
-                        <span className="text-[10px] font-black uppercase opacity-40">{t.units[item.unit as keyof typeof t.units] || item.unit}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <div className="mt-8 relative group">
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+                  <Input 
+                    placeholder="Mahsulot nomi yoki kodini yozing..." 
+                    className="h-14 pl-14 pr-6 rounded-[1.5rem] bg-background/40 border-white/5 focus:border-primary/30 transition-all font-bold text-sm shadow-inner"
+                    value={stockSearch}
+                    onChange={(e) => setStockSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Scrollable Content with Soft Cards */}
+              <ScrollArea className="flex-1 px-10 py-6 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-10">
+                  <AnimatePresence mode="popLayout">
+                    {filteredWarehouseStock.map((item: any, idx) => {
+                      const isLowStock = item.stock <= 10;
+                      const isOut = item.stock <= 0;
+                      const unitLabel = t.units[item.unit as keyof typeof t.units] || item.unit;
+
+                      return (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ delay: idx * 0.02, ease: "easeOut" }}
+                        >
+                          <div className={cn(
+                            "p-5 rounded-[2rem] border transition-all duration-300 group relative overflow-hidden",
+                            isOut ? "bg-rose-500/[0.02] border-rose-500/10" : 
+                            isLowStock ? "bg-amber-500/[0.02] border-amber-500/10" : 
+                            "bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:shadow-xl hover:shadow-primary/[0.02]"
+                          )}>
+                            <div className="flex items-center justify-between gap-4 relative z-10">
+                              <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className={cn(
+                                  "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 shadow-sm",
+                                  isOut ? "bg-rose-500/10 text-rose-500" : 
+                                  isLowStock ? "bg-amber-500/10 text-amber-500" : 
+                                  "bg-primary/10 text-primary"
+                                )}>
+                                  <Package className="w-6 h-6" />
+                                </div>
+                                <div className="min-w-0 space-y-1">
+                                  <h4 className="font-black text-sm tracking-tight text-foreground truncate">{item.productName}</h4>
+                                  <div className="flex items-center gap-3">
+                                    <Badge variant="outline" className="h-5 px-2 rounded-md font-black text-[8px] uppercase border-white/10 bg-black/5 text-muted-foreground/60">
+                                      <Hash className="w-2.5 h-2.5 mr-1 opacity-40" /> {item.sku}
+                                    </Badge>
+                                    <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">{formatMoney(item.price)} so'm</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <p className="text-[8px] font-black uppercase text-muted-foreground/30 tracking-[0.2em] mb-0.5">Ombordagi qoldiq</p>
+                                <div className="flex items-baseline justify-end gap-1.5">
+                                  <span className={cn(
+                                    "text-2xl font-black font-headline tracking-tighter",
+                                    isOut ? "text-rose-500" : isLowStock ? "text-amber-500" : "text-primary"
+                                  )}>
+                                    {item.stock}
+                                  </span>
+                                  <span className="text-[9px] font-black uppercase opacity-30">{unitLabel}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status Indicator */}
+                            {isLowStock && (
+                              <div className="absolute top-0 right-0 p-2">
+                                <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isOut ? "bg-rose-500" : "bg-amber-500")} />
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+
                 {filteredWarehouseStock.length === 0 && (
-                  <div className="py-24 text-center opacity-10 flex flex-col items-center">
-                    <Package className="w-20 h-20 mb-4" />
-                    <p className="font-black uppercase tracking-[0.4em] text-xs">Mahsulotlar topilmadi</p>
+                  <div className="py-32 text-center opacity-10 flex flex-col items-center">
+                    <Search className="w-24 h-24 mb-6" />
+                    <p className="font-black uppercase tracking-[0.5em] text-sm">Ma'lumot topilmadi</p>
                   </div>
                 )}
-              </div>
-            </ScrollArea>
+              </ScrollArea>
 
-            <DialogFooter className="mt-8 pt-6 border-t border-white/5">
-              <Button onClick={() => setViewStockWarehouse(null)} className="rounded-2xl h-14 px-12 font-black uppercase tracking-widest text-[11px] bg-primary text-white border-none shadow-2xl shadow-primary/20 hover:translate-y-[-2px] transition-all">
-                Yopish
-              </Button>
-            </DialogFooter>
+              {/* Soft Footer */}
+              <div className="p-8 border-t border-white/5 bg-primary/[0.02] flex justify-end">
+                <Button 
+                  onClick={() => setViewStockWarehouse(null)} 
+                  className="rounded-[1.5rem] h-14 px-12 font-black uppercase tracking-[0.2em] text-[11px] bg-primary text-white border-none shadow-2xl shadow-primary/20 hover:translate-y-[-2px] hover:shadow-primary/30 transition-all active:scale-95"
+                >
+                  Yopish
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </main>
