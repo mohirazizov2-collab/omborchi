@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,13 +22,21 @@ export default function InventoryAuditPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role, assignedWarehouseId } = useUser();
+  const router = useRouter();
+  const { user, role, isUserLoading, assignedWarehouseId } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
   const [isSaving, setIsSaving] = useState<string | null>(null);
   const [auditData, setAuditData] = useState<Record<string, number>>({});
 
   const isAdmin = role === "Super Admin" || role === "Admin";
+
+  // Faqat adminlar kira oladi
+  useEffect(() => {
+    if (!isUserLoading && !isAdmin) {
+      router.push("/");
+    }
+  }, [isAdmin, isUserLoading, router]);
 
   // Agar foydalanuvchiga ombor biriktirilgan bo'lsa, uni avtomatik tanlash
   useEffect(() => {
@@ -152,15 +161,13 @@ export default function InventoryAuditPage() {
     }
   };
 
-  if (!isAdmin && !assignedWarehouseId) return (
-    <div className="flex min-h-screen bg-background items-center justify-center p-10">
-      <Card className="max-w-md p-8 text-center rounded-[2rem]">
-        <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-        <h2 className="text-xl font-black">Ruxsat yo'q</h2>
-        <p className="text-muted-foreground mt-2">Sizga hali birorta ham ombor biriktirilmagan. Iltimos, admin bilan bog'laning.</p>
-      </Card>
+  if (isUserLoading) return (
+    <div className="flex h-screen items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
     </div>
   );
+
+  if (!isAdmin) return null;
 
   return (
     <div className="flex min-h-screen bg-background font-body">
@@ -180,7 +187,7 @@ export default function InventoryAuditPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="border-none glass-card bg-card/40 backdrop-blur-xl p-4 md:col-span-1 shadow-sm">
             <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50 mb-2 block">Omborni tanlang</Label>
-            <Select onValueChange={setSelectedWarehouseId} value={selectedWarehouseId} disabled={!isAdmin && !!assignedWarehouseId}>
+            <Select onValueChange={setSelectedWarehouseId} value={selectedWarehouseId}>
               <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
                 <div className="flex items-center gap-2">
                   <Warehouse className="w-4 h-4 text-primary" />

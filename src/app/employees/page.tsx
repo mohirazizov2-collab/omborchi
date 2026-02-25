@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,7 +45,8 @@ export default function EmployeesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role, isUserLoading: authLoading } = useUser();
+  const router = useRouter();
+  const { user, role, isUserLoading } = useUser();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPayrollOpen, setIsPayrollOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
@@ -51,6 +54,13 @@ export default function EmployeesPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const isAdmin = role === "Super Admin" || role === "Admin";
+
+  // Faqat adminlar kira oladi
+  useEffect(() => {
+    if (!isUserLoading && !isAdmin) {
+      router.push("/");
+    }
+  }, [isAdmin, isUserLoading, router]);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -205,6 +215,14 @@ export default function EmployeesPage() {
     doc.save(`Payroll_${emp.fullName}_${Date.now()}.pdf`);
   };
 
+  if (isUserLoading) return (
+    <div className="flex h-screen items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
+
+  if (!isAdmin) return null;
+
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
@@ -325,7 +343,7 @@ export default function EmployeesPage() {
           </CardContent>
         </Card>
 
-        {(isLoading || authLoading) ? (
+        {isLoading ? (
           <div className="flex justify-center py-32">
             <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
           </div>
