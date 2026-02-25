@@ -1,3 +1,4 @@
+
 "use client";
 
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -20,7 +21,7 @@ import {
   Warehouse,
   FileInput
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, getDoc, setDoc } from "firebase/firestore";
@@ -37,7 +38,7 @@ export default function StockInPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user } = useUser();
+  const { user, role, assignedWarehouseId } = useUser();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
   const [dnNumber, setDnNumber] = useState("");
@@ -45,6 +46,15 @@ export default function StockInPage() {
   const [warehouseId, setWarehouseId] = useState("");
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [processedInvoice, setProcessedInvoice] = useState<any>(null);
+
+  const isAdmin = role === "Super Admin" || role === "Admin";
+
+  // Agar foydalanuvchiga ombor biriktirilgan bo'lsa, uni avtomatik tanlash
+  useEffect(() => {
+    if (!isAdmin && assignedWarehouseId) {
+      setWarehouseId(assignedWarehouseId);
+    }
+  }, [isAdmin, assignedWarehouseId]);
 
   const productsQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -168,7 +178,8 @@ export default function StockInPage() {
       setItems([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
       setDnNumber("");
       setSupplier("");
-      setWarehouseId("");
+      // Faqat admin bo'lsa omborni tozalaymiz, aks holda u tanlangan qoladi
+      if (isAdmin) setWarehouseId("");
     } catch (err) {
       console.error(err);
       toast({ variant: "destructive", title: "Xatolik", description: "Saqlashda xato yuz berdi." });
@@ -277,7 +288,7 @@ export default function StockInPage() {
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Qabul qiluvchi ombor</Label>
-                <Select onValueChange={setWarehouseId} value={warehouseId}>
+                <Select onValueChange={setWarehouseId} value={warehouseId} disabled={!isAdmin && !!assignedWarehouseId}>
                   <SelectTrigger className="h-11 rounded-xl bg-background/50 border-border/40 font-bold">
                     <div className="flex items-center gap-2">
                       <Warehouse className="w-4 h-4 text-primary/40" />

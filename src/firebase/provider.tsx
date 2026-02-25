@@ -17,6 +17,7 @@ interface FirebaseProviderProps {
 interface UserAuthState {
   user: User | null;
   role: string | null;
+  assignedWarehouseId: string | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -28,6 +29,7 @@ export interface FirebaseContextState {
   auth: Auth | null;
   user: User | null;
   role: string | null;
+  assignedWarehouseId: string | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -38,6 +40,7 @@ export interface FirebaseServicesAndUser {
   auth: Auth;
   user: User | null;
   role: string | null;
+  assignedWarehouseId: string | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -45,6 +48,7 @@ export interface FirebaseServicesAndUser {
 export interface UserHookResult {
   user: User | null;
   role: string | null;
+  assignedWarehouseId: string | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -62,6 +66,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
     user: null,
     role: null,
+    assignedWarehouseId: null,
     isUserLoading: true,
     userError: null,
   });
@@ -81,18 +86,23 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           setUserAuthState({ 
             user: firebaseUser, 
             role: isPermanentAdmin ? "Super Admin" : "Omborchi", 
+            assignedWarehouseId: null,
             isUserLoading: false, 
             userError: null 
           });
 
-          // Real-time role syncing
+          // Real-time role and warehouse syncing
           const userRef = doc(firestore, "users", firebaseUser.uid);
           const adminRef = doc(firestore, "rolesAdmin", firebaseUser.uid);
 
           const unsubUser = onSnapshot(userRef, (uDoc) => {
             if (uDoc.exists()) {
               const uData = uDoc.data();
-              setUserAuthState(prev => ({ ...prev, role: isPermanentAdmin ? "Super Admin" : (uData.role || "Omborchi") }));
+              setUserAuthState(prev => ({ 
+                ...prev, 
+                role: isPermanentAdmin ? "Super Admin" : (uData.role || "Omborchi"),
+                assignedWarehouseId: uData.assignedWarehouseId || null
+              }));
             }
           });
 
@@ -107,11 +117,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             unsubAdmin();
           };
         } else {
-          setUserAuthState({ user: null, role: null, isUserLoading: false, userError: null });
+          setUserAuthState({ user: null, role: null, assignedWarehouseId: null, isUserLoading: false, userError: null });
         }
       },
       (error) => {
-        setUserAuthState({ user: null, role: null, isUserLoading: false, userError: error });
+        setUserAuthState({ user: null, role: null, assignedWarehouseId: null, isUserLoading: false, userError: error });
       }
     );
     return () => unsubscribe();
@@ -126,6 +136,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       auth: servicesAvailable ? auth : null,
       user: userAuthState.user,
       role: userAuthState.role,
+      assignedWarehouseId: userAuthState.assignedWarehouseId,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
     };
@@ -153,6 +164,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     auth: context.auth,
     user: context.user,
     role: context.role,
+    assignedWarehouseId: context.assignedWarehouseId,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
   };
@@ -170,6 +182,6 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T & 
 }
 
 export const useUser = (): UserHookResult => {
-  const { user, role, isUserLoading, userError } = useFirebase();
-  return { user, role, isUserLoading, userError };
+  const { user, role, assignedWarehouseId, isUserLoading, userError } = useFirebase();
+  return { user, role, assignedWarehouseId, isUserLoading, userError };
 };

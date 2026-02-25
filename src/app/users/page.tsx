@@ -19,7 +19,7 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
-import { UserPlus, Trash2, ShieldCheck, Loader2, UserX, Mail, User, Lock, Eye, EyeOff } from "lucide-react";
+import { UserPlus, Trash2, ShieldCheck, Loader2, UserX, Mail, User, Lock, Eye, EyeOff, Warehouse } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
@@ -44,7 +44,8 @@ export default function UsersPage() {
     displayName: "",
     email: "",
     password: "",
-    role: "Omborchi"
+    role: "Omborchi",
+    assignedWarehouseId: "all"
   });
 
   const isSuperAdmin = role === "Super Admin";
@@ -62,6 +63,12 @@ export default function UsersPage() {
   
   const { data: rawUsersList, isLoading } = useCollection(usersQuery);
   const usersList = (rawUsersList || []).filter((u: any) => u.email !== "f2472839@gmail.com");
+
+  const warehousesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "warehouses");
+  }, [db]);
+  const { data: warehouses } = useCollection(warehousesQuery);
 
   const handleAddUser = async () => {
     if (!db || !formData.email || !formData.displayName || !formData.password) {
@@ -103,6 +110,7 @@ export default function UsersPage() {
         displayName: formData.displayName,
         email: formData.email,
         role: formData.role,
+        assignedWarehouseId: formData.assignedWarehouseId === "all" ? null : formData.assignedWarehouseId,
         status: "Active",
         createdAt: new Date().toISOString()
       };
@@ -116,7 +124,7 @@ export default function UsersPage() {
       });
       
       setIsDialogOpen(false);
-      setFormData({ displayName: "", email: "", password: "", role: "Omborchi" });
+      setFormData({ displayName: "", email: "", password: "", role: "Omborchi", assignedWarehouseId: "all" });
     } catch (error: any) {
       let message = "Foydalanuvchini yaratishda xatolik yuz berdi.";
       if (error.code === 'auth/email-already-in-use') message = "Ushbu elektron pochta manzili allaqachon ro'yxatdan o'tgan.";
@@ -221,20 +229,39 @@ export default function UsersPage() {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Rol</Label>
-                  <Select 
-                    onValueChange={(val) => setFormData({...formData, role: val})}
-                    value={formData.role}
-                  >
-                    <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
-                      <SelectValue placeholder="Rolni tanlang" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-border/40">
-                      <SelectItem value="Admin" className="font-bold">Admin</SelectItem>
-                      <SelectItem value="Omborchi" className="font-bold">Omborchi</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Rol</Label>
+                    <Select 
+                      onValueChange={(val) => setFormData({...formData, role: val})}
+                      value={formData.role}
+                    >
+                      <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
+                        <SelectValue placeholder="Rolni tanlang" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border/40">
+                        <SelectItem value="Admin" className="font-bold">Admin</SelectItem>
+                        <SelectItem value="Omborchi" className="font-bold">Omborchi</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest pl-1 opacity-50">Biriktirilgan ombor</Label>
+                    <Select 
+                      onValueChange={(val) => setFormData({...formData, assignedWarehouseId: val})}
+                      value={formData.assignedWarehouseId}
+                    >
+                      <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
+                        <SelectValue placeholder="Ombor..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-border/40">
+                        <SelectItem value="all" className="font-bold">Barchasi (Admin)</SelectItem>
+                        {warehouses?.map(w => (
+                          <SelectItem key={w.id} value={w.id} className="font-bold">{w.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
               <DialogFooter className="gap-3">
@@ -261,55 +288,61 @@ export default function UsersPage() {
                     <tr>
                       <th className="px-10 py-6">Foydalanuvchi</th>
                       <th className="px-6 py-6">{t.users.role}</th>
-                      <th className="px-6 py-6">Holat</th>
+                      <th className="px-6 py-6">Mas'ul ombor</th>
                       <th className="px-10 py-6 text-right">Amallar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/10">
-                    {usersList && usersList.map((u: any) => (
-                      <tr key={u.id} className="hover:bg-primary/[0.02] transition-colors group">
-                        <td className="px-10 py-6">
-                          <div className="flex items-center gap-4">
-                            <Avatar className="h-12 w-12 border border-white/5 shadow-sm">
-                              <AvatarFallback className="bg-primary/10 text-primary font-black text-sm">
-                                {u.displayName ? u.displayName.split(' ').map((n: string) => n[0]).join('') : (u.email ? u.email[0].toUpperCase() : 'U')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <span className="font-black text-foreground tracking-tight text-base">{u.displayName || 'Noma\'lum'}</span>
-                              <span className="text-[11px] text-muted-foreground font-bold opacity-60">{u.email}</span>
+                    {usersList && usersList.map((u: any) => {
+                      const assignedWh = warehouses?.find(w => w.id === u.assignedWarehouseId);
+                      return (
+                        <tr key={u.id} className="hover:bg-primary/[0.02] transition-colors group">
+                          <td className="px-10 py-6">
+                            <div className="flex items-center gap-4">
+                              <Avatar className="h-12 w-12 border border-white/5 shadow-sm">
+                                <AvatarFallback className="bg-primary/10 text-primary font-black text-sm">
+                                  {u.displayName ? u.displayName.split(' ').map((n: string) => n[0]).join('') : (u.email ? u.email[0].toUpperCase() : 'U')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="font-black text-foreground tracking-tight text-base">{u.displayName || 'Noma\'lum'}</span>
+                                <span className="text-[11px] text-muted-foreground font-bold opacity-60">{u.email}</span>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-6">
-                          <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "p-1.5 rounded-lg",
-                              u.role === "Admin" ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
-                            )}>
-                              <ShieldCheck className="w-4 h-4" />
+                          </td>
+                          <td className="px-6 py-6">
+                            <div className="flex items-center gap-2">
+                              <div className={cn(
+                                "p-1.5 rounded-lg",
+                                u.role === "Admin" ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
+                              )}>
+                                <ShieldCheck className="w-4 h-4" />
+                              </div>
+                              <span className="text-xs font-black uppercase tracking-wider">{u.role || 'Omborchi'}</span>
                             </div>
-                            <span className="text-xs font-black uppercase tracking-wider">{u.role || 'Omborchi'}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-6">
-                          <Badge variant="outline" className="rounded-xl font-black text-[9px] uppercase px-3 py-1 bg-emerald-500/10 text-emerald-500 border-none shadow-sm">
-                            {u.status || 'Active'}
-                          </Badge>
-                        </td>
-                        <td className="px-10 py-6 text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-10 w-10 rounded-xl opacity-0 group-hover:opacity-100 transition-all text-rose-500 hover:bg-rose-500/10"
-                            onClick={() => handleDeleteUser(u.id)}
-                            disabled={isDeleting === u.id}
-                          >
-                            {isDeleting === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-6 py-6">
+                            <div className="flex items-center gap-2">
+                              <Warehouse className="w-3.5 h-3.5 text-muted-foreground/40" />
+                              <span className="text-xs font-bold text-foreground/70">
+                                {assignedWh ? assignedWh.name : 'Barcha omborlar'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-10 py-6 text-right">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 rounded-xl opacity-0 group-hover:opacity-100 transition-all text-rose-500 hover:bg-rose-500/10"
+                              onClick={() => handleDeleteUser(u.id)}
+                              disabled={isDeleting === u.id}
+                            >
+                              {isDeleting === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {(!usersList || usersList.length === 0) && (
                       <tr>
                         <td colSpan={4} className="px-6 py-40 text-center">
