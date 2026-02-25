@@ -1,57 +1,50 @@
 
 # 🚀 ombor.uz - Professional Ombor Boshqaruvi Tizimi
 
-Loyihani internetga (Netlify) chiqarish va undan samarali foydalanish bo'yicha to'liq qo'llanma.
+Loyihani **Firebase Hosting**-ga chiqarish va undan samarali foydalanish bo'yicha qo'llanma.
 
 ---
 
-## 🛠️ Texnologiyalar va Chidamlilik
-Ushbu tizim eng zamonaviy **Serverless** arxitektura asosida qurilgan:
-*   **Frontend**: Next.js 15 (App Router) - Maksimal tezlik.
-*   **Backend**: Firebase Auth & Firestore - Millionlab foydalanuvchi va ma'lumotlarni ko'tara oladi.
-*   **AI**: Google Gemini 1.5 Flash - Sekundiga bir necha tahlillarni bajarish quvvatiga ega.
-*   **Hosting**: Netlify - Global barqarorlik va yuqori trafikni (High Traffic) boshqarish.
+## 🛠️ Texnologiyalar
+Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
+*   **Frontend**: Next.js 15 (App Router)
+*   **Backend**: Firebase Auth & Firestore
+*   **AI**: Google Gemini (Genkit)
+*   **Hosting**: Firebase App Hosting (Tavsiya etiladi)
 
 ---
 
-## 🚀 1-bosqich: GitHub-ga yuklash
-Loyiha kodini GitHub omboringizga yuborish uchun terminalda quyidagilarni bajaring:
+## 🌍 Firebase Hosting-ga joylashtirish (Deploy)
 
-```bash
-git add .
-git commit -m "feat: finalized all processes and AI logic"
-git push origin main
-```
+Loyihani Firebase-ning o'ziga joylashtirish uchun quyidagi bosqichlarni bajaring:
 
----
+### 1-usul: Firebase CLI orqali (Tezkor)
+1.  Terminalda Firebase asboblarini o'rnating: `npm install -g firebase-tools`
+2.  Tizimga kiring: `firebase login`
+3.  Loyihani ishga tushiring (agar oldin qilinmagan bo'lsa): `firebase init hosting`
+    *   *Savol tug'ilganda "Next.js" frameworkini tanlang.*
+4.  Loyihani internetga chiqaring: `firebase deploy`
 
-## 🌍 2-bosqich: Netlify-da ishga tushirish (Deploy)
-1.  Netlify panelida **"Add new site"** -> **"Import from GitHub"** tanlang.
-2.  Loyiha sozlamalarida quyidagilarni kiriting:
-    *   **Build command**: `npm run build`
-    *   **Publish directory**: `.next`
-3.  **Environment Variables** (Muhim!):
-    *   **"Contents of .env file"** oynasiga o'z AI kalitingizni kiriting:
-    ```text
-    GOOGLE_GENAI_API_KEY=Sizning_Google_AI_Kalitingiz
-    ```
-4.  **"Deploy site"** tugmasini bosing.
+### 2-usul: Firebase App Hosting (Avtomatik)
+Bu usul GitHub bilan integratsiya qilingan bo'lib, har gal kodni GitHub-ga yuborganingizda (push), tizim o'zi avtomatik yangilanadi:
+1.  [Firebase Console](https://console.firebase.google.com/)-ga kiring.
+2.  **"Build"** menyusidan **"App Hosting"** bo'limini tanlang.
+3.  GitHub omboringizni (repository) ulang.
+4.  Sozlamalarda `GOOGLE_GENAI_API_KEY` o'zgaruvchisini qo'shing.
 
 ---
 
 ## 📦 Tizim Imkoniyatlari
-1.  **Dashboard**: Umumiy zaxira qiymati, kam qolgan tovarlar va moliyaviy tahlil.
-2.  **Mahsulotlar**: Katalog, SKU boshqaruvi va shtrix-kod skanerlash.
-3.  **Operatsiyalar**: Kirim (In), Chiqim (Out) va Transfer.
-4.  **Inventarizatsiya**: Jismoniy qoldiqni tizim bilan solishtirish.
-5.  **Ishchilar**: Xodimlar ro'yxati va oylik maosh hisob-kitobi.
-6.  **AI System Gen**: Yangi tizimlar uchun tayyor backend kodlarini yaratish.
-7.  **AI Assistant**: Tizim ichidagi aqlli yordamchi (Chat).
+1.  **Dashboard**: Umumiy zaxira qiymati va oylik xarajatlar tahlili.
+2.  **Mahsulotlar**: Katalog, SKU (Tavar kodi) bo'yicha qidirish va sonli saralash.
+3.  **Nakladnolar**: Kirim va Chiqim jarayonlarini PDF formatida saqlash.
+4.  **Moliya**: Oylik maoshlar va biznes xarajatlarini (ijara, kommunal) hisoblash.
+5.  **AI Assistant**: Tizim ichidagi aqlli yordamchi (Chat).
 
 ---
 
 ## 🔑 Kirish Ma'lumotlari (Demo)
 *   **Email**: `f2472839@gmail.com` (Super Admin)
-*   **Parol**: *(O'zingiz o'rnatgan parol)*
+*   **Parol**: *(Siz o'rnatgan parol)*
 
 Created by **X e M team** © 2026
