@@ -1,7 +1,7 @@
 
 # 🚀 ombor.uz - Professional Ombor Boshqaruvi Tizimi
 
-Rasmiy havola: [https://studio-4209846898-d5885.web.app](https://studio-4209846898-d5885.web.app)
+Rasmiy havola: [https://ombor.uz](https://ombor.uz)
 
 Loyihani **Firebase Hosting**-ga chiqarish va undan samarali foydalanish bo'yicha qo'llanma.
 
