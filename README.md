@@ -16,14 +16,12 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ## 🌐 Domenni (ombor.uz) ulash uchun DNS sozlamalari
 
-Sizning so'rovingizga binoan, Firebase IP-manzili olib tashlandi va shaxsiy IP-manzilingizni kiritish uchun yo'riqnoma tayyorlandi.
+Domeningizni tizimga bog'lash uchun quyidagi yozuvlarni domen boshqaruv paneliga kiriting:
 
-### 1. DNS panelda kiritilishi kerak bo'lgan yozuvlar:
-Domeningiz boshqaruv paneliga (DNS settings) kiring va quyidagi yozuvni qo'shing:
-
+### 1. A Record (Asosiy IP manzil):
 *   **Type (Turi)**: A Record
 *   **Host/Name**: `@` yoki `ombor.uz`
-*   **Value (Qiymati)**: `[BU YERGA O'ZINGIZNING IP MANZILINGIZNI YOZING]`
+*   **Value (Qiymati)**: `199.36.158.100`
 
 ### 2. TXT Record (Egalikni tasdiqlash uchun):
 Firebase loyihangizni tanishi uchun ushbu TXT yozuvini albatta kiritishingiz kerak:
@@ -40,6 +38,6 @@ Saytingizdagi o'zgarishlarni yangilash uchun terminalda quyidagi buyruqlarni ket
 1.  `firebase login` (agar kirmagan bo'lsangiz)
 2.  `firebase deploy`
 
-**Eslatma:** Agar siz o'zingizning shaxsiy IP-manzilingizni DNS-ga bog'lasangiz, Firebase Hosting orqali avtomatik ulanish uzilishi mumkin. Bunday holda saytni o'sha shaxsiy IP-ga ega serveringizda sozlashingiz kerak bo'ladi.
+**Eslatma:** DNS sozlamalari yangilangandan so'ng, sayt to'liq ishga tushishi uchun odatda 1 soatdan 24 soatgacha vaqt talab qilinishi mumkin.
 
 Created by **X e M team** © 2026
