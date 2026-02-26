@@ -16,7 +16,7 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ## 🌐 Domenni (omborchi.uz) ulash uchun DNS sozlamalari
 
-Domeningizni tizimga bog'lash uchun quyidagi yozuvlarni domen boshqaruv paneliga kiriting. **Muhim:** Eski IP manzillarni o'chirib tashlang!
+Domeningizni tizimga bog'lash uchun quyidagi yozuvlarni domen boshqaruv paneliga kiriting. **Muhim:** Eski barcha IP manzillarni (masalan, 92.255.111.71) o'chirib tashlang! Faqat quyidagi yozuvlar qolsin:
 
 ### 1. A Record (Asosiy IP manzil):
 *   **Type (Turi)**: A Record
