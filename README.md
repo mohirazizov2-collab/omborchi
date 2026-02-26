@@ -16,11 +16,13 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ## 🌐 Domenni (ombor.uz) ulash uchun DNS sozlamalari
 
+**MUHIM:** Firebase-dagi eski `.web.app` domenlari o'chib ketmaydi, bu normal holat. Asosiysi `ombor.uz` ni sozlash.
+
 Firebase Console-dagi so'rovga asosan, domeningiz DNS paneliga quyidagi yozuvlarni kiriting:
 
 ### 1. O'chirish kerak bo'lgan eski yozuv:
 *   **Type**: A
-*   **Value**: `92.255.111.71` (Buni o'chiring)
+*   **Value**: `92.255.111.71` (Buni albatta o'chiring, aks holda sayt ochilmaydi)
 
 ### 2. Qo'shish kerak bo'lgan yangi yozuvlar:
 *   **Record 1 (A Record)**:
@@ -34,11 +36,11 @@ Firebase Console-dagi so'rovga asosan, domeningiz DNS paneliga quyidagi yozuvlar
 
 ## 🌍 Loyihani internetga chiqarish (Deploy)
 
-Saytingizdagi o'zgarishlarni yangilash uchun:
+Saytingizdagi o'zgarishlarni yangilash uchun terminalda quyidagi buyruqlarni ketma-ket yozing:
 
-1.  Terminalda tizimga kiring: `firebase login`
-2.  Loyihani internetga chiqaring: `firebase deploy`
+1.  `firebase login` (agar kirmagan bo'lsangiz)
+2.  `firebase deploy`
 
-Deploy bo'lgandan so'ng va DNS yozuvlar tarqalgach (1-24 soat), saytingiz `ombor.uz` manzilida ishlay boshlaydi.
+Deploy bo'lgandan so'ng va DNS yozuvlar tarqalgach (1-24 soat), saytingiz `ombor.uz` manzilida to'liq ishlay boshlaydi.
 
 Created by **X e M team** © 2026
