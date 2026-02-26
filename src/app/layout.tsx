@@ -10,7 +10,7 @@ import { ChatAssistant } from '@/components/ai/chat-assistant';
 export const metadata: Metadata = {
   title: 'ombor.uz - Professional Ombor Boshqaruvi',
   description: 'AI-powered inventory and warehouse management system. Professional ombor boshqaruvi tizimi.',
-  metadataBase: new URL('https://ombor.uz.web.app'),
+  metadataBase: new URL('https://studio-4209846898-d5885.web.app'),
 };
 
 export default function RootLayout({
