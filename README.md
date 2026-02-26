@@ -14,26 +14,31 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ---
 
-## 🌐 Shaxsiy domen (ombor.uz) ulash bo'yicha yakuniy bosqichlar
+## 🌐 Domenni (ombor.uz) ulash uchun DNS sozlamalari
 
-Siz hozirgina to'g'ri bo'limga kirdingiz! Domenni to'liq ulash uchun:
+Firebase Console-dagi so'rovga asosan, domeningiz DNS paneliga quyidagi yozuvlarni kiriting:
 
-1.  Ochilgan sahifadagi **"Domain"** katagiga `ombor.uz` deb yozing.
-2.  **"Continue"** tugmasini bosing.
-3.  Firebase sizga beradigan **Value** (IP manzil) va **TXT record** ma'lumotlarini nusxalab oling.
-4.  Ushbu ma'lumotlarni domeningiz sotib olingan joydagi (masalan, Uzinfocom yoki boshqa DNS panel) sozlamalarga **A record** sifatida qo'shing.
-5.  Status **"Pending"** dan **"Connected"** ga o'tishini kuting (bu 1-24 soat vaqt olishi mumkin).
+### 1. O'chirish kerak bo'lgan eski yozuv:
+*   **Type**: A
+*   **Value**: `92.255.111.71` (Buni o'chiring)
+
+### 2. Qo'shish kerak bo'lgan yangi yozuvlar:
+*   **Record 1 (A Record)**:
+    *   **Host/Name**: `@` yoki `ombor.uz`
+    *   **Value**: `199.36.158.100`
+*   **Record 2 (TXT Record)**:
+    *   **Host/Name**: `@` yoki `ombor.uz`
+    *   **Value**: `hosting-site-studio-4209846898-d5885`
 
 ---
 
 ## 🌍 Loyihani internetga chiqarish (Deploy)
 
-Sizning Hosting sahifangizda "Waiting for your first release" yozuvi turibdi. Bu degani, kod hali serverga yuklanmagan. Yuklash uchun:
+Saytingizdagi o'zgarishlarni yangilash uchun:
 
-1.  Loyihangiz terminalida Firebase asboblarini o'rnating: `npm install -g firebase-tools`
-2.  Tizimga kiring: `firebase login`
-3.  Loyihani internetga chiqaring: `firebase deploy`
+1.  Terminalda tizimga kiring: `firebase login`
+2.  Loyihani internetga chiqaring: `firebase deploy`
 
-Deploy bo'lgandan so'ng, saytingiz `ombor.uz` manzilida ishlay boshlaydi.
+Deploy bo'lgandan so'ng va DNS yozuvlar tarqalgach (1-24 soat), saytingiz `ombor.uz` manzilida ishlay boshlaydi.
 
 Created by **X e M team** © 2026
