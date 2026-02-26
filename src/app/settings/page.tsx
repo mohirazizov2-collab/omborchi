@@ -28,11 +28,12 @@ import {
   RefreshCw,
   Rocket,
   Settings as SettingsIcon,
-  PackagePlus
+  PackagePlus,
+  Trash2
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, doc, setDoc } from "firebase/firestore";
+import { collection, doc, setDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { generateDatabaseSchema } from "@/ai/flows/generate-database-schema";
 import { generateBackendProjectStructure } from "@/ai/flows/generate-backend-project-structure";
@@ -48,6 +49,7 @@ export default function SettingsPage() {
   const db = useFirestore();
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   
   const [genLoading, setGenLoading] = useState(false);
   const [requirements, setRequirements] = useState("");
@@ -68,10 +70,13 @@ export default function SettingsPage() {
 
   const handleImportProducts = async () => {
     if (!db) return;
+    if (PREDEFINED_PRODUCTS.length === 0) {
+      toast({ variant: "destructive", title: "Xabar", description: "Import qilish uchun tayyor mahsulotlar yo'q." });
+      return;
+    }
     setImporting(true);
     try {
       for (const product of PREDEFINED_PRODUCTS) {
-        // ID sifatida SKU kodi ishlatiladi
         const productId = product.sku;
         const productRef = doc(db, "products", productId);
         await setDoc(productRef, {
@@ -89,13 +94,37 @@ export default function SettingsPage() {
       }
       toast({
         title: "Import yakunlandi",
-        description: `${PREDEFINED_PRODUCTS.length} ta mahsulot SKU kodlari bilan ID-lashtirildi.`,
+        description: `${PREDEFINED_PRODUCTS.length} ta mahsulot yuklandi.`,
       });
     } catch (err) {
       console.error(err);
       toast({ variant: "destructive", title: "Xatolik", description: "Mahsulotlarni yuklashda xato." });
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleClearAllData = async () => {
+    if (!db || !confirm("DIQQAT! Barcha mahsulotlar va ombor qoldiqlari butunlay o'chiriladi. Ushbu amalni qaytarib bo'lmaydi. Tasdiqlaysizmi?")) return;
+    
+    setClearing(true);
+    try {
+      const productSnap = await getDocs(collection(db, "products"));
+      for (const d of productSnap.docs) {
+        await deleteDoc(doc(db, "products", d.id));
+      }
+      
+      const invSnap = await getDocs(collection(db, "inventory"));
+      for (const d of invSnap.docs) {
+        await deleteDoc(doc(db, "inventory", d.id));
+      }
+
+      toast({ title: "Muvaffaqiyatli", description: "Barcha mahsulotlar bazadan tozalandi." });
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "Xatolik", description: "Ma'lumotlarni o'chirishda xatolik yuz berdi." });
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -179,27 +208,52 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="data" className="space-y-6">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden max-w-2xl">
-              <CardHeader className="p-8">
-                <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
-                  <PackagePlus className="text-primary w-6 h-6" />
-                  Ommaviy mahsulot yuklash
-                </CardTitle>
-                <CardDescription>
-                  Tizimda oldindan tayyorlangan mahsulotlarni SKU kodlarini ID sifatida ishlatgan holda katalogga qo'shish.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="px-8 pb-8">
-                <Button 
-                  className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20"
-                  onClick={handleImportProducts}
-                  disabled={importing}
-                >
-                  {importing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Download className="w-5 h-5 mr-2" />}
-                  Importni boshlash ({PREDEFINED_PRODUCTS.length} ta tavar)
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="p-8">
+                  <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3">
+                    <PackagePlus className="text-primary w-6 h-6" />
+                    Ommaviy mahsulot yuklash
+                  </CardTitle>
+                  <CardDescription>
+                    Tizimda oldindan tayyorlangan mahsulotlarni katalogga qo'shish.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-8 pb-8">
+                  <Button 
+                    className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20"
+                    onClick={handleImportProducts}
+                    disabled={importing || PREDEFINED_PRODUCTS.length === 0}
+                  >
+                    {importing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Download className="w-5 h-5 mr-2" />}
+                    Importni boshlash ({PREDEFINED_PRODUCTS.length} ta tavar)
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden border-rose-500/10">
+                <CardHeader className="p-8">
+                  <CardTitle className="font-headline font-black text-xl tracking-tight flex items-center gap-3 text-rose-500">
+                    <Trash2 className="w-6 h-6" />
+                    Katalogni tozalash
+                  </CardTitle>
+                  <CardDescription>
+                    Bazadagi barcha mahsulotlar va qoldiqlarni butunlay o'chirib tashlash.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-8 pb-8">
+                  <Button 
+                    variant="destructive"
+                    className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-rose-500/20"
+                    onClick={handleClearAllData}
+                    disabled={clearing}
+                  >
+                    {clearing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Trash2 className="w-5 h-5 mr-2" />}
+                    Barcha mahsulotlarni o'chirish
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {isSuperAdmin && (
@@ -235,5 +289,39 @@ export default function SettingsPage() {
         </Tabs>
       </main>
     </div>
+  );
+}
+
+function CodeBlock({ title, code, onCopy, isCopied, fullHeight }: any) {
+  return (
+    <Card className={cn(
+      "border-none glass-card bg-card/40 backdrop-blur-2xl rounded-[2.5rem] overflow-hidden flex flex-col",
+      fullHeight ? "h-full" : ""
+    )}>
+      <CardHeader className="px-8 py-5 border-b border-border/10 flex flex-row items-center justify-between shrink-0 bg-muted/10">
+        <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">{title}</CardTitle>
+        <div className="flex gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+            onClick={onCopy}
+          >
+            {isCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-muted">
+            <Download className="w-4 h-4" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0 flex-1 overflow-hidden relative">
+        <pre className={cn(
+          "p-8 text-[11px] font-code overflow-auto whitespace-pre custom-scrollbar h-full bg-black/5 dark:bg-white/5 selection:bg-primary/20",
+          fullHeight ? "min-h-[400px]" : "max-h-[400px]"
+        )}>
+          <code>{code}</code>
+        </pre>
+      </CardContent>
+    </Card>
   );
 }

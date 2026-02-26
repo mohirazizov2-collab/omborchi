@@ -1,3 +1,4 @@
+
 export interface PredefinedProduct {
   name: string;
   sku: string;
