@@ -14,29 +14,26 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ---
 
-## 🌐 Shaxsiy domen (ombor.uz) ulash bo'yicha ko'rsatma
+## 🌐 Shaxsiy domen (ombor.uz) ulash bo'yicha yakuniy bosqichlar
 
-Domen ulash uchun quyidagi bosqichlarni bajaring:
+Siz hozirgina to'g'ri bo'limga kirdingiz! Domenni to'liq ulash uchun:
 
-1.  Firebase Console-da chap menyuda **"Build"** menyusini bosing.
-2.  Ichidan **"Hosting"** bo'limini tanlang (diqqat: *App Hosting* emas, aynan *Hosting*).
-3.  Ochilgan sahifada **"Custom domains"** degan blokni toping.
-4.  **"Add custom domain"** tugmasini bosing va `ombor.uz` manzilini yozing.
-5.  Firebase sizga bergan **A record** (IP manzil) yoki **CNAME** ma'lumotlarini domeningiz joylashgan DNS sozlamalariga saqlang.
+1.  Ochilgan sahifadagi **"Add custom domain"** tugmasini bosing.
+2.  `ombor.uz` manzilini yozing.
+3.  Firebase sizga beradigan **TXT** va **A record** (IP manzil) ma'lumotlarini nusxalab oling.
+4.  Ushbu ma'lumotlarni domeningiz sotib olingan joydagi (masalan, Uzinfocom yoki boshqa DNS panel) sozlamalarga saqlang.
+5.  Status **"Pending"** dan **"Connected"** ga o'tishini kuting (bu 1-24 soat vaqt olishi mumkin).
 
 ---
 
 ## 🌍 Loyihani internetga chiqarish (Deploy)
 
-1.  Terminalda Firebase asboblarini o'rnating: `npm install -g firebase-tools`
+Sizning Hosting sahifangizda "Waiting for your first release" yozuvi turibdi. Bu degani, kod hali serverga yuklanmagan. Yuklash uchun:
+
+1.  Loyihangiz terminalida Firebase asboblarini o'rnating: `npm install -g firebase-tools`
 2.  Tizimga kiring: `firebase login`
 3.  Loyihani internetga chiqaring: `firebase deploy`
 
-## 📦 Tizim Imkoniyatlari
-1.  **Dashboard**: Umumiy zaxira qiymati va oylik xarajatlar tahlili.
-2.  **Mahsulotlar**: Katalog, SKU bo'yicha qidirish va sonli saralash.
-3.  **Nakladnolar**: Kirim va Chiqim jarayonlarini PDF formatida saqlash.
-4.  **Moliya**: Oylik maoshlar va biznes xarajatlarini (ijara, kommunal) hisoblash.
-5.  **AI Assistant**: Tizim ichidagi aqlli yordamchi (Chat).
+Deploy bo'lgandan so'ng, saytingiz `studio-4209846898-d5885.web.app` va keyinchalik `ombor.uz` manzillarida ishlay boshlaydi.
 
 Created by **X e M team** © 2026
