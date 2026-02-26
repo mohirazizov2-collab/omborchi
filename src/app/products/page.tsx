@@ -55,6 +55,15 @@ export default function ProductsPage() {
   }, [db, user]);
   const { data: products, isLoading } = useCollection(productsQuery);
 
+  const calculateNextSku = () => {
+    if (!products || products.length === 0) return "0001";
+    const skus = products
+      .map(p => parseInt(p.sku, 10))
+      .filter(n => !isNaN(n));
+    const maxSku = skus.length > 0 ? Math.max(...skus) : 0;
+    return (maxSku + 1).toString().padStart(4, '0');
+  };
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     
@@ -113,6 +122,16 @@ export default function ProductsPage() {
         }));
       })
       .finally(() => setIsSaving(false));
+  };
+
+  const handleAddNewClick = () => {
+    setEditingProduct(null);
+    setFormData({
+      name: "",
+      sku: calculateNextSku(),
+      unit: "pcs"
+    });
+    setIsDialogOpen(true);
   };
 
   const handleEditClick = (p: any) => {
@@ -202,7 +221,7 @@ export default function ProductsPage() {
             {canEdit && (
               <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => setIsDialogOpen(true)} className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
+                  <Button onClick={handleAddNewClick} className="gap-2 font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-2xl premium-button shadow-xl shadow-primary/20 bg-primary text-white border-none">
                     <Plus className="w-4 h-4" /> {t.products.addNew}
                   </Button>
                 </DialogTrigger>
@@ -228,9 +247,8 @@ export default function ProductsPage() {
                         <Input 
                           className="h-12 rounded-2xl bg-white/5 border-white/10 text-white placeholder:text-white/20 font-bold"
                           value={formData.sku} 
-                          onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                          placeholder="Masalan: 0020" 
-                          disabled={!!editingProduct}
+                          placeholder="0001" 
+                          disabled
                         />
                       </div>
                       <div className="space-y-2">
@@ -257,11 +275,6 @@ export default function ProductsPage() {
                         </Select>
                       </div>
                     </div>
-                    {!editingProduct && (
-                      <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest bg-white/5 p-4 rounded-xl border border-white/5">
-                        * Yangi mahsulot kodi (SKU) uning asosiy ID-si bo'lib xizmat qiladi.
-                      </p>
-                    )}
                   </div>
                   <DialogFooter className="mt-10 gap-2">
                     <Button variant="ghost" className="rounded-2xl h-12 hover:bg-white/5 text-white/60" onClick={handleCloseDialog}>{t.actions.cancel}</Button>
