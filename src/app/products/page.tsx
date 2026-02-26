@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,42 +19,70 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, Search, Plus, Loader2, Trash2, Edit2, Hash, CheckSquare } from "lucide-react";
+import { 
+  Package, 
+  Search, 
+  Plus, 
+  Loader2, 
+  Trash2, 
+  Edit2, 
+  Hash, 
+  Folder, 
+  FolderPlus,
+  ChevronRight,
+  MoreVertical,
+  Filter
+} from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, query, where } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function ProductsPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, isUserLoading: authLoading } = useUser();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   const canEdit = role === "Super Admin" || role === "Admin";
 
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
-    unit: "pcs"
+    unit: "pcs",
+    categoryId: ""
   });
 
+  // --- Data Fetching ---
   const productsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return collection(db, "products");
   }, [db, user]);
-  const { data: products, isLoading } = useCollection(productsQuery);
+  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
 
+  const categoriesQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "categories");
+  }, [db, user]);
+  const { data: categories, isLoading: categoriesLoading } = useCollection(categoriesQuery);
+
+  // --- Logic ---
   const calculateNextSku = () => {
     if (!products || products.length === 0) return "0001";
     const skus = products
@@ -72,7 +100,8 @@ export default function ProductsPage() {
         const matchesSearch = 
           p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
           (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-        return matchesSearch;
+        const matchesCategory = selectedCategoryId === "all" || p.categoryId === selectedCategoryId;
+        return matchesSearch && matchesCategory;
       })
       .sort((a, b) => {
         const skuA = a.sku || "";
@@ -82,10 +111,11 @@ export default function ProductsPage() {
         if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
         return skuA.localeCompare(skuB);
       });
-  }, [products, searchQuery]);
+  }, [products, searchQuery, selectedCategoryId]);
 
   const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
+  // --- Actions ---
   const handleSave = () => {
     if (!db || !user || !formData.name || !formData.sku) return;
     
@@ -98,6 +128,7 @@ export default function ProductsPage() {
       name: formData.name,
       sku: formData.sku,
       unit: formData.unit,
+      categoryId: formData.categoryId || null,
       updatedAt: new Date().toISOString()
     };
 
@@ -124,12 +155,44 @@ export default function ProductsPage() {
       .finally(() => setIsSaving(false));
   };
 
+  const handleCreateCategory = async () => {
+    if (!db || !newCategoryName) return;
+    setIsSaving(true);
+    const id = doc(collection(db, "categories")).id;
+    try {
+      await setDoc(doc(db, "categories", id), {
+        id,
+        name: newCategoryName,
+        createdAt: new Date().toISOString()
+      });
+      setNewCategoryName("");
+      setIsCategoryDialogOpen(false);
+      toast({ title: "Papka yaratildi", description: `"${newCategoryName}" toifasi qo'shildi.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Toifani yaratishda xato." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (!db || !confirm(`"${name}" papkasini o'chirishni tasdiqlaysizmi? (Ichidagi mahsulotlar o'chmaydi)`)) return;
+    try {
+      await deleteDoc(doc(db, "categories", id));
+      if (selectedCategoryId === id) setSelectedCategoryId("all");
+      toast({ title: "O'chirildi", description: "Toifa muvaffaqiyatli o'chirildi." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Toifani o'chirishda xato." });
+    }
+  };
+
   const handleAddNewClick = () => {
     setEditingProduct(null);
     setFormData({
       name: "",
       sku: calculateNextSku(),
-      unit: "pcs"
+      unit: "pcs",
+      categoryId: selectedCategoryId !== "all" ? selectedCategoryId : ""
     });
     setIsDialogOpen(true);
   };
@@ -139,7 +202,8 @@ export default function ProductsPage() {
     setFormData({
       name: p.name,
       sku: p.sku || "",
-      unit: p.unit || "pcs"
+      unit: p.unit || "pcs",
+      categoryId: p.categoryId || ""
     });
     setIsDialogOpen(true);
   };
@@ -147,7 +211,7 @@ export default function ProductsPage() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingProduct(null);
-    setFormData({ name: "", sku: "", unit: "pcs" });
+    setFormData({ name: "", sku: "", unit: "pcs", categoryId: "" });
   };
 
   const handleDelete = (id: string) => {
@@ -197,9 +261,9 @@ export default function ProductsPage() {
       <motion.main 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex-1 p-6 md:p-10 overflow-y-auto page-transition"
+        className="flex-1 p-6 md:p-10 overflow-y-auto page-transition flex flex-col gap-8"
       >
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground">{t.products.title}</h1>
             <p className="text-sm text-muted-foreground mt-1 font-medium">{t.products.description}</p>
@@ -275,6 +339,20 @@ export default function ProductsPage() {
                         </Select>
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Papka (Toifa)</Label>
+                      <Select value={formData.categoryId} onValueChange={(val) => setFormData({...formData, categoryId: val})}>
+                        <SelectTrigger className="h-12 rounded-2xl bg-white/5 border-white/10 font-bold">
+                          <SelectValue placeholder="Toifasiz" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-white/10 bg-black text-white">
+                          <SelectItem value="none">Toifasiz</SelectItem>
+                          {categories?.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <DialogFooter className="mt-10 gap-2">
                     <Button variant="ghost" className="rounded-2xl h-12 hover:bg-white/5 text-white/60" onClick={handleCloseDialog}>{t.actions.cancel}</Button>
@@ -288,142 +366,236 @@ export default function ProductsPage() {
           </div>
         </header>
 
-        <Card className="border-none glass-card mb-8 bg-card/40 backdrop-blur-xl">
-          <CardContent className="p-4 flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-              <Input 
-                placeholder={t.products.search} 
-                className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-medium" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          {/* Categories/Folders Sidebar */}
+          <Card className="w-full lg:w-72 border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden shrink-0">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-black text-[10px] uppercase tracking-widest text-muted-foreground opacity-50">Papkalar</h3>
+                <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 text-primary">
+                      <FolderPlus className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-[2rem] max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle className="font-black">Yangi papka yaratish</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                      <Label className="text-[10px] font-black uppercase tracking-widest">Papka nomi</Label>
+                      <Input 
+                        placeholder="Masalan: Filterlar" 
+                        value={newCategoryName} 
+                        onChange={(e) => setNewCategoryName(e.target.value)} 
+                        className="rounded-xl h-12"
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button className="w-full rounded-xl bg-primary text-white font-black h-12" onClick={handleCreateCategory} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yaratish"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
 
-        {(isLoading || authLoading) ? (
-          <div className="flex justify-center py-32">
-            <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
-          </div>
-        ) : (
-          <Card className="border-none glass-card overflow-hidden bg-card/40 backdrop-blur-xl">
-            <div className="relative overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.2em]">
-                  <tr>
-                    {canEdit && (
-                      <th className="px-6 py-6 w-10">
-                        <Checkbox 
-                          checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
-                          onCheckedChange={toggleSelectAll}
-                          className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                      </th>
-                    )}
-                    <th className="px-8 py-6">{t.products.productInfo}</th>
-                    <th className="px-6 py-6">{t.products.sku}</th>
-                    <th className="px-6 py-6">{t.products.stock}</th>
-                    <th className="px-6 py-6">{t.units.label}</th>
-                    <th className="px-6 py-6">{t.products.price}</th>
-                    <th className="px-6 py-6">{t.products.status}</th>
-                    {canEdit && <th className="px-6 py-6"></th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/20">
-                  <AnimatePresence mode="popLayout">
-                    {filteredProducts.map((p: any, idx) => (
-                      <motion.tr 
-                        key={p.id} 
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ delay: idx * 0.03 }}
+              <div className="space-y-1">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setSelectedCategoryId("all")}
+                  className={cn(
+                    "w-full justify-start gap-3 rounded-xl h-11 font-bold transition-all",
+                    selectedCategoryId === "all" ? "bg-primary text-white shadow-lg shadow-primary/20" : "hover:bg-muted"
+                  )}
+                >
+                  <Filter className="w-4 h-4" /> Barcha mahsulotlar
+                </Button>
+                
+                {categoriesLoading ? (
+                  <div className="py-4 flex justify-center"><Loader2 className="w-4 h-4 animate-spin opacity-20" /></div>
+                ) : (
+                  categories?.map((cat) => (
+                    <div key={cat.id} className="group relative">
+                      <Button 
+                        variant="ghost" 
+                        onClick={() => setSelectedCategoryId(cat.id)}
                         className={cn(
-                          "hover:bg-primary/[0.02] transition-colors group cursor-pointer",
-                          selectedIds.includes(p.id) && "bg-primary/[0.04]"
+                          "w-full justify-start gap-3 rounded-xl h-11 font-bold transition-all pr-10",
+                          selectedCategoryId === cat.id ? "bg-primary text-white shadow-lg shadow-primary/20" : "hover:bg-muted"
                         )}
-                        onClick={() => canEdit && toggleSelect(p.id)}
                       >
+                        <Folder className={cn("w-4 h-4", selectedCategoryId === cat.id ? "fill-white/20" : "fill-primary/10 text-primary")} />
+                        <span className="truncate">{cat.name}</span>
+                      </Button>
+                      
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                              <MoreVertical className="w-3.5 h-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem className="text-rose-500 font-bold gap-2 cursor-pointer" onClick={() => handleDeleteCategory(cat.id, cat.name)}>
+                              <Trash2 className="w-3.5 h-3.5" /> O'chirish
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Main Content Area */}
+          <div className="flex-1 w-full space-y-6">
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
+              <CardContent className="p-4 flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                  <Input 
+                    placeholder={t.products.search} 
+                    className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-medium" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {(productsLoading || categoriesLoading || authLoading) ? (
+              <div className="flex justify-center py-32">
+                <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
+              </div>
+            ) : (
+              <Card className="border-none glass-card overflow-hidden bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.2em]">
+                      <tr>
                         {canEdit && (
-                          <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                          <th className="px-6 py-6 w-10">
                             <Checkbox 
-                              checked={selectedIds.includes(p.id)}
-                              onCheckedChange={() => toggleSelect(p.id)}
+                              checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                              onCheckedChange={toggleSelectAll}
                               className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                             />
-                          </td>
+                          </th>
                         )}
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-4">
-                            <motion.div 
-                              whileHover={{ scale: 1.1, rotate: 5 }}
-                              className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm"
+                        <th className="px-8 py-6">{t.products.productInfo}</th>
+                        <th className="px-6 py-6">{t.products.sku}</th>
+                        <th className="px-6 py-6">Papka</th>
+                        <th className="px-6 py-6">{t.products.stock}</th>
+                        <th className="px-6 py-6">{t.products.price}</th>
+                        <th className="px-6 py-6">{t.products.status}</th>
+                        {canEdit && <th className="px-6 py-6"></th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/20">
+                      <AnimatePresence mode="popLayout">
+                        {filteredProducts.map((p: any, idx) => {
+                          const productCategory = categories?.find(c => c.id === p.categoryId);
+                          return (
+                            <motion.tr 
+                              key={p.id} 
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ delay: idx * 0.03 }}
+                              className={cn(
+                                "hover:bg-primary/[0.02] transition-colors group cursor-pointer",
+                                selectedIds.includes(p.id) && "bg-primary/[0.04]"
+                              )}
+                              onClick={() => canEdit && toggleSelect(p.id)}
                             >
-                              <Package className="w-5.5 h-5.5" />
-                            </motion.div>
-                            <span className="font-black text-foreground tracking-tight">{p.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase opacity-60">
-                            <Hash className="w-3 h-3" /> {p.sku || '---'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-5 font-black text-sm">{p.stock || 0}</td>
-                        <td className="px-6 py-5">
-                          <span className="text-xs font-bold text-muted-foreground">
-                            {t.units[p.unit as keyof typeof t.units] || p.unit || '---'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5 font-black text-sm">{formatMoney(p.salePrice || 0)} so'm</td>
-                        <td className="px-6 py-5">
-                          <Badge 
-                            variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}
-                            className={cn(
-                              "rounded-lg font-black text-[9px] uppercase tracking-widest px-3 py-1 border-none shadow-sm",
-                              (p.stock || 0) > (p.lowStockThreshold || 10) ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" : "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
-                            )}
-                          >
-                            {(p.stock || 0) > (p.lowStockThreshold || 10) ? "Mavjud" : "Kam qolgan"}
-                          </Badge>
-                        </td>
-                        {canEdit && (
-                          <td className="px-6 py-5 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditClick(p);
-                                }}
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-9 w-9 rounded-xl hover:bg-rose-500/10 text-rose-500"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(p.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        )}
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
+                              {canEdit && (
+                                <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox 
+                                    checked={selectedIds.includes(p.id)}
+                                    onCheckedChange={() => toggleSelect(p.id)}
+                                    className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                  />
+                                </td>
+                              )}
+                              <td className="px-8 py-5">
+                                <div className="flex items-center gap-4">
+                                  <motion.div 
+                                    whileHover={{ scale: 1.1, rotate: 5 }}
+                                    className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm"
+                                  >
+                                    <Package className="w-5.5 h-5.5" />
+                                  </motion.div>
+                                  <span className="font-black text-foreground tracking-tight">{p.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase opacity-60">
+                                  <Hash className="w-3 h-3" /> {p.sku || '---'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <div className="flex items-center gap-2">
+                                  <Folder className="w-3.5 h-3.5 text-muted-foreground/40" />
+                                  <span className="text-xs font-bold text-muted-foreground">{productCategory?.name || '---'}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5 font-black text-sm">
+                                {p.stock || 0} <span className="text-[10px] opacity-40 font-bold uppercase ml-1">{t.units[p.unit as keyof typeof t.units] || p.unit}</span>
+                              </td>
+                              <td className="px-6 py-5 font-black text-sm">{formatMoney(p.salePrice || 0)} so'm</td>
+                              <td className="px-6 py-5">
+                                <Badge 
+                                  variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}
+                                  className={cn(
+                                    "rounded-lg font-black text-[9px] uppercase tracking-widest px-3 py-1 border-none shadow-sm",
+                                    (p.stock || 0) > (p.lowStockThreshold || 10) ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" : "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
+                                  )}
+                                >
+                                  {(p.stock || 0) > (p.lowStockThreshold || 10) ? "Mavjud" : "Kam qolgan"}
+                                </Badge>
+                              </td>
+                              {canEdit && (
+                                <td className="px-6 py-5 text-right">
+                                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditClick(p);
+                                      }}
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-9 w-9 rounded-xl hover:bg-rose-500/10 text-rose-500"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(p.id);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              )}
+                            </motion.tr>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
       </motion.main>
     </div>
   );

@@ -15,6 +15,17 @@
       },
       "required": ["id", "name", "responsibleUserId"]
     },
+    "Category": {
+      "title": "Category",
+      "description": "Mahsulotlar uchun toifalar (papkalar).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
     "Product": {
       "title": "Product",
       "description": "Mahsulotlar katalogi: nomi, narxi va joriy zaxira miqdori.",
@@ -22,13 +33,15 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "categoryId": { "type": "string" },
         "salePrice": { "type": "number" },
         "stock": { "type": "number" },
         "unit": { "type": "string", "enum": ["pcs", "kg", "g", "m", "cm", "l", "ml", "m2", "m3", "set", "bag", "box", "pack"] },
         "lowStockThreshold": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "salePrice", "unit"]
+      "required": ["id", "name", "sku", "unit"]
     },
     "WarehouseInventory": {
       "title": "WarehouseInventory",
@@ -128,6 +141,10 @@
     "/warehouses/{warehouseId}": {
       "schema": "#/entities/Warehouse",
       "description": "Omborlar ro'yxati."
+    },
+    "/categories/{categoryId}": {
+      "schema": "#/entities/Category",
+      "description": "Mahsulot toifalari (papkalar)."
     },
     "/products/{productId}": {
       "schema": "#/entities/Product",
