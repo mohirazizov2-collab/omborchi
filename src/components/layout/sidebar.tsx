@@ -150,7 +150,7 @@ export function OmniSidebar() {
               <path d="M8 18H16" />
             </svg>
           </div>
-          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">ombor.uz</span>
+          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
         </Link>
       </div>
 

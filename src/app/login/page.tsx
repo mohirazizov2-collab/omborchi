@@ -146,7 +146,7 @@ export default function LoginPage() {
             animate={{ opacity: 1, y: 0 }}
             className="font-headline font-black text-6xl tracking-tighter text-foreground"
           >
-            ombor.uz
+            omborchi.uz
           </motion.h1>
           <p className="text-muted-foreground/50 text-[10px] font-black uppercase tracking-[0.4em] mt-3">Advanced Warehouse Management</p>
         </div>
@@ -227,7 +227,7 @@ export default function LoginPage() {
         </motion.div>
 
         <p className="text-center mt-12 text-muted-foreground/40 text-[11px] font-black uppercase tracking-[0.5em] select-none">
-          ombor.uz by X e M team © 2026
+          omborchi.uz by X e M team © 2026
         </p>
       </div>
     </div>

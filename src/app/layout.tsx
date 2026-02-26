@@ -8,9 +8,9 @@ import { Toaster } from '@/components/ui/toaster';
 import { ChatAssistant } from '@/components/ai/chat-assistant';
 
 export const metadata: Metadata = {
-  title: 'ombor.uz - Professional Ombor Boshqaruvi',
+  title: 'omborchi.uz - Professional Ombor Boshqaruvi',
   description: 'AI-powered inventory and warehouse management system. Professional ombor boshqaruvi tizimi.',
-  metadataBase: new URL('https://ombor.uz'),
+  metadataBase: new URL('https://omborchi.uz'),
 };
 
 export default function RootLayout({

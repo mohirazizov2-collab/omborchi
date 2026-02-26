@@ -121,7 +121,7 @@ export const translations = {
     },
     auth: {
       loginTitle: "Tizimga kirish",
-      loginDescription: "ombor.uz boshqaruv paneliga kirish uchun ma'lumotlaringizni kiriting.",
+      loginDescription: "omborchi.uz boshqaruv paneliga kirish uchun ma'lumotlaringizni kiriting.",
       emailLabel: "Elektron pochta",
       passwordLabel: "Parol",
       loginButton: "Kirish",
@@ -132,7 +132,7 @@ export const translations = {
     },
     dashboard: {
       title: "Boshqaruv paneli",
-      description: "ombor.uz inventar va ombor operatsiyalari umumiy ko'rinishi.",
+      description: "omborchi.uz inventar va ombor operatsiyalari umumiy ko'rinishi.",
       totalStockValue: "Jami zaxira qiymati",
       activeWarehouses: "Faol omborlar",
       monthlyStockIn: "Oylik Kirim",
@@ -243,7 +243,7 @@ export const translations = {
     },
     settings: {
       title: "Tizim sozlamalari",
-      description: "ombor.uz global parametrlarini va xavfsizlikni sozlash.",
+      description: "omborchi.uz global parametrlarini va xavfsizlikni sozlash.",
       general: "Umumiy configuration",
       companyName: "Kompaniya nomi",
       currency: "Valyuta",
@@ -253,7 +253,7 @@ export const translations = {
     },
     systemGen: {
       title: "AI Tizim Generatsiyasi",
-      description: "Sun'iy intellekt yordamida yangi tizim arxitekturasini va kodlarini avtomatik yaratish vositasi.",
+      description: "Sun'iy intellekt yordamida yeni tizim arxitekturasini va kodlarini avtomatik yaratish vositasi.",
       inputReqs: "Tizim talablarini kiritish",
       generate: "Arxitekturani yaratish",
       database: "Ma'lumotlar bazasi",
@@ -406,7 +406,7 @@ export const translations = {
     },
     auth: {
       loginTitle: 'Вход в систему',
-      loginDescription: 'Введите свои данные для доступа к панели управления ombor.uz.',
+      loginDescription: 'Введите свои данные для доступа к панели управления omborchi.uz.',
       emailLabel: 'Электронная почта',
       passwordLabel: 'Пароль',
       loginButton: 'Войти',
@@ -417,7 +417,7 @@ export const translations = {
     },
     dashboard: {
       title: 'Панель управления',
-      description: 'Обзор инвентаря и складских операций ombor.uz.',
+      description: 'Обзор инвентаря и складских операций omborchi.uz.',
       totalStockValue: 'Общая стоимость запасов',
       activeWarehouses: 'Активные склады',
       monthlyStockIn: 'Месячный Приход',
@@ -528,7 +528,7 @@ export const translations = {
     },
     settings: {
       title: 'Системные настройки',
-      description: 'Настройка глобальных параметров ombor.uz и безопасности.',
+      description: 'Настройка глобальных параметров omborchi.uz и безопасности.',
       general: 'Общая конфигурация',
       companyName: 'Название компании',
       currency: 'Валюта',
@@ -691,7 +691,7 @@ export const translations = {
     },
     auth: {
       loginTitle: 'Sign In',
-      loginDescription: 'Enter your credentials to access ombor.uz dashboard.',
+      loginDescription: 'Enter your credentials to access omborchi.uz dashboard.',
       emailLabel: 'Email Address',
       passwordLabel: 'Password',
       loginButton: 'Sign In',
@@ -702,7 +702,7 @@ export const translations = {
     },
     dashboard: {
       title: 'Dashboard',
-      description: 'Overview of ombor.uz inventory and warehouse operations.',
+      description: 'Overview of omborchi.uz inventory and warehouse operations.',
       totalStockValue: 'Total Stock Value',
       activeWarehouses: 'Active Warehouses',
       monthlyStockIn: 'Monthly Stock In',
@@ -813,7 +813,7 @@ export const translations = {
     },
     settings: {
       title: 'System Settings',
-      description: 'Configure ombor.uz global parameters and security.',
+      description: 'Configure omborchi.uz global parameters and security.',
       general: 'General Configuration',
       companyName: 'Company Name',
       currency: 'Currency',

@@ -1,7 +1,7 @@
 
-# 🚀 ombor.uz - Professional Ombor Boshqaruvi Tizimi
+# 🚀 omborchi.uz - Professional Ombor Boshqaruvi Tizimi
 
-Rasmiy havola: [https://ombor.uz](https://ombor.uz)
+Rasmiy havola: [https://omborchi.uz](https://omborchi.uz)
 
 ---
 
@@ -14,13 +14,13 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ---
 
-## 🌐 Domenni (ombor.uz) ulash uchun DNS sozlamalari
+## 🌐 Domenni (omborchi.uz) ulash uchun DNS sozlamalari
 
 Domeningizni tizimga bog'lash uchun quyidagi yozuvlarni domen boshqaruv paneliga kiriting:
 
 ### 1. A Record (Asosiy IP manzil):
 *   **Type (Turi)**: A Record
-*   **Host/Name**: `@` yoki `ombor.uz`
+*   **Host/Name**: `@` yoki `omborchi.uz`
 *   **Value (Qiymati)**: `199.36.158.100`
 
 ### 2. TXT Record (Egalikni tasdiqlash uchun):

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -160,7 +161,7 @@ export default function SettingsPage() {
                 <CardContent className="px-8 space-y-6">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">{t.settings.companyName}</Label>
-                    <Input className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold" defaultValue="ombor.uz Logistics" />
+                    <Input className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold" defaultValue="omborchi.uz Logistics" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">{t.settings.currency}</Label>
