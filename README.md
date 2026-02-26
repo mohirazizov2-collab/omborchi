@@ -16,7 +16,7 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ## 🌐 Domenni (omborchi.uz) ulash uchun DNS sozlamalari
 
-Domeningizni tizimga bog'lash uchun quyidagi yozuvlarni domen boshqaruv paneliga kiriting:
+Domeningizni tizimga bog'lash uchun quyidagi yozuvlarni domen boshqaruv paneliga kiriting. **Muhim:** Eski IP manzillarni o'chirib tashlang!
 
 ### 1. A Record (Asosiy IP manzil):
 *   **Type (Turi)**: A Record
@@ -31,13 +31,19 @@ Firebase loyihangizni tanishi uchun ushbu TXT yozuvini albatta kiritishingiz ker
 
 ---
 
+## ⚠️ DNS Xatoligini hal qilish (DNS request failed)
+Agar Firebase "DNS request failed" xatosini ko'rsatsa:
+1. **Propagation**: DNS sozlamalari yangilanishi uchun 1-24 soat kuting.
+2. **Conflict**: Paneldagi barcha boshqa A va CNAME yozuvlarini o'chiring.
+3. **Verify**: Biroz vaqtdan so'ng Firebase Console-da "Verify" tugmasini qayta bosing.
+
+---
+
 ## 🌍 Loyihani internetga chiqarish (Deploy)
 
 Saytingizdagi o'zgarishlarni yangilash uchun terminalda quyidagi buyruqlarni ketma-ket yozing:
 
 1.  `firebase login` (agar kirmagan bo'lsangiz)
 2.  `firebase deploy`
-
-**Eslatma:** DNS sozlamalari yangilangandan so'ng, sayt to'liq ishga tushishi uchun odatda 1 soatdan 24 soatgacha vaqt talab qilinishi mumkin.
 
 Created by **X e M team** © 2026
