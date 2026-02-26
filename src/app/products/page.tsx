@@ -17,7 +17,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, Search, Plus, Filter, Loader2, Trash2, Edit2, Hash } from "lucide-react";
+import { Package, Search, Plus, Loader2, Trash2, Edit2, Hash } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -60,17 +60,11 @@ export default function ProductsPage() {
         return matchesSearch;
       })
       .sort((a, b) => {
-        // SKU bo'yicha son tartibida saralash (1, 2, 10...)
         const skuA = a.sku || "";
         const skuB = b.sku || "";
-        
         const numA = parseInt(skuA, 10);
         const numB = parseInt(skuB, 10);
-
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB;
-        }
-        
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
         return skuA.localeCompare(skuB);
       });
   }, [products, searchQuery]);
@@ -78,10 +72,11 @@ export default function ProductsPage() {
   const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
   const handleSave = () => {
-    if (!db || !user || !formData.name) return;
+    if (!db || !user || !formData.name || !formData.sku) return;
     
     setIsSaving(true);
-    const productId = editingProduct ? editingProduct.id : doc(collection(db, "products")).id;
+    // Yangi ID sifatida SKU ishlatiladi, tahrirlashda esa mavjud ID qoladi
+    const productId = editingProduct ? editingProduct.id : formData.sku;
     const productRef = doc(db, "products", productId);
     
     const productData: any = {
@@ -181,7 +176,8 @@ export default function ProductsPage() {
                         className="h-12 rounded-2xl bg-white/5 border-white/10 text-white placeholder:text-white/20 font-bold"
                         value={formData.sku} 
                         onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                        placeholder="Masalan: 1-chi tavar" 
+                        placeholder="Masalan: 0020" 
+                        disabled={!!editingProduct}
                       />
                     </div>
                     <div className="space-y-2">
@@ -210,7 +206,7 @@ export default function ProductsPage() {
                   </div>
                   {!editingProduct && (
                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest bg-white/5 p-4 rounded-xl border border-white/5">
-                      * Narx va zaxira miqdori Nakladnoy orqali avtomatik shakllanadi.
+                      * Yangi mahsulot kodi (SKU) uning asosiy ID-si bo'lib xizmat qiladi.
                     </p>
                   )}
                 </div>
@@ -334,16 +330,6 @@ export default function ProductsPage() {
                       </motion.tr>
                     ))}
                   </AnimatePresence>
-                  {filteredProducts.length === 0 && (
-                    <tr>
-                      <td colSpan={canEdit ? 7 : 6} className="px-6 py-32 text-center">
-                        <div className="flex flex-col items-center justify-center opacity-10">
-                          <Package className="w-16 h-16 mb-4" />
-                          <p className="text-[12px] font-black uppercase tracking-[0.4em]">Mahsulotlar topilmadi</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
