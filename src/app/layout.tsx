@@ -8,8 +8,9 @@ import { Toaster } from '@/components/ui/toaster';
 import { ChatAssistant } from '@/components/ai/chat-assistant';
 
 export const metadata: Metadata = {
-  title: 'ombor.uz - Advanced Inventory Management',
-  description: 'AI-powered inventory and warehouse management system for modern enterprises.',
+  title: 'ombor.uz - Professional Ombor Boshqaruvi',
+  description: 'AI-powered inventory and warehouse management system. Professional ombor boshqaruvi tizimi.',
+  metadataBase: new URL('https://ombor.uz.web.app'),
 };
 
 export default function RootLayout({

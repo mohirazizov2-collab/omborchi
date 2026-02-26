@@ -1,6 +1,8 @@
 
 # 🚀 ombor.uz - Professional Ombor Boshqaruvi Tizimi
 
+Rasmiy havola: [https://ombor.uz.web.app](https://ombor.uz.web.app)
+
 Loyihani **Firebase Hosting**-ga chiqarish va undan samarali foydalanish bo'yicha qo'llanma.
 
 ---
