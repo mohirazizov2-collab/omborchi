@@ -16,21 +16,20 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ## 🌐 Domenni (ombor.uz) ulash uchun DNS sozlamalari
 
-**MUHIM:** Firebase-dagi eski `.web.app` domenlari o'chib ketmaydi, bu normal holat. Asosiysi `ombor.uz` ni sozlash.
+Sizning so'rovingizga binoan, Firebase IP-manzili olib tashlandi va shaxsiy IP-manzilingizni kiritish uchun yo'riqnoma tayyorlandi.
 
-Firebase Console-dagi so'rovga asosan, domeningiz DNS paneliga quyidagi yozuvlarni kiriting:
+### 1. DNS panelda kiritilishi kerak bo'lgan yozuvlar:
+Domeningiz boshqaruv paneliga (DNS settings) kiring va quyidagi yozuvni qo'shing:
 
-### 1. O'chirish kerak bo'lgan eski yozuv:
-*   **Type**: A
-*   **Value**: `92.255.111.71` (Buni albatta o'chiring, aks holda sayt ochilmaydi)
+*   **Type (Turi)**: A Record
+*   **Host/Name**: `@` yoki `ombor.uz`
+*   **Value (Qiymati)**: `[BU YERGA O'ZINGIZNING IP MANZILINGIZNI YOZING]`
 
-### 2. Qo'shish kerak bo'lgan yangi yozuvlar:
-*   **Record 1 (A Record)**:
-    *   **Host/Name**: `@` yoki `ombor.uz`
-    *   **Value**: `199.36.158.100`
-*   **Record 2 (TXT Record)**:
-    *   **Host/Name**: `@` yoki `ombor.uz`
-    *   **Value**: `hosting-site-studio-4209846898-d5885`
+### 2. TXT Record (Egalikni tasdiqlash uchun):
+Firebase loyihangizni tanishi uchun ushbu TXT yozuvini albatta kiritishingiz kerak:
+*   **Type**: TXT
+*   **Host**: `@`
+*   **Value**: `hosting-site-studio-4209846898-d5885`
 
 ---
 
@@ -41,6 +40,6 @@ Saytingizdagi o'zgarishlarni yangilash uchun terminalda quyidagi buyruqlarni ket
 1.  `firebase login` (agar kirmagan bo'lsangiz)
 2.  `firebase deploy`
 
-Deploy bo'lgandan so'ng va DNS yozuvlar tarqalgach (1-24 soat), saytingiz `ombor.uz` manzilida to'liq ishlay boshlaydi.
+**Eslatma:** Agar siz o'zingizning shaxsiy IP-manzilingizni DNS-ga bog'lasangiz, Firebase Hosting orqali avtomatik ulanish uzilishi mumkin. Bunday holda saytni o'sha shaxsiy IP-ga ega serveringizda sozlashingiz kerak bo'ladi.
 
 Created by **X e M team** © 2026
