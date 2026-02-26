@@ -271,7 +271,8 @@ export const translations = {
       edit: "Tahrirlash",
       delete: "O'chirish",
       viewAll: "Hammasini ko'rish",
-      addItem: "Buyum qo'shish"
+      addItem: "Buyum qo'shish",
+      deleteSelected: "Tanlanganlarni o'chirish"
     },
     common: {
       quantity: "Miqdor",
@@ -319,7 +320,7 @@ export const translations = {
       pcs: "Штук",
       kg: "Килограмм (кг)",
       g: "Грамм (г)",
-      m: "Метр (м)",
+      m: "Местр (м)",
       cm: "Сантиметр (см)",
       l: "Литр (л)",
       ml: "Миллилитр (мл)",
@@ -556,7 +557,8 @@ export const translations = {
       edit: 'Изменить',
       delete: 'Удалить',
       viewAll: 'Посмотреть все',
-      addItem: 'Добавить позицию'
+      addItem: 'Добавить позицию',
+      deleteSelected: "Удалить выбранные"
     },
     common: {
       quantity: 'Кол-во',
@@ -841,7 +843,8 @@ export const translations = {
       edit: 'Edit',
       delete: 'Delete',
       viewAll: 'View All',
-      addItem: 'Add Item'
+      addItem: 'Add Item',
+      deleteSelected: "Delete Selected"
     },
     common: {
       quantity: 'Quantity',
