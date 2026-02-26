@@ -31,7 +31,9 @@ import {
   FolderPlus,
   ChevronRight,
   MoreVertical,
-  Filter
+  Filter,
+  ArrowLeft,
+  PackagePlus
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -93,15 +95,13 @@ export default function ProductsPage() {
   };
 
   const filteredProducts = useMemo(() => {
-    if (!products) return [];
+    if (!products || selectedCategoryId === "all") return [];
     
     return products
+      .filter(p => p.categoryId === selectedCategoryId)
       .filter(p => {
-        const matchesSearch = 
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-        const matchesCategory = selectedCategoryId === "all" || p.categoryId === selectedCategoryId;
-        return matchesSearch && matchesCategory;
+        return p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+               (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
       })
       .sort((a, b) => {
         const skuA = a.sku || "";
@@ -113,6 +113,8 @@ export default function ProductsPage() {
       });
   }, [products, searchQuery, selectedCategoryId]);
 
+  const currentCategory = categories?.find(c => c.id === selectedCategoryId);
+
   const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
   // --- Actions ---
@@ -120,7 +122,7 @@ export default function ProductsPage() {
     if (!db || !user || !formData.name || !formData.sku) return;
     
     setIsSaving(true);
-    const productId = editingProduct ? editingProduct.id : formData.sku;
+    const productId = editingProduct ? editingProduct.id : doc(collection(db, "products")).id;
     const productRef = doc(db, "products", productId);
     
     const productData: any = {
@@ -264,9 +266,25 @@ export default function ProductsPage() {
         className="flex-1 p-6 md:p-10 overflow-y-auto page-transition flex flex-col gap-8"
       >
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground">{t.products.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1 font-medium">{t.products.description}</p>
+          <div className="flex items-center gap-4">
+            {selectedCategoryId !== "all" && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full h-12 w-12 hover:bg-muted"
+                onClick={() => setSelectedCategoryId("all")}
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </Button>
+            )}
+            <div>
+              <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground">
+                {selectedCategoryId === "all" ? t.products.title : currentCategory?.name}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 font-medium">
+                {selectedCategoryId === "all" ? "Papkalar bo'yicha saralangan katalog" : `${filteredProducts.length} ta mahsulot`}
+              </p>
+            </div>
           </div>
           
           <div className="flex gap-3">
@@ -367,7 +385,7 @@ export default function ProductsPage() {
         </header>
 
         <div className="flex flex-col lg:flex-row gap-8 items-start">
-          {/* Categories/Folders Sidebar */}
+          {/* Sidebar logic for small screens or filters */}
           <Card className="w-full lg:w-72 border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden shrink-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -409,7 +427,7 @@ export default function ProductsPage() {
                     selectedCategoryId === "all" ? "bg-primary text-white shadow-lg shadow-primary/20" : "hover:bg-muted"
                   )}
                 >
-                  <Filter className="w-4 h-4" /> Barcha mahsulotlar
+                  <Filter className="w-4 h-4" /> Barcha papkalar
                 </Button>
                 
                 {categoriesLoading ? (
@@ -452,147 +470,215 @@ export default function ProductsPage() {
 
           {/* Main Content Area */}
           <div className="flex-1 w-full space-y-6">
-            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
-              <CardContent className="p-4 flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1 group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                  <Input 
-                    placeholder={t.products.search} 
-                    className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-medium" 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
             {(productsLoading || categoriesLoading || authLoading) ? (
               <div className="flex justify-center py-32">
                 <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
               </div>
+            ) : selectedCategoryId === "all" ? (
+              /* FOLDERS GRID VIEW - Default */
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <AnimatePresence mode="popLayout">
+                  {categories?.map((cat, idx) => (
+                    <motion.div
+                      key={cat.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.05 }}
+                    >
+                      <Card 
+                        className="cursor-pointer hover:bg-primary/[0.03] hover:-translate-y-1 transition-all group border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden relative"
+                        onClick={() => setSelectedCategoryId(cat.id)}
+                      >
+                        <CardContent className="p-10 flex flex-col items-center text-center gap-6">
+                          <div className="w-24 h-24 rounded-[2rem] bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-inner">
+                            <Folder className="w-12 h-12 fill-primary/20" />
+                          </div>
+                          <div>
+                            <h3 className="font-black text-2xl tracking-tight text-foreground">{cat.name}</h3>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 mt-2">
+                              {products?.filter(p => p.categoryId === cat.id).length || 0} ta mahsulot
+                            </p>
+                          </div>
+                          <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
+                                <ChevronRight className="w-5 h-5" />
+                             </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                  
+                  {/* Create Folder Card */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: (categories?.length || 0) * 0.05 }}
+                  >
+                    <Card 
+                      className="cursor-pointer hover:bg-primary/5 transition-all group border-2 border-dashed border-primary/20 bg-transparent rounded-[2.5rem] overflow-hidden h-full flex items-center justify-center"
+                      onClick={() => setIsCategoryDialogOpen(true)}
+                    >
+                      <CardContent className="p-10 flex flex-col items-center text-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-primary/5 flex items-center justify-center text-primary/30 group-hover:scale-110 transition-transform">
+                          <FolderPlus className="w-8 h-8" />
+                        </div>
+                        <p className="font-black text-[11px] uppercase tracking-widest text-primary/60">Yangi papka qo'shish</p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
             ) : (
-              <Card className="border-none glass-card overflow-hidden bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
-                <div className="relative overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.2em]">
-                      <tr>
-                        {canEdit && (
-                          <th className="px-6 py-6 w-10">
-                            <Checkbox 
-                              checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
-                              onCheckedChange={toggleSelectAll}
-                              className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                            />
-                          </th>
-                        )}
-                        <th className="px-8 py-6">{t.products.productInfo}</th>
-                        <th className="px-6 py-6">{t.products.sku}</th>
-                        <th className="px-6 py-6">Papka</th>
-                        <th className="px-6 py-6">{t.products.stock}</th>
-                        <th className="px-6 py-6">{t.products.price}</th>
-                        <th className="px-6 py-6">{t.products.status}</th>
-                        {canEdit && <th className="px-6 py-6"></th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                      <AnimatePresence mode="popLayout">
-                        {filteredProducts.map((p: any, idx) => {
-                          const productCategory = categories?.find(c => c.id === p.categoryId);
-                          return (
-                            <motion.tr 
-                              key={p.id} 
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ delay: idx * 0.03 }}
-                              className={cn(
-                                "hover:bg-primary/[0.02] transition-colors group cursor-pointer",
-                                selectedIds.includes(p.id) && "bg-primary/[0.04]"
-                              )}
-                              onClick={() => canEdit && toggleSelect(p.id)}
-                            >
-                              {canEdit && (
-                                <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
-                                  <Checkbox 
-                                    checked={selectedIds.includes(p.id)}
-                                    onCheckedChange={() => toggleSelect(p.id)}
-                                    className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                  />
-                                </td>
-                              )}
-                              <td className="px-8 py-5">
-                                <div className="flex items-center gap-4">
-                                  <motion.div 
-                                    whileHover={{ scale: 1.1, rotate: 5 }}
-                                    className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm"
-                                  >
-                                    <Package className="w-5.5 h-5.5" />
-                                  </motion.div>
-                                  <span className="font-black text-foreground tracking-tight">{p.name}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-5">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase opacity-60">
-                                  <Hash className="w-3 h-3" /> {p.sku || '---'}
-                                </div>
-                              </td>
-                              <td className="px-6 py-5">
-                                <div className="flex items-center gap-2">
-                                  <Folder className="w-3.5 h-3.5 text-muted-foreground/40" />
-                                  <span className="text-xs font-bold text-muted-foreground">{productCategory?.name || '---'}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-5 font-black text-sm">
-                                {p.stock || 0} <span className="text-[10px] opacity-40 font-bold uppercase ml-1">{t.units[p.unit as keyof typeof t.units] || p.unit}</span>
-                              </td>
-                              <td className="px-6 py-5 font-black text-sm">{formatMoney(p.salePrice || 0)} so'm</td>
-                              <td className="px-6 py-5">
-                                <Badge 
-                                  variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}
-                                  className={cn(
-                                    "rounded-lg font-black text-[9px] uppercase tracking-widest px-3 py-1 border-none shadow-sm",
-                                    (p.stock || 0) > (p.lowStockThreshold || 10) ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" : "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
-                                  )}
-                                >
-                                  {(p.stock || 0) > (p.lowStockThreshold || 10) ? "Mavjud" : "Kam qolgan"}
-                                </Badge>
-                              </td>
-                              {canEdit && (
-                                <td className="px-6 py-5 text-right">
-                                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditClick(p);
-                                      }}
+              /* PRODUCTS TABLE VIEW - When Folder Selected */
+              <div className="space-y-6">
+                <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
+                  <CardContent className="p-4 flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1 group">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                      <Input 
+                        placeholder={t.products.search} 
+                        className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-medium" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none glass-card overflow-hidden bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
+                  <div className="relative overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-[10px] uppercase bg-muted/30 text-muted-foreground font-black tracking-[0.2em]">
+                        <tr>
+                          {canEdit && (
+                            <th className="px-6 py-6 w-10">
+                              <Checkbox 
+                                checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                                onCheckedChange={toggleSelectAll}
+                                className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                              />
+                            </th>
+                          )}
+                          <th className="px-8 py-6">{t.products.productInfo}</th>
+                          <th className="px-6 py-6">{t.products.sku}</th>
+                          <th className="px-6 py-6">Papka</th>
+                          <th className="px-6 py-6">{t.products.stock}</th>
+                          <th className="px-6 py-6">{t.products.price}</th>
+                          <th className="px-6 py-6">{t.products.status}</th>
+                          {canEdit && <th className="px-6 py-6"></th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/20">
+                        <AnimatePresence mode="popLayout">
+                          {filteredProducts.map((p: any, idx) => {
+                            const productCategory = categories?.find(c => c.id === p.categoryId);
+                            return (
+                              <motion.tr 
+                                key={p.id} 
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ delay: idx * 0.03 }}
+                                className={cn(
+                                  "hover:bg-primary/[0.02] transition-colors group cursor-pointer",
+                                  selectedIds.includes(p.id) && "bg-primary/[0.04]"
+                                )}
+                                onClick={() => canEdit && toggleSelect(p.id)}
+                              >
+                                {canEdit && (
+                                  <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox 
+                                      checked={selectedIds.includes(p.id)}
+                                      onCheckedChange={() => toggleSelect(p.id)}
+                                      className="border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-8 py-5">
+                                  <div className="flex items-center gap-4">
+                                    <motion.div 
+                                      whileHover={{ scale: 1.1, rotate: 5 }}
+                                      className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm"
                                     >
-                                      <Edit2 className="w-4 h-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-9 w-9 rounded-xl hover:bg-rose-500/10 text-rose-500"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDelete(p.id);
-                                      }}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                      <Package className="w-5.5 h-5.5" />
+                                    </motion.div>
+                                    <span className="font-black text-foreground tracking-tight">{p.name}</span>
                                   </div>
                                 </td>
-                              )}
-                            </motion.tr>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+                                <td className="px-6 py-5">
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase opacity-60">
+                                    <Hash className="w-3 h-3" /> {p.sku || '---'}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-5">
+                                  <div className="flex items-center gap-2">
+                                    <Folder className="w-3.5 h-3.5 text-muted-foreground/40" />
+                                    <span className="text-xs font-bold text-muted-foreground">{productCategory?.name || '---'}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-5 font-black text-sm">
+                                  {p.stock || 0} <span className="text-[10px] opacity-40 font-bold uppercase ml-1">{t.units[p.unit as keyof typeof t.units] || p.unit}</span>
+                                </td>
+                                <td className="px-6 py-5 font-black text-sm">{formatMoney(p.salePrice || 0)} so'm</td>
+                                <td className="px-6 py-5">
+                                  <Badge 
+                                    variant={(p.stock || 0) > (p.lowStockThreshold || 10) ? "default" : "destructive"}
+                                    className={cn(
+                                      "rounded-lg font-black text-[9px] uppercase tracking-widest px-3 py-1 border-none shadow-sm",
+                                      (p.stock || 0) > (p.lowStockThreshold || 10) ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" : "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
+                                    )}
+                                  >
+                                    {(p.stock || 0) > (p.lowStockThreshold || 10) ? "Mavjud" : "Kam qolgan"}
+                                  </Badge>
+                                </td>
+                                {canEdit && (
+                                  <td className="px-6 py-5 text-right">
+                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditClick(p);
+                                        }}
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-9 w-9 rounded-xl hover:bg-rose-500/10 text-rose-500"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDelete(p.id);
+                                        }}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                )}
+                              </motion.tr>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                {filteredProducts.length === 0 && (
+                  <div className="py-32 text-center opacity-10 flex flex-col items-center gap-4">
+                    <PackagePlus className="w-20 h-20" />
+                    <p className="text-sm font-black uppercase tracking-[0.5em]">Bu papka bo'sh</p>
+                    <Button onClick={handleAddNewClick} variant="outline" className="rounded-xl border-dashed">
+                      Mahsulot qo'shish
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
