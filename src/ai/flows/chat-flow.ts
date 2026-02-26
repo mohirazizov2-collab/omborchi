@@ -92,7 +92,7 @@ const chatPrompt = ai.definePrompt({
   tools: [checkProductStock, listWarehouses],
   input: { schema: ChatInputSchema },
   output: { schema: ChatOutputSchema },
-  prompt: `Siz "ombor.uz" tizimining aqlli va kuchli yordamchisisiz. Ismingiz - Omborchi GPT.
+  prompt: `Siz "omborchi.uz" tizimining aqlli va kuchli yordamchisisiz. Ismingiz - Omborchi GPT.
 Sizning vazifangiz ombor boshqaruvi, logistika va inventarizatsiya bo'yicha foydalanuvchilarga yordam berish.
 
 Sizda quyidagi imkoniyatlar bor:

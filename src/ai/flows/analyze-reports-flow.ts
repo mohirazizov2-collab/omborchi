@@ -40,7 +40,7 @@ const analyzePrompt = ai.definePrompt({
   input: { schema: AnalyzeReportsInputSchema },
   output: { schema: AnalyzeReportsOutputSchema },
   prompt: `Siz professional ombor boshqaruvi va logistika bo'yicha AI konsultantisiz.
-Sizga ombor.uz tizimidan olingan quyidagi ma'lumotlar taqdim etiladi:
+Sizga omborchi.uz tizimidan olingan quyidagi ma'lumotlar taqdim etiladi:
 
 Ma'lumotlar:
 - Jami zaxira qiymati: {{stats.totalValue}} so'm
