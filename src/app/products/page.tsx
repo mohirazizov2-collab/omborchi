@@ -33,7 +33,8 @@ import {
   MoreVertical,
   Filter,
   ArrowLeft,
-  PackagePlus
+  PackagePlus,
+  X
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -95,13 +96,25 @@ export default function ProductsPage() {
   };
 
   const filteredProducts = useMemo(() => {
-    if (!products || selectedCategoryId === "all") return [];
+    if (!products) return [];
     
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Global search across all categories
+    if (selectedCategoryId === "all") {
+      if (!query) return [];
+      return products.filter(p => 
+        p.name.toLowerCase().includes(query) || 
+        (p.sku && p.sku.toLowerCase().includes(query))
+      ).sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
+    }
+    
+    // Category specific search
     return products
       .filter(p => p.categoryId === selectedCategoryId)
       .filter(p => {
-        return p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-               (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+        return p.name.toLowerCase().includes(query) || 
+               (p.sku && p.sku.toLowerCase().includes(query));
       })
       .sort((a, b) => {
         const skuA = a.sku || "";
@@ -257,6 +270,8 @@ export default function ProductsPage() {
     }
   };
 
+  const isShowFolderGrid = selectedCategoryId === "all" && !searchQuery.trim();
+
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
@@ -272,17 +287,22 @@ export default function ProductsPage() {
                 variant="ghost" 
                 size="icon" 
                 className="rounded-full h-12 w-12 hover:bg-muted"
-                onClick={() => setSelectedCategoryId("all")}
+                onClick={() => {
+                  setSelectedCategoryId("all");
+                  setSearchQuery("");
+                }}
               >
                 <ArrowLeft className="w-6 h-6" />
               </Button>
             )}
             <div>
               <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground">
-                {selectedCategoryId === "all" ? t.products.title : currentCategory?.name}
+                {searchQuery.trim() ? "Qidiruv natijalari" : (selectedCategoryId === "all" ? t.products.title : currentCategory?.name)}
               </h1>
               <p className="text-sm text-muted-foreground mt-1 font-medium">
-                {selectedCategoryId === "all" ? "Papkalar bo'yicha saralangan katalog" : `${filteredProducts.length} ta mahsulot`}
+                {searchQuery.trim() 
+                  ? `"${searchQuery}" bo'yicha ${filteredProducts.length} ta mahsulot topildi` 
+                  : (selectedCategoryId === "all" ? "Papkalar bo'yicha saralangan katalog" : `${filteredProducts.length} ta mahsulot`)}
               </p>
             </div>
           </div>
@@ -385,7 +405,6 @@ export default function ProductsPage() {
         </header>
 
         <div className="flex flex-col lg:flex-row gap-8 items-start">
-          {/* Sidebar logic for small screens or filters */}
           <Card className="w-full lg:w-72 border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden shrink-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -421,7 +440,10 @@ export default function ProductsPage() {
               <div className="space-y-1">
                 <Button 
                   variant="ghost" 
-                  onClick={() => setSelectedCategoryId("all")}
+                  onClick={() => {
+                    setSelectedCategoryId("all");
+                    setSearchQuery("");
+                  }}
                   className={cn(
                     "w-full justify-start gap-3 rounded-xl h-11 font-bold transition-all",
                     selectedCategoryId === "all" ? "bg-primary text-white shadow-lg shadow-primary/20" : "hover:bg-muted"
@@ -437,7 +459,10 @@ export default function ProductsPage() {
                     <div key={cat.id} className="group relative">
                       <Button 
                         variant="ghost" 
-                        onClick={() => setSelectedCategoryId(cat.id)}
+                        onClick={() => {
+                          setSelectedCategoryId(cat.id);
+                          setSearchQuery("");
+                        }}
                         className={cn(
                           "w-full justify-start gap-3 rounded-xl h-11 font-bold transition-all pr-10",
                           selectedCategoryId === cat.id ? "bg-primary text-white shadow-lg shadow-primary/20" : "hover:bg-muted"
@@ -468,13 +493,37 @@ export default function ProductsPage() {
             </CardContent>
           </Card>
 
-          {/* Main Content Area */}
           <div className="flex-1 w-full space-y-6">
+            {/* SEARCH BAR - Always visible or when Global searching */}
+            <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
+              <CardContent className="p-4">
+                <div className="relative group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                  <Input 
+                    placeholder="Qidirish: Mahsulot nomi yoki tavar kodi..." 
+                    className="pl-12 pr-12 h-14 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-bold text-base shadow-inner" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-xl hover:bg-rose-500/10 text-rose-500"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {(productsLoading || categoriesLoading || authLoading) ? (
               <div className="flex justify-center py-32">
                 <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
               </div>
-            ) : selectedCategoryId === "all" ? (
+            ) : isShowFolderGrid ? (
               /* FOLDERS GRID VIEW - Default */
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 <AnimatePresence mode="popLayout">
@@ -530,22 +579,8 @@ export default function ProductsPage() {
                 </AnimatePresence>
               </div>
             ) : (
-              /* PRODUCTS TABLE VIEW - When Folder Selected */
+              /* PRODUCTS TABLE VIEW - Results */
               <div className="space-y-6">
-                <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
-                  <CardContent className="p-4 flex flex-col md:flex-row gap-4">
-                    <div className="relative flex-1 group">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                      <Input 
-                        placeholder={t.products.search} 
-                        className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50 transition-all font-medium" 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
                 <Card className="border-none glass-card overflow-hidden bg-card/40 backdrop-blur-xl rounded-[2.5rem]">
                   <div className="relative overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -672,9 +707,12 @@ export default function ProductsPage() {
                 {filteredProducts.length === 0 && (
                   <div className="py-32 text-center opacity-10 flex flex-col items-center gap-4">
                     <PackagePlus className="w-20 h-20" />
-                    <p className="text-sm font-black uppercase tracking-[0.5em]">Bu papka bo'sh</p>
-                    <Button onClick={handleAddNewClick} variant="outline" className="rounded-xl border-dashed">
-                      Mahsulot qo'shish
+                    <p className="text-sm font-black uppercase tracking-[0.5em]">Hech narsa topilmadi</p>
+                    <Button onClick={() => {
+                      setSearchQuery("");
+                      setSelectedCategoryId("all");
+                    }} variant="outline" className="rounded-xl border-dashed">
+                      Orqaga qaytish
                     </Button>
                   </div>
                 )}
