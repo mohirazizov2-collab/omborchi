@@ -17,5 +17,5 @@ export const ai = genkit({
 });
 
 // Google Gemini 1.5 Flash modeli identifikatori
-// 'gemini-1.5-flash-latest' aliasidan foydalanish 404 xatolarini oldini olishda yordam beradi
-export const model = 'googleai/gemini-1.5-flash-latest';
+// 'googleai/gemini-1.5-flash' eng barqaror identifikator hisoblanadi
+export const model = 'googleai/gemini-1.5-flash';
