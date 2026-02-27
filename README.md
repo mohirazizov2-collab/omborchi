@@ -16,34 +16,35 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ## 🌐 Domenni (omborchi.uz) ulash uchun DNS sozlamalari
 
-Domeningizni tizimga bog'lash uchun quyidagi yozuvlarni domen boshqaruv paneliga kiriting. **Muhim:** Eski barcha IP manzillarni (masalan, 92.255.111.71) o'chirib tashlang! Faqat quyidagi yozuvlar qolsin:
+Domeningizni Firebase-ga bog'lash uchun DNS provayderingiz (masalan, Uzinfocom yoki boshqa panel)ga quyidagi 2 ta yozuvni kiriting. **Muhim:** Eski barcha `A` yoki `CNAME` yozuvlarini o'chirib tashlang!
 
 ### 1. A Record (Asosiy IP manzil):
-*   **Type (Turi)**: A Record
-*   **Host/Name**: `@` yoki `omborchi.uz`
+*   **Type (Turi)**: `A`
+*   **Host (Nomi)**: `@` (yoki bo'sh qoldiring)
 *   **Value (Qiymati)**: `199.36.158.100`
 
 ### 2. TXT Record (Egalikni tasdiqlash uchun):
-Firebase loyihangizni tanishi uchun ushbu TXT yozuvini albatta kiritishingiz kerak:
-*   **Type**: TXT
-*   **Host**: `@`
-*   **Value**: `hosting-site-studio-4209846898-d5885`
+*   **Type (Turi)**: `TXT`
+*   **Host (Nomi)**: `@` (yoki bo'sh qoldiring)
+*   **Value (Qiymati)**: `hosting-site=studio-4209846898-d5885`  <-- **DIQQAT: `=` belgisi bo'lishi shart!**
 
 ---
 
-## ⚠️ DNS Xatoligini hal qilish (DNS request failed)
-Agar Firebase "DNS request failed" xatosini ko'rsatsa:
-1. **Propagation**: DNS sozlamalari yangilanishi uchun 1-24 soat kuting.
-2. **Conflict**: Paneldagi barcha boshqa A va CNAME yozuvlarini o'chiring.
-3. **Verify**: Biroz vaqtdan so'ng Firebase Console-da "Verify" tugmasini qayta bosing.
+## ⚠️ DNS Xatoligini hal qilish (Troubleshooting)
+
+Agar "DNS request failed" yoki "Needs setup" xatosi chiqsa, quyidagilarni tekshiring:
+
+1.  **Konfliktlar**: Paneldagi barcha eski IP manzillarni va ayniqsa `CNAME` yozuvlarini o'chirib tashlang. Root domenda (`omborchi.uz`) ham `A`, ham `CNAME` yozuvi bo'lishi mumkin emas.
+2.  **Host qismi**: Ko'p panellarda "Host" degan joyga domen nomini emas, shunchaki `@` belgisini yozish kerak.
+3.  **To'g'ri qiymat**: TXT qiymati aynan `hosting-site=...` ko'rinishida ekanini tekshiring.
+4.  **Propagation**: DNS o'zgarishi butun dunyoga tarqalishi uchun **1 soatdan 24 soatgacha** vaqt ketishi mumkin.
 
 ---
 
-## 🌍 Loyihani internetga chiqarish (Deploy)
+## 🌍 Loyihani yangilash (Deploy)
 
-Saytingizdagi o'zgarishlarni yangilash uchun terminalda quyidagi buyruqlarni ketma-ket yozing:
-
-1.  `firebase login` (agar kirmagan bo'lsangiz)
-2.  `firebase deploy`
+Terminalda:
+1. `firebase login`
+2. `firebase deploy`
 
 Created by **X e M team** © 2026
