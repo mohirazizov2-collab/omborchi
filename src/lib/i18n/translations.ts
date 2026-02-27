@@ -108,7 +108,7 @@ export const translations = {
     employees: {
       title: "Xodimlarni boshqarish",
       description: "Ishchilar ro'yxati, lavozimlar va maoshlarni hisoblash.",
-      addNew: "Yangi ishchi",
+      addNew: "Yangi xodim",
       fullName: "F.I.SH",
       position: "Lavozimi",
       baseSalary: "Asosiy maosh (so'm)",
