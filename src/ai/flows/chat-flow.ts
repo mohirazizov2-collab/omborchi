@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview Omborchi GPT - Aqlli yordamchi uchun Genkit flow.
- * Bu flow mahsulotlar va omborlar haqida real ma'lumotlarni olish uchun asboblarga (tools) ega.
+ * Bu flow mahsulotlar va omborlar haqia real ma'lumotlarni olish uchun asboblarga (tools) ega.
  */
 
 import { ai, model } from '@/ai/genkit';
@@ -109,7 +109,6 @@ Qoidalar:
 Suhbat tarixi:
 {{#each history}}
 {{role}}: {{{content}}}
-{{#if toolCalls}} (Used tools) {{/if}}
 {{/each}}
 
 Foydalanuvchi xabari: {{{message}}}`,

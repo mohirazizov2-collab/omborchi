@@ -4,9 +4,10 @@ import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * @fileOverview AI konfiguratsiyasi (Google Gemini).
+ * Genkit 1.x standartiga moslangan.
  */
 
-const API_KEY = process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || '';
+const API_KEY = process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY;
 
 export const ai = genkit({
   plugins: [
@@ -16,5 +17,5 @@ export const ai = genkit({
   ],
 });
 
-// Genkit 1.x uchun eng barqaror model nomi
+// Genkit 1.x uchun Google AI provayderi bilan model nomi
 export const model = 'googleai/gemini-1.5-flash';
