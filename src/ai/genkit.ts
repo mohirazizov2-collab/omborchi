@@ -16,6 +16,5 @@ export const ai = genkit({
   ],
 });
 
-// Google Gemini 1.5 Flash modeli identifikatori
-// 'googleai/gemini-1.5-flash' eng barqaror identifikator hisoblanadi
+// Google Gemini 1.5 Flash modeli - eng tezkor va barqaror model
 export const model = 'googleai/gemini-1.5-flash';
