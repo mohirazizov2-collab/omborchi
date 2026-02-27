@@ -17,5 +17,5 @@ export const ai = genkit({
 });
 
 // Google Gemini 1.5 Flash modeli identifikatori
-// Genkit 1.x da modelni string ko'rinishida ko'rsatish eng xavfsiz usuldir
-export const model = 'googleai/gemini-1.5-flash';
+// 'gemini-1.5-flash-latest' aliasidan foydalanish 404 xatolarini oldini olishda yordam beradi
+export const model = 'googleai/gemini-1.5-flash-latest';
