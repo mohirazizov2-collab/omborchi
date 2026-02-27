@@ -11,20 +11,17 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
   Loader2, 
-  ArrowDownLeft, 
-  ArrowRightLeft, 
-  FileText, 
-  User, 
-  ShoppingCart, 
   Trash2, 
   Warehouse,
   Calendar,
-  ChevronRight,
   FolderOpen,
   ClipboardCheck,
   FileBox,
   FileUp,
-  FileDown
+  FileDown,
+  ChevronDown,
+  FileText,
+  User
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -40,7 +37,6 @@ export default function HistoryPage() {
   const { user, role } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [expandedDays, setExpandedDays] = useState<string[]>([]);
 
   const isAdmin = role === "Super Admin" || role === "Admin";
 
@@ -69,7 +65,6 @@ export default function HistoryPage() {
       if (!groups[dateKey]) groups[dateKey] = { StockIn: {}, StockOut: {}, Adjustment: {}, Transfer: {} };
 
       const type = m.movementType as keyof typeof groups[string];
-      // Group items by Document ID (dnNumber for In, orderNumber for Out, or timestamp for others)
       const docId = m.dnNumber || m.orderNumber || m.saleId || m.movementDate.substring(0, 16); 
       
       if (!groups[dateKey][type][docId]) {
@@ -89,12 +84,6 @@ export default function HistoryPage() {
 
     return groups;
   }, [movements, searchQuery]);
-
-  const toggleDay = (day: string) => {
-    setExpandedDays(prev => 
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    );
-  };
 
   const handleDelete = async (movementItems: any[]) => {
     if (!isAdmin || !db) return;
@@ -136,8 +125,6 @@ export default function HistoryPage() {
       setIsDeleting(null);
     }
   };
-
-  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
   if (isLoading) {
     return (
@@ -194,7 +181,6 @@ export default function HistoryPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* StockIn File */}
                   <TypeFolder 
                     title="Kirim Nakladnolari" 
                     icon={FileDown} 
@@ -205,7 +191,6 @@ export default function HistoryPage() {
                     isAdmin={isAdmin}
                   />
                   
-                  {/* StockOut File */}
                   <TypeFolder 
                     title="Chiqim Nakladnolari" 
                     icon={FileUp} 
@@ -216,7 +201,6 @@ export default function HistoryPage() {
                     isAdmin={isAdmin}
                   />
 
-                  {/* Adjustment & Transfer File */}
                   <TypeFolder 
                     title="Inventarizatsiya & Boshqa" 
                     icon={ClipboardCheck} 
@@ -237,6 +221,7 @@ export default function HistoryPage() {
 }
 
 function TypeFolder({ title, icon: Icon, color, data, onDelete, isDeleting, isAdmin }: any) {
+  const [isOpen, setIsOpen] = useState(false);
   const docs = Object.values(data);
   const count = docs.length;
 
@@ -245,13 +230,17 @@ function TypeFolder({ title, icon: Icon, color, data, onDelete, isDeleting, isAd
   return (
     <Card className="border-none glass-card bg-card/40 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden group">
       <CardContent className="p-0">
-        <div className={cn(
-          "p-6 flex items-center justify-between border-b border-white/5 transition-colors",
-          color === 'emerald' ? "bg-emerald-500/5" : color === 'rose' ? "bg-rose-500/5" : "bg-blue-500/5"
-        )}>
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "w-full p-6 flex items-center justify-between border-b border-white/5 transition-all outline-none text-left",
+            color === 'emerald' ? "hover:bg-emerald-500/5" : color === 'rose' ? "hover:bg-rose-500/5" : "hover:bg-blue-500/5",
+            isOpen && (color === 'emerald' ? "bg-emerald-500/10" : color === 'rose' ? "bg-rose-500/10" : "bg-blue-500/10")
+          )}
+        >
           <div className="flex items-center gap-4">
             <div className={cn(
-              "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
+              "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-105",
               color === 'emerald' ? "bg-emerald-500/10 text-emerald-500" : color === 'rose' ? "bg-rose-500/10 text-rose-500" : "bg-blue-500/10 text-blue-500"
             )}>
               <Icon className="w-6 h-6" />
@@ -261,57 +250,75 @@ function TypeFolder({ title, icon: Icon, color, data, onDelete, isDeleting, isAd
               <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">{count} ta hujjat</p>
             </div>
           </div>
-          <FolderOpen className="w-5 h-5 text-muted-foreground opacity-20" />
-        </div>
+          <div className="flex items-center gap-2">
+            <ChevronDown className={cn("w-5 h-5 text-muted-foreground transition-transform duration-300", isOpen ? "rotate-180" : "")} />
+            <FolderOpen className="w-5 h-5 text-muted-foreground opacity-20" />
+          </div>
+        </button>
 
-        <div className="p-4 space-y-3">
-          {docs.map((doc: any) => (
-            <div key={doc.id} className="p-4 rounded-2xl bg-muted/10 hover:bg-muted/20 transition-all group/doc">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5 text-primary/40" />
-                  <span className="text-xs font-black uppercase tracking-wider text-primary">#{doc.id.substring(0, 10)}</span>
-                </div>
-                {isAdmin && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-7 w-7 rounded-lg text-rose-500 hover:bg-rose-500/10 opacity-0 group-hover/doc:opacity-100 transition-all"
-                    onClick={() => onDelete(doc.items)}
-                    disabled={isDeleting === doc.items[0].id}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                )}
-              </div>
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <div className="p-4 space-y-3">
+                {docs.map((doc: any) => (
+                  <div key={doc.id} className="p-4 rounded-2xl bg-muted/10 hover:bg-muted/20 transition-all group/doc">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-primary/40" />
+                        <span className="text-xs font-black uppercase tracking-wider text-primary">#{doc.id.substring(0, 10)}</span>
+                      </div>
+                      {isAdmin && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7 rounded-lg text-rose-500 hover:bg-rose-500/10 opacity-0 group-hover/doc:opacity-100 transition-all"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(doc.items);
+                          }}
+                          disabled={isDeleting === doc.items[0].id}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
 
-              <div className="space-y-2">
-                {doc.items.map((item: any) => (
-                  <div key={item.id} className="flex justify-between items-center text-[11px]">
-                    <span className="font-bold text-foreground/70 truncate max-w-[140px]">{item.productName}</span>
-                    <span className={cn(
-                      "font-black",
-                      item.quantityChange > 0 ? "text-emerald-500" : "text-rose-500"
-                    )}>
-                      {item.quantityChange > 0 ? `+${item.quantityChange}` : item.quantityChange}
-                    </span>
+                    <div className="space-y-2">
+                      {doc.items.map((item: any) => (
+                        <div key={item.id} className="flex justify-between items-center text-[11px]">
+                          <span className="font-bold text-foreground/70 truncate max-w-[140px]">{item.productName}</span>
+                          <span className={cn(
+                            "font-black",
+                            item.quantityChange > 0 ? "text-emerald-500" : "text-rose-500"
+                          )}>
+                            {item.quantityChange > 0 ? `+${item.quantityChange}` : item.quantityChange}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 opacity-40">
+                        <User className="w-3 h-3" />
+                        <span className="text-[9px] font-black uppercase">{doc.responsible?.split(' ')[0]}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 opacity-40">
+                        <Warehouse className="w-3 h-3" />
+                        <span className="text-[9px] font-black uppercase truncate max-w-[80px]">{doc.warehouse}</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-
-              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 opacity-40">
-                  <User className="w-3 h-3" />
-                  <span className="text-[9px] font-black uppercase">{doc.responsible?.split(' ')[0]}</span>
-                </div>
-                <div className="flex items-center gap-1.5 opacity-40">
-                  <Warehouse className="w-3 h-3" />
-                  <span className="text-[9px] font-black uppercase truncate max-w-[80px]">{doc.warehouse}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </CardContent>
     </Card>
   );
