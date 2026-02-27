@@ -1,8 +1,6 @@
-
 'use server';
 /**
- * @fileOverview Omborchi GPT - Aqlli yordamchi uchun Genkit flow.
- * Bu flow mahsulotlar va omborlar haqia real ma'lumotlarni olish uchun asboblarga (tools) ega.
+ * @fileOverview Omborchi GPT - Aqlli yordamchi uchun ilg'or mantiq.
  */
 
 import { ai, model } from '@/ai/genkit';
@@ -12,13 +10,12 @@ import { collection, getDocs } from 'firebase/firestore';
 
 // --- AI ASBOBLARI (TOOLS) ---
 
-/** Mahsulot qoldig'ini tekshirish asbobi */
 const checkProductStock = ai.defineTool(
   {
     name: "checkProductStock",
-    description: "Ombordagi muayyan mahsulotning joriy qoldig'ini va narxini tekshiradi.",
+    description: "Ombordagi mahsulot qoldig'i, narxi va o'lcham birligini tekshiradi.",
     inputSchema: z.object({
-      productName: z.string().describe("Mahsulot nomi (to'liq yoki qisman)"),
+      productName: z.string().describe("Qidirilayotgan mahsulot nomi (to'liq yoki qisman)"),
     }),
     outputSchema: z.array(z.object({
       name: z.string(),
@@ -32,7 +29,7 @@ const checkProductStock = ai.defineTool(
     const snapshot = await getDocs(collection(firestore, "products"));
     const results = snapshot.docs
       .map(doc => doc.data())
-      .filter(p => p.name.toLowerCase().includes(input.productName.toLowerCase()))
+      .filter(p => !p.isDeleted && p.name.toLowerCase().includes(input.productName.toLowerCase()))
       .map(p => ({
         name: p.name,
         stock: p.stock || 0,
@@ -43,16 +40,15 @@ const checkProductStock = ai.defineTool(
   }
 );
 
-/** Omborlar ro'yxatini olish asbobi */
 const listWarehouses = ai.defineTool(
   {
     name: "listWarehouses",
-    description: "Tizimdagi barcha faol omborxonalar va ularning manzillarini ko'rsatadi.",
+    description: "Tizimdagi barcha faol omborlar va ularning joylashuvi haqida ma'lumot beradi.",
     inputSchema: z.object({}),
     outputSchema: z.array(z.object({
       name: z.string(),
       address: z.string(),
-      phone: z.string(),
+      manager: z.string(),
     })),
   },
   async () => {
@@ -62,8 +58,8 @@ const listWarehouses = ai.defineTool(
       const d = doc.data();
       return {
         name: d.name,
-        address: d.address || "Manzil ko'rsatilmagan",
-        phone: d.phoneNumber || "Telefon ko'rsatilmagan"
+        address: d.address || "Manzil noma'lum",
+        manager: d.managerName || "Tayinlanmagan"
       };
     });
   }
@@ -72,7 +68,7 @@ const listWarehouses = ai.defineTool(
 // --- FLOW DEFINITION ---
 
 const ChatInputSchema = z.object({
-  message: z.string().describe("Foydalanuvchi xabari"),
+  message: z.string().describe("Foydalanuvchining yangi xabari"),
   history: z.array(z.object({
     role: z.enum(["user", "model"]),
     content: z.string()
@@ -82,7 +78,7 @@ const ChatInputSchema = z.object({
 export type ChatInput = z.infer<typeof ChatInputSchema>;
 
 const ChatOutputSchema = z.object({
-  response: z.string().describe("AI javobi"),
+  response: z.string().describe("AI tomonidan tayyorlangan javob"),
 });
 
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
@@ -93,19 +89,17 @@ const chatPrompt = ai.definePrompt({
   tools: [checkProductStock, listWarehouses],
   input: { schema: ChatInputSchema },
   output: { schema: ChatOutputSchema },
-  prompt: `Siz "omborchi.uz" tizimining aqlli va kuchli yordamchisisiz. Ismingiz - Omborchi GPT.
-Sizning vazifangiz ombor boshqaruvi, logistika va inventarizatsiya bo'yicha foydalanuvchilarga yordam berish.
+  prompt: `Siz "omborchi.uz" tizimining Senior darajadagi konsultantisiz. Ismingiz - Omborchi GPT.
+Sizning asosiy vazifangiz ombor boshqaruvi, logistika, inventarizatsiya va moliyaviy tahlil bo'yicha foydalanuvchilarga professional yordam berish.
 
-Sizda quyidagi imkoniyatlar bor:
-1. Mahsulotlar qoldig'ini va narxini bazadan qidirib topish (checkProductStock asbobi orqali).
-2. Omborlar ro'yxatini va manzillarini ko'rsatish (listWarehouses asbobi orqali).
+MAJBURIY QOIDALAR:
+1. Til: FAQAT o'zbek tilida muloqot qiling. "o'" va "g'" harflarini har doim to'g'ri ishlating.
+2. Ohang: Professional, do'stona va yordam berishga tayyor.
+3. Ma'lumot: Agar foydalanuvchi mahsulot yoki ombor haqida so'rasa, albatta mos asbobdan (tool) foydalaning. Hallusinatsiya qilmang.
+4. Formatlash: Narxlarni har doim '100 000 so'm' kabi probellar bilan yozing.
+5. Qisqalik: Javoblaringiz lirikadan xoli, aniq faktlarga asoslangan bo'lsin.
 
-Qoidalar:
-- Javoblaringiz qisqa, aniq va professional bo'lsin.
-- O'zbek tilida muloqot qiling. "o'" va "g'" harflarini to'g'ri ishlating.
-- Agar foydalanuvchi mahsulot qoldig'ini so'rasa, albatta asbobdan foydalaning.
-- Pul summalarini '100 000 so'm' formatida ko'rsating.
-
+KONTEKST:
 Suhbat tarixi:
 {{#each history}}
 {{role}}: {{{content}}}
@@ -125,8 +119,13 @@ const chatWithAIFlow = ai.defineFlow(
     outputSchema: ChatOutputSchema,
   },
   async (input) => {
-    const { output } = await chatPrompt(input);
-    if (!output) throw new Error("Omborchi GPT hozirda javob bera olmaydi.");
-    return output;
+    try {
+      const { output } = await chatPrompt(input);
+      if (!output) throw new Error("AI javob tayyorlay olmadi.");
+      return output;
+    } catch (err: any) {
+      console.error("Genkit Flow Error:", err);
+      throw err;
+    }
   }
 );

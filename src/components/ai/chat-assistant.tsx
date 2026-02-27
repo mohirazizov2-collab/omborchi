@@ -3,19 +3,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Sparkles, 
   X, 
   Send, 
   Bot, 
   User, 
   Loader2, 
-  Minimize2, 
   AlertCircle, 
   RefreshCcw, 
   ArrowRight,
   Zap,
   Package,
-  Warehouse
+  Warehouse,
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,17 +33,16 @@ interface Message {
 export function ChatAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', content: "Assalomu alaykum! Men Omborchi GPT - sizning aqlli yordamchingizman. Qaysi mahsulotni tekshiramiz yoki qanday yordam kerak?" }
+    { role: 'model', content: "Assalomu alaykum! Men Omborchi GPT - sizning aqlli yordamchingizman. Qanday yordam bera olaman?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const suggestedQuestions = [
-    { text: "Stol qoldig'ini tekshir", icon: Package },
-    { text: "Omborlar ro'yxatini ber", icon: Warehouse },
-    { text: "Zaxiralarni kamaytirish bo'yicha maslahat", icon: Zap },
-    { text: "Yangi kirim qanday qilinadi?", icon: ArrowRight }
+  const suggestedActions = [
+    { text: "Mahsulot qoldig'ini bilish", icon: Package },
+    { text: "Omborlar ro'yxati", icon: Warehouse },
+    { text: "Tizim qanday ishlaydi?", icon: Sparkles }
   ];
 
   useEffect(() => {
@@ -53,27 +52,34 @@ export function ChatAssistant() {
   }, [messages, isLoading]);
 
   const handleSend = async (customMessage?: string) => {
-    const messageToSend = customMessage || input.trim();
-    if (!messageToSend || isLoading) return;
+    const text = customMessage || input.trim();
+    if (!text || isLoading) return;
 
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: messageToSend }]);
+    const userMsg: Message = { role: 'user', content: text };
+    setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
     try {
       const response = await chatWithAI({
-        message: messageToSend,
+        message: text,
         history: messages.filter(m => !m.isError).map(m => ({ role: m.role, content: m.content }))
       });
       setMessages(prev => [...prev, { role: 'model', content: response.response }]);
     } catch (error: any) {
-      console.error('Chat error:', error);
-      let errorMessage = "Xatolik yuz berdi.";
+      console.error('AI Chat Error:', error);
+      let errMsg = "Tizimda xatolik yuz berdi.";
       const errorStr = String(error?.message || "").toLowerCase();
-      if (errorStr.includes('429')) errorMessage = "AI limiti tugadi. Iltimos, 1 daqiqa kuting.";
-      else errorMessage = `Xato: ${error.message || 'Server bilan aloqa uzildi'}`;
+      
+      if (errorStr.includes('api key expired')) {
+        errMsg = "API kalitining muddati tugagan. Iltimos, uni yangilang.";
+      } else if (errorStr.includes('429')) {
+        errMsg = "AI limiti tugadi. Iltimos, bir oz kuting.";
+      } else {
+        errMsg = "AI bilan bog'lanib bo'lmadi. Kalit yoki ulanishni tekshiring.";
+      }
 
-      setMessages(prev => [...prev, { role: 'model', content: errorMessage, isError: true }]);
+      setMessages(prev => [...prev, { role: 'model', content: errMsg, isError: true }]);
     } finally {
       setIsLoading(false);
     }
@@ -82,24 +88,24 @@ export function ChatAssistant() {
   return (
     <>
       <motion.div
-        className="fixed bottom-6 right-6 z-[100]"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        className="fixed bottom-8 right-8 z-[100]"
+        initial={{ scale: 0, rotate: -20 }}
+        animate={{ scale: 1, rotate: 0 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
       >
         <Button
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "w-16 h-16 rounded-full shadow-[0_20px_50px_rgba(59,130,246,0.3)] transition-all duration-500 p-0 border-none group",
+            "w-16 h-16 rounded-[2rem] shadow-2xl shadow-primary/40 transition-all duration-500 p-0 border-none group",
             isOpen ? "bg-rose-500" : "bg-primary"
           )}
         >
           {isOpen ? (
-            <X className="w-7 h-7 text-white" />
+            <ChevronDown className="w-8 h-8 text-white" />
           ) : (
             <div className="relative">
-              <Bot className="w-8 h-8 text-white animate-bounce" />
+              <Bot className="w-8 h-8 text-white" />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-primary animate-pulse" />
             </div>
           )}
@@ -109,95 +115,93 @@ export function ChatAssistant() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 100, scale: 0.9, transformOrigin: 'bottom right' }}
+            initial={{ opacity: 0, y: 100, scale: 0.8, transformOrigin: 'bottom right' }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 100, scale: 0.9 }}
-            className="fixed bottom-24 right-6 z-[100] w-[440px] max-w-[calc(100vw-3rem)]"
+            exit={{ opacity: 0, y: 100, scale: 0.8 }}
+            className="fixed bottom-28 right-8 z-[100] w-[450px] max-w-[calc(100vw-4rem)]"
           >
-            <Card className="border-none shadow-[0_32px_120px_-20px_rgba(0,0,0,0.3)] dark:shadow-[0_32px_120px_-20px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col h-[650px] rounded-[3rem] bg-card/95 backdrop-blur-2xl">
-              <CardHeader className="bg-primary/5 border-b border-white/5 py-6 px-8">
+            <Card className="border-none shadow-[0_40px_120px_-20px_rgba(0,0,0,0.4)] overflow-hidden flex flex-col h-[680px] rounded-[3rem] bg-card/90 backdrop-blur-3xl border border-white/5">
+              <CardHeader className="bg-gradient-to-br from-primary/10 to-transparent py-8 px-8 border-b border-white/5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[1.25rem] bg-primary flex items-center justify-center text-white shadow-xl shadow-primary/20">
-                      <Zap className="w-6 h-6 fill-white" />
+                    <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center text-white shadow-xl shadow-primary/20">
+                      <Zap className="w-7 h-7 fill-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-base font-black tracking-tight">Omborchi GPT</CardTitle>
-                      <div className="flex items-center gap-1.5">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
+                      <CardTitle className="text-xl font-black tracking-tight">Omborchi GPT</CardTitle>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Tizimga bog'langan</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl hover:bg-white/10" onClick={() => setMessages([{ role: 'model', content: "Xush kelibsiz! Men sizga yordam berishga tayyorman." }])}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-white/10" onClick={() => setMessages([{ role: 'model', content: "Suhbat tozalandi. Qanday yordam berishim mumkin?" }])}>
                       <RefreshCcw className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl hover:bg-rose-500/10 text-rose-500" onClick={() => setIsOpen(false)}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-rose-500/10 text-rose-500" onClick={() => setIsOpen(false)}>
                       <X className="w-5 h-5" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               
-              <CardContent className="flex-1 p-0 overflow-hidden relative">
-                <ScrollArea className="h-full p-8">
+              <CardContent className="flex-1 p-0 overflow-hidden relative bg-gradient-to-b from-transparent to-primary/[0.02]">
+                <ScrollArea className="h-full p-8 scrollbar-hide">
                   <div className="space-y-8 pb-6">
                     {messages.map((m, i) => (
                       <motion.div
                         key={i}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, y: 20, x: m.role === 'user' ? 20 : -20 }}
+                        animate={{ opacity: 1, y: 0, x: 0 }}
                         className={cn("flex gap-4", m.role === 'user' ? "flex-row-reverse" : "flex-row")}
                       >
                         <div className={cn(
-                          "w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
+                          "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
                           m.role === 'user' ? "bg-primary text-white" : "bg-muted text-muted-foreground"
                         )}>
-                          {m.role === 'user' ? <User className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
+                          {m.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                         </div>
                         <div className={cn(
-                          "p-5 rounded-[1.75rem] text-sm max-w-[85%] shadow-sm leading-relaxed font-bold",
+                          "p-5 rounded-[2rem] text-sm max-w-[80%] shadow-sm leading-relaxed font-bold",
                           m.role === 'user' 
                             ? "bg-primary text-white rounded-tr-none" 
-                            : cn("bg-muted/30 border border-white/5 text-foreground rounded-tl-none", m.isError && "border-rose-500/30 bg-rose-500/5 text-rose-500")
+                            : cn("bg-muted/40 border border-white/5 text-foreground rounded-tl-none", m.isError && "border-rose-500/30 bg-rose-500/5 text-rose-500")
                         )}>
                           {m.isError && <AlertCircle className="w-4 h-4 mb-2 inline-block mr-2" />}
                           {m.content}
                         </div>
                       </motion.div>
                     ))}
+                    
                     {isLoading && (
-                      <div className="flex gap-4">
-                        <div className="w-9 h-9 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground animate-pulse">
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4">
+                        <div className="w-10 h-10 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground animate-pulse">
                           <Bot className="w-5 h-5" />
                         </div>
-                        <div className="bg-muted/20 p-5 rounded-[1.75rem] rounded-tl-none border border-white/5 flex items-center gap-3">
+                        <div className="bg-muted/20 p-5 rounded-[2rem] rounded-tl-none border border-white/5 flex items-center gap-3">
                           <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                          <span className="text-xs font-black uppercase tracking-widest opacity-40">GPT o'ylamoqda...</span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">GPT o'ylamoqda...</span>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
 
                     {!isLoading && messages.length < 3 && (
                       <div className="pt-6 space-y-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/40 px-2">Tezkor amallar</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground/40 px-2">Tezkor savollar</p>
                         <div className="grid grid-cols-1 gap-2">
-                          {suggestedQuestions.map((q, idx) => (
+                          {suggestedActions.map((act, idx) => (
                             <motion.button
                               key={idx}
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: 0.1 * idx }}
-                              onClick={() => handleSend(q.text)}
+                              onClick={() => handleSend(act.text)}
                               className="w-full text-left p-4 rounded-2xl bg-primary/[0.03] hover:bg-primary/10 border border-primary/10 text-[11px] font-black text-primary transition-all flex items-center justify-between group"
                             >
                               <div className="flex items-center gap-3">
-                                <q.icon className="w-4 h-4 opacity-60" />
-                                {q.text}
+                                <act.icon className="w-4 h-4 opacity-60" />
+                                {act.text}
                               </div>
                               <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
                             </motion.button>
@@ -210,17 +214,17 @@ export function ChatAssistant() {
                 </ScrollArea>
               </CardContent>
 
-              <CardFooter className="p-6 bg-background/40 border-t border-white/5 backdrop-blur-xl">
+              <CardFooter className="p-8 bg-background/60 border-t border-white/5 backdrop-blur-3xl">
                 <form 
                   onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                   className="flex w-full gap-3 items-center"
                 >
                   <div className="relative flex-1">
                     <Input
-                      placeholder="GPT-dan so'rang..."
+                      placeholder="Savolingizni yozing..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      className="h-14 pl-6 pr-12 rounded-2xl bg-background/50 border-white/10 focus:ring-primary/40 focus:border-primary/40 text-sm font-bold shadow-inner"
+                      className="h-16 pl-6 pr-12 rounded-[1.5rem] bg-background/50 border-white/10 focus:ring-primary/40 focus:border-primary/40 text-sm font-bold shadow-inner"
                       disabled={isLoading}
                     />
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-widest opacity-20 hidden md:block">
@@ -230,10 +234,10 @@ export function ChatAssistant() {
                   <Button 
                     type="submit" 
                     size="icon" 
-                    className="h-14 w-14 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex-shrink-0"
+                    className="h-16 w-16 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all flex-shrink-0"
                     disabled={isLoading || !input.trim()}
                   >
-                    <Send className="w-5 h-5" />
+                    <Send className="w-6 h-6" />
                   </Button>
                 </form>
               </CardFooter>
