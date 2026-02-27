@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -14,8 +13,6 @@ import {
   Trash2, 
   Warehouse,
   Calendar,
-  FolderOpen,
-  ClipboardCheck,
   FileBox,
   FileUp,
   FileDown,
@@ -23,7 +20,7 @@ import {
   FileText,
   User,
   Download,
-  Table as TableIcon
+  ClipboardCheck
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -63,7 +60,15 @@ export default function HistoryPage() {
 
     filtered.forEach(m => {
       const dateKey = format(new Date(m.movementDate), 'dd.MM.yyyy');
-      if (!groups[dateKey]) groups[dateKey] = { StockIn: {}, StockOut: {}, Adjustment: {}, Transfer: {} };
+      if (!groups[dateKey]) {
+        groups[dateKey] = { 
+          StockIn: {}, 
+          StockOut: {}, 
+          Adjustment: {}, 
+          Transfer: {},
+          allMovements: []
+        };
+      }
 
       const type = m.movementType as keyof typeof groups[string];
       const docId = m.dnNumber || m.orderNumber || m.saleId || m.movementDate.substring(0, 16); 
@@ -81,7 +86,6 @@ export default function HistoryPage() {
         };
       }
       groups[dateKey][type][docId].items.push(m);
-group[dateKey].allMovements = groups[dateKey].allMovements || [];
       groups[dateKey].allMovements.push(m);
     });
 

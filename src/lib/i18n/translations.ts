@@ -1,4 +1,3 @@
-
 export type Language = 'uz' | 'ru' | 'en';
 
 export const translations = {
@@ -373,7 +372,7 @@ export const translations = {
     inventoryAudit: {
       title: 'Инвентаризация',
       description: 'Сравнение системных запасов с фактическими остатками и корректировка.',
-      physicalStock: 'Фактическое кол-во',
+      physicalStock: 'Факческое кол-во',
       systemStock: 'Системное кол-во',
       discrepancy: 'Разница',
       reconcile: 'Скоректировать запас',

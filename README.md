@@ -16,16 +16,21 @@ Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 
 ## 🌐 Domenni (omborchi.uz) ulash uchun DNS sozlamalari
 
-Domeningizni Firebase-ga bog'lash uchun DNS provayderingiz (masalan, Uzinfocom yoki boshqa panel)ga quyidagi 2 ta yozuvni kiriting. **Muhim:** Eski barcha `A` yoki `CNAME` yozuvlarini o'chirib tashlang!
+Domeningizni Firebase-ga bog'lash uchun DNS provayderingiz (domenni sotib olgan joyingiz, masalan: Uzinfocom, Arsenal-D, Webname va h.k.) boshqaruv paneliga quyidagi 2 ta yozuvni kiriting.
+
+### ❓ Domen paneli nima va qayerda?
+Domen paneli - bu siz domenni sotib olgan saytdagi shaxsiy kabinetdir. U yerda "DNS boshqaruvi" yoki "DNS tahrirlash" degan bo'lim bo'ladi. Shu bo'limga quyidagi ma'lumotlarni kiriting:
+
+**Muhim:** Eski barcha `A` yoki `CNAME` yozuvlarini o'chirib tashlang!
 
 ### 1. A Record (Asosiy IP manzil):
 *   **Type (Turi)**: `A`
-*   **Host (Nomi)**: `@` (yoki bo'sh qoldiring)
+*   **Host (Nomi)**: `@`
 *   **Value (Qiymati)**: `199.36.158.100`
 
 ### 2. TXT Record (Egalikni tasdiqlash uchun):
 *   **Type (Turi)**: `TXT`
-*   **Host (Nomi)**: `@` (yoki bo'sh qoldiring)
+*   **Host (Nomi)**: `@`
 *   **Value (Qiymati)**: `hosting-site=studio-4209846898-d5885`  <-- **DIQQAT: `=` belgisi bo'lishi shart!**
 
 ---
@@ -36,8 +41,8 @@ Agar "DNS request failed" yoki "Needs setup" xatosi chiqsa, quyidagilarni tekshi
 
 1.  **Konfliktlar**: Paneldagi barcha eski IP manzillarni va ayniqsa `CNAME` yozuvlarini o'chirib tashlang. Root domenda (`omborchi.uz`) ham `A`, ham `CNAME` yozuvi bo'lishi mumkin emas.
 2.  **Host qismi**: Ko'p panellarda "Host" degan joyga domen nomini emas, shunchaki `@` belgisini yozish kerak.
-3.  **To'g'ri qiymat**: TXT qiymati aynan `hosting-site=...` ko'rinishida ekanini tekshiring.
-4.  **Propagation**: DNS o'zgarishi butun dunyoga tarqalishi uchun **1 soatdan 24 soatgacha** vaqt ketishi mumkin.
+3.  **Tenglik belgisi**: TXT qiymati aynan `hosting-site=...` ko'rinishida ekanini tekshiring. Agar o'rtada `=` o'rniga `-` bo'lsa, Firebase tasdiqlamaydi.
+4.  **Kutish vaqti**: DNS o'zgarishi butun dunyoga tarqalishi uchun **1 soatdan 24 soatgacha** vaqt ketishi mumkin.
 
 ---
 
