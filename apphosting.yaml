@@ -9,6 +9,6 @@ runConfig:
 
 env:
   - name: GOOGLE_GENAI_API_KEY
-    value: "SIZ_OLGAN_YANGI_API_KEY"
+    value: "AIzaSyC9G1AR3Cvf1oy_8wltCTytiqRCzFg5Y_4"
   - name: GEMINI_API_KEY
-    value: "SIZ_OLGAN_YANGI_API_KEY"
+    value: "AIzaSyC9G1AR3Cvf1oy_8wltCTytiqRCzFg5Y_4"
