@@ -11,10 +11,10 @@ import { googleAI } from '@genkit-ai/google-genai';
 export const ai = genkit({
   plugins: [
     googleAI({
-      apiKey: process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY,
+      apiKey: process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || 'AIzaSyC9G1AR3Cvf1oy_8wltCTytiqRCzFg5Y_4',
     }),
   ],
 });
 
-// Genkit 1.x uchun eng barqaror Gemini modeli identifikatori
+// Genkit 1.x uchun Google AI provayderidagi eng barqaror model nomi
 export const model = 'googleai/gemini-1.5-flash';

@@ -4,14 +4,12 @@
  * @fileOverview Omborchi GPT - Aqlli yordamchi mantiqi.
  * 
  * - chatWithAI - AI bilan muloqot qilish funksiyasi.
- * - checkProductStock - Ombordagi qoldiqlarni tekshirish asbobi.
- * - listWarehouses - Omborlar ro'yxatini olish asbobi.
  */
 
 import { ai, model } from '@/ai/genkit';
 import { z } from 'genkit';
 import { initializeFirebase } from '@/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
 
 // --- AI ASBOBLARI (TOOLS) ---
 
@@ -30,18 +28,21 @@ const checkProductStock = ai.defineTool(
     })),
   },
   async (input) => {
-    const { firestore } = initializeFirebase();
-    const snapshot = await getDocs(collection(firestore, "products"));
-    const results = snapshot.docs
-      .map(doc => doc.data())
-      .filter(p => !p.isDeleted && p.name.toLowerCase().includes(input.productName.toLowerCase()))
-      .map(p => ({
-        name: p.name,
-        stock: p.stock || 0,
-        price: p.salePrice || 0,
-        unit: p.unit || "dona"
-      }));
-    return results;
+    try {
+      const { firestore } = initializeFirebase();
+      const snapshot = await getDocs(query(collection(firestore, "products"), limit(20)));
+      return snapshot.docs
+        .map(doc => doc.data())
+        .filter(p => p.name.toLowerCase().includes(input.productName.toLowerCase()))
+        .map(p => ({
+          name: p.name,
+          stock: p.stock || 0,
+          price: p.salePrice || 0,
+          unit: p.unit || "dona"
+        }));
+    } catch (e) {
+      return [];
+    }
   }
 );
 
@@ -57,16 +58,20 @@ const listWarehouses = ai.defineTool(
     })),
   },
   async () => {
-    const { firestore } = initializeFirebase();
-    const snapshot = await getDocs(collection(firestore, "warehouses"));
-    return snapshot.docs.map(doc => {
-      const d = doc.data();
-      return {
-        name: d.name,
-        address: d.address || "Manzil noma'lum",
-        manager: d.managerName || "Tayinlanmagan"
-      };
-    });
+    try {
+      const { firestore } = initializeFirebase();
+      const snapshot = await getDocs(collection(firestore, "warehouses"));
+      return snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          name: d.name,
+          address: d.address || "Manzil noma'lum",
+          manager: d.managerName || "Tayinlanmagan"
+        };
+      });
+    } catch (e) {
+      return [];
+    }
   }
 );
 
@@ -105,7 +110,7 @@ ASOSIY VAZIFALAR:
 MAJBURIY QOIDALAR:
 - FAQAT o'zbek tilida javob bering.
 - Narxlarni '100 000 so'm' formatida yozing.
-- "o'" va "g'" harflarini har doim to'g'ri ishlating.
+- "o'" va "g'" harflarini har doim to'g'ri ishlating (masalan: o'rniga o‘ emas, o' ishlating).
 - Agar savol ombor tizimiga aloqador bo'lmasa, uni muloyimlik bilan rad eting.
 
 KONTEKST:
@@ -128,11 +133,6 @@ const chatWithAIFlow = ai.defineFlow(
     outputSchema: ChatOutputSchema,
   },
   async (input) => {
-    // API kalit mavjudligini tekshirish
-    if (!process.env.GOOGLE_GENAI_API_KEY && !process.env.GEMINI_API_KEY) {
-      throw new Error("AI API kaliti topilmadi. .env faylini tekshiring.");
-    }
-
     try {
       const { output } = await chatPrompt(input);
       if (!output) throw new Error("AI javob tayyorlay olmadi.");
@@ -140,8 +140,11 @@ const chatWithAIFlow = ai.defineFlow(
     } catch (err: any) {
       console.error("Genkit Flow Error:", err);
       // Xatolik xabarini foydalanuvchiga tushunarli qilish
-      if (err.message?.includes('expired')) {
-        throw new Error("API kalitining muddati tugagan. Iltimos, yangilang.");
+      if (err.message?.includes('expired') || err.message?.includes('400')) {
+        throw new Error("API kalitining muddati tugagan yoki xato. Iltimos, yangilang.");
+      }
+      if (err.message?.includes('404')) {
+        throw new Error("Model topilmadi. Konfiguratsiyani tekshiring.");
       }
       throw err;
     }
