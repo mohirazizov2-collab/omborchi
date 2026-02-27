@@ -19,7 +19,8 @@ import {
   TrendingDown,
   DollarSign,
   FileText,
-  Download
+  Download,
+  Calendar
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -27,6 +28,7 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { startOfWeek, startOfMonth, subDays, isWithinInterval } from "date-fns";
 
 export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
@@ -49,67 +51,53 @@ export default function ReportsPage() {
     }
   }, [role, authLoading, router]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return collection(db, "products");
-  }, [db, user]);
+  // Unified Data Subscriptions
+  const productsQuery = useMemoFirebase(() => (db && user) ? collection(db, "products") : null, [db, user]);
+  const warehousesQuery = useMemoFirebase(() => (db && user) ? collection(db, "warehouses") : null, [db, user]);
+  const employeesQuery = useMemoFirebase(() => (db && user) ? collection(db, "employees") : null, [db, user]);
+  const expensesQuery = useMemoFirebase(() => (db && user) ? collection(db, "expenses") : null, [db, user]);
+  const movementsQuery = useMemoFirebase(() => (db && user) ? query(collection(db, "stockMovements"), orderBy("movementDate", "desc")) : null, [db, user]);
+
   const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
-
-  const warehousesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return collection(db, "warehouses");
-  }, [db, user]);
   const { data: warehouses, isLoading: warehousesLoading } = useCollection(warehousesQuery);
-
-  const employeesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return collection(db, "employees");
-  }, [db, user]);
   const { data: employees } = useCollection(employeesQuery);
-
-  const expensesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return collection(db, "expenses");
-  }, [db, user]);
   const { data: operationalExpenses } = useCollection(expensesQuery);
-
-  const movementsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "stockMovements"), orderBy("movementDate", "desc"));
-  }, [db, user]);
   const { data: movements, isLoading: movementsLoading } = useCollection(movementsQuery);
 
+  // Financial Engine - All components share this logic
   const financials = useMemo(() => {
-    if (!movements || !products) return { revenue: 0, expenses: 0, profit: 0 };
+    if (!movements || !products) return { revenue: 0, expenses: 0, profit: 0, opsExpenses: 0, salaryExp: 0 };
 
-    const now = Date.now();
-    const days = reportPeriod === 'weekly' ? 7 : 30;
-    const thresholdDate = now - (days * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const startDate = reportPeriod === 'weekly' ? startOfWeek(now) : startOfMonth(now);
+    const interval = { start: startDate, end: now };
 
     let revenue = 0;
     movements.forEach(m => {
-      if (m.movementType === 'StockOut' && new Date(m.movementDate).getTime() >= thresholdDate) {
+      if (m.movementType === 'StockOut' && isWithinInterval(new Date(m.movementDate), interval)) {
         revenue += Math.abs(m.quantityChange || 0) * (m.unitPrice || 0);
       }
     });
 
     let opsExpenses = 0;
     operationalExpenses?.forEach(ex => {
-      if (new Date(ex.date).getTime() >= thresholdDate) {
+      if (isWithinInterval(new Date(ex.date), interval)) {
         opsExpenses += (ex.amount || 0);
       }
     });
 
-    let salaryExpenses = 0;
+    let salaryExp = 0;
     employees?.forEach(e => {
       const monthlyTotal = (e.baseSalary || 0);
-      salaryExpenses += (reportPeriod === 'weekly' ? monthlyTotal / 4 : monthlyTotal);
+      salaryExp += (reportPeriod === 'weekly' ? monthlyTotal / 4 : monthlyTotal);
     });
 
-    const totalExpenses = opsExpenses + salaryExpenses;
+    const totalExpenses = opsExpenses + salaryExp;
 
     return { 
       revenue, 
+      opsExpenses,
+      salaryExp,
       expenses: totalExpenses, 
       profit: revenue - totalExpenses 
     };
@@ -123,11 +111,14 @@ export default function ReportsPage() {
     if (!products) return;
     setIsAiLoading(true);
     try {
-      const topProducts = products.slice(0, 5).map(p => ({
-        name: p.name,
-        stock: p.stock || 0,
-        price: p.salePrice || 0
-      }));
+      const topProducts = products
+        .sort((a, b) => (b.stock || 0) - (a.stock || 0))
+        .slice(0, 5)
+        .map(p => ({
+          name: p.name,
+          stock: p.stock || 0,
+          price: p.salePrice || 0
+        }));
 
       const result = await analyzeReports({
         stats: {
@@ -149,11 +140,17 @@ export default function ReportsPage() {
   const exportToExcel = async () => {
     const XLSX = (await import("xlsx")).default;
     const data = [
-      ["Hisobot turi", "Qiymat"],
+      ["MOLIYAVIY HISOBOT", ""],
       ["Davr", reportPeriod === 'weekly' ? "Haftalik" : "Oylik"],
+      ["Sana", new Date().toLocaleDateString()],
+      ["", ""],
       ["Sotuv tushumi", financials.revenue],
-      ["Xarajatlar", financials.expenses],
+      ["Operatsion xarajatlar", financials.opsExpenses],
+      ["Maosh xarajatlari", financials.salaryExp],
+      ["Jami xarajatlar", financials.expenses],
       ["Sof foyda", financials.profit],
+      ["", ""],
+      ["OMBOR HOLATI", ""],
       ["Jami zaxira qiymati", totalInventoryValue],
       ["Mahsulot turlari", products?.length || 0],
       ["Faol omborlar", warehouses?.length || 0]
@@ -162,7 +159,7 @@ export default function ReportsPage() {
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
-    XLSX.writeFile(wb, `Hisobot_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`);
     toast({ title: "Excel yuklandi" });
   };
 
@@ -170,40 +167,55 @@ export default function ReportsPage() {
     const jsPDFLib = (await import("jspdf")).default;
     const doc = new jsPDFLib();
     
-    doc.setFontSize(20);
-    doc.text("MOLIYAVIY HISOBOT", 105, 20, { align: "center" });
-    doc.setFontSize(12);
+    doc.setFontSize(22);
+    doc.setTextColor(59, 130, 246);
+    doc.text("MOLIYAVIY HISOBOT", 105, 25, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
     doc.text(`Davr: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 20, 40);
-    doc.text(`Sana: ${new Date().toLocaleDateString()}`, 20, 47);
+    doc.text(`Tayyorlangan sana: ${new Date().toLocaleString()}`, 20, 47);
 
+    doc.setDrawColor(230);
     doc.line(20, 55, 190, 55);
-    doc.text(`Sotuv tushumi:`, 20, 65); doc.text(`${formatMoney(financials.revenue)} so'm`, 140, 65);
-    doc.text(`Xarajatlar:`, 20, 72); doc.text(`${formatMoney(financials.expenses)} so'm`, 140, 72);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(40);
+    doc.text(`Sotuv tushumi:`, 20, 70); doc.text(`${formatMoney(financials.revenue)} so'm`, 140, 70);
+    doc.text(`Maoshlar:`, 20, 78); doc.text(`- ${formatMoney(financials.salaryExp)} so'm`, 140, 78);
+    doc.text(`Boshqa xarajatlar:`, 20, 86); doc.text(`- ${formatMoney(financials.opsExpenses)} so'm`, 140, 86);
+    
     doc.setFont("helvetica", "bold");
-    doc.text(`SOF FOYDA:`, 20, 82); doc.text(`${formatMoney(financials.profit)} so'm`, 140, 82);
+    doc.setTextColor(financials.profit >= 0 ? 16 : 225, financials.profit >= 0 ? 185 : 29, financials.profit >= 0 ? 129 : 72);
+    doc.text(`SOF FOYDA:`, 20, 100); doc.text(`${formatMoney(financials.profit)} so'm`, 140, 100);
     
     doc.setFont("helvetica", "normal");
-    doc.text(`Zaxira qiymati:`, 20, 95); doc.text(`${formatMoney(totalInventoryValue)} so'm`, 140, 95);
+    doc.setTextColor(100);
+    doc.text(`Ombordagi jami zaxira qiymati:`, 20, 115); doc.text(`${formatMoney(totalInventoryValue)} so'm`, 140, 115);
 
     if (aiResult) {
       doc.addPage();
       doc.setFontSize(18);
-      doc.text("AI TAHLIL XULOSASI", 105, 20, { align: "center" });
-      doc.setFontSize(10);
+      doc.setTextColor(59, 130, 246);
+      doc.text("AI TAHLIL XULOSASI", 105, 25, { align: "center" });
+      doc.setFontSize(11);
+      doc.setTextColor(60);
       const splitSummary = doc.splitTextToSize(aiResult.summary, 170);
-      doc.text(splitSummary, 20, 40);
+      doc.text(splitSummary, 20, 45);
       
-      doc.text("TAVSIYALAR:", 20, 80);
+      doc.setFont("helvetica", "bold");
+      doc.text("STRATEGIK TAVSIYALAR:", 20, 90);
+      doc.setFont("helvetica", "normal");
       aiResult.recommendations.forEach((rec, i) => {
-        doc.text(`${i+1}. ${rec}`, 20, 90 + (i * 7));
+        doc.text(`${i+1}. ${rec}`, 20, 100 + (i * 8));
       });
     }
 
-    doc.save(`Hisobot_${Date.now()}.pdf`);
+    doc.save(`Omborchi_Hisobot_${Date.now()}.pdf`);
     toast({ title: "PDF yuklandi" });
   };
 
-  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+  const formatMoney = (val: number) => Math.floor(val).toLocaleString().replace(/,/g, ' ');
 
   if (!mounted || authLoading) {
     return (
@@ -292,14 +304,14 @@ export default function ReportsPage() {
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
                   <p className="text-2xl font-black font-headline tracking-tighter">
-                    {financials.profit > 0 ? '+' : ''}{formatMoney(financials.profit)} so'm
+                    {financials.profit >= 0 ? '+' : ''}{formatMoney(financials.profit)} so'm
                   </p>
                 </div>
               </CardContent>
             </Card>
             <Card className="border-none glass-card bg-muted/20 rounded-[2rem]">
               <CardContent className="pt-8">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">{t.dashboard.totalStockValue}</p>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-2">Zaxira Qiymati</p>
                 <p className="text-2xl font-black font-headline tracking-tighter opacity-60">{formatMoney(totalInventoryValue)} so'm</p>
               </CardContent>
             </Card>
@@ -309,29 +321,33 @@ export default function ReportsPage() {
         <AnimatePresence>
           {aiResult && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12">
-              <Card className="border-none glass-card bg-primary/5 border border-primary/20 rounded-[2.5rem]">
-                <CardHeader className="pt-8 px-8">
+              <Card className="border-none glass-card bg-primary/5 border border-primary/20 rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="pt-8 px-8 bg-gradient-to-r from-primary/10 to-transparent">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkles className="w-4 h-4 text-primary" />
                     <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/70">Intelligent Analysis</span>
                   </div>
-                  <CardTitle className="font-headline font-black text-3xl tracking-tight">AI Xulosasi</CardTitle>
+                  <CardTitle className="font-headline font-black text-3xl tracking-tight">AI Biznes Tahlili</CardTitle>
                 </CardHeader>
-                <CardContent className="px-8 pb-8 space-y-8">
-                  <div className="p-6 rounded-[2rem] bg-background/40 backdrop-blur-xl italic font-medium shadow-sm">
+                <CardContent className="px-8 pb-8 space-y-8 pt-6">
+                  <div className="p-6 rounded-[2rem] bg-background/60 backdrop-blur-xl italic font-medium shadow-sm border border-white/5">
                     "{aiResult.summary}"
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    <div>
-                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Trendlar</h4>
+                    <div className="space-y-4">
+                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Activity className="w-3.5 h-3.5" /> Trendlar va Muammolar
+                      </h4>
                       <p className="text-sm text-muted-foreground font-medium leading-relaxed">{aiResult.analysis}</p>
                     </div>
-                    <div>
-                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Strategik Tavsiyalar</h4>
+                    <div className="space-y-4">
+                      <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Wand2 className="w-3.5 h-3.5" /> Strategik Tavsiyalar
+                      </h4>
                       <div className="space-y-3">
                         {aiResult.recommendations.map((rec, i) => (
-                          <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-primary/10">
-                            <div className="w-6 h-6 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 text-[10px] font-black">{i + 1}</div>
+                          <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-primary/10 border border-primary/5 group hover:bg-primary/20 transition-colors">
+                            <div className="w-6 h-6 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 text-[10px] font-black group-hover:scale-110 transition-transform">{i + 1}</div>
                             <span className="text-sm font-bold">{rec}</span>
                           </div>
                         ))}

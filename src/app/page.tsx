@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -10,21 +11,24 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, query, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Warehouse as WarehouseIcon, 
   AlertTriangle,
   Loader2,
-  Calendar,
   Layers,
   PlusCircle,
   Wallet,
-  TrendingUp
+  TrendingUp,
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign
 } from "lucide-react";
 import Link from "next/link";
+import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
-// Recharts components are client-only and heavy, load them dynamically
+// Recharts components
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
@@ -36,7 +40,6 @@ const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: fa
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
-  const { toast } = useToast();
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
 
@@ -44,57 +47,95 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  const warehousesQuery = useMemoFirebase(() => {
-    if (!mounted || !db || !user) return null;
-    return collection(db, "warehouses");
-  }, [mounted, db, user]);
+  // Data fetching
+  const warehousesQuery = useMemoFirebase(() => (mounted && db && user) ? collection(db, "warehouses") : null, [mounted, db, user]);
+  const productsQuery = useMemoFirebase(() => (mounted && db && user) ? collection(db, "products") : null, [mounted, db, user]);
+  const employeesQuery = useMemoFirebase(() => (mounted && db && user) ? collection(db, "employees") : null, [mounted, db, user]);
+  const movementsQuery = useMemoFirebase(() => (mounted && db && user) ? collection(db, "stockMovements") : null, [mounted, db, user]);
+  const expensesQuery = useMemoFirebase(() => (mounted && db && user) ? collection(db, "expenses") : null, [mounted, db, user]);
+
   const { data: warehouses } = useCollection(warehousesQuery);
-
-  const productsQuery = useMemoFirebase(() => {
-    if (!mounted || !db || !user) return null;
-    return collection(db, "products");
-  }, [mounted, db, user]);
   const { data: products } = useCollection(productsQuery);
-
-  const employeesQuery = useMemoFirebase(() => {
-    if (!mounted || !db || !user) return null;
-    return collection(db, "employees");
-  }, [mounted, db, user]);
   const { data: employees } = useCollection(employeesQuery);
+  const { data: movements } = useCollection(movementsQuery);
+  const { data: expenses } = useCollection(expensesQuery);
 
-  const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
+  const formatMoney = (val: number) => Math.floor(val).toLocaleString().replace(/,/g, ' ');
 
+  // Calculate dynamic chart data based on movements
+  const chartData = useMemo(() => {
+    if (!movements) return [];
+    
+    const months = Array.from({ length: 6 }).map((_, i) => {
+      const d = subMonths(new Date(), 5 - i);
+      return {
+        name: format(d, 'MMM'),
+        monthIdx: d.getMonth(),
+        year: d.getFullYear(),
+        in: 0,
+        out: 0
+      };
+    });
+
+    movements.forEach(m => {
+      const mDate = new Date(m.movementDate);
+      const monthLabel = format(mDate, 'MMM');
+      const year = mDate.getFullYear();
+      
+      const monthData = months.find(d => d.name === monthLabel && d.year === year);
+      if (monthData) {
+        if (m.movementType === 'StockIn') monthData.in += (m.quantityChange || 0);
+        if (m.movementType === 'StockOut') monthData.out += Math.abs(m.quantityChange || 0);
+      }
+    });
+
+    return months;
+  }, [movements]);
+
+  // Comprehensive stats
   const stats = useMemo(() => {
-    if (!products && !employees && !warehouses) return [];
+    if (!products || !movements) return [];
     
     const totalInventoryVal = products?.reduce((acc, p) => acc + ((p.salePrice || 0) * (p.stock || 0)), 0) || 0;
     const lowStock = products?.filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length || 0;
-    const totalSalary = employees?.reduce((acc, e) => acc + (e.baseSalary || 0), 0) || 0;
     
+    // Financials for current month
+    const thisMonthInterval = { start: startOfMonth(new Date()), end: endOfMonth(new Date()) };
+    
+    const monthlyRevenue = movements
+      ?.filter(m => m.movementType === 'StockOut' && isWithinInterval(new Date(m.movementDate), thisMonthInterval))
+      .reduce((acc, m) => acc + (Math.abs(m.quantityChange || 0) * (m.unitPrice || 0)), 0) || 0;
+
+    const monthlyExp = (expenses
+      ?.filter(ex => isWithinInterval(new Date(ex.date), thisMonthInterval))
+      .reduce((acc, ex) => acc + (ex.amount || 0), 0) || 0) + (employees?.reduce((acc, e) => acc + (e.baseSalary || 0), 0) || 0);
+
+    const netProfit = monthlyRevenue - monthlyExp;
+
     return [
       { 
         label: t.dashboard.totalStockValue, 
         value: `${formatMoney(totalInventoryVal)} so'm`, 
         icon: Layers, 
         color: "bg-primary/10 text-primary", 
-        trend: "Aktiv", 
+        trend: "Umumiy", 
+        trendColor: "text-primary" 
+      },
+      { 
+        label: "Oylik Tushum", 
+        value: `${formatMoney(monthlyRevenue)} so'm`, 
+        icon: TrendingUp, 
+        color: "bg-emerald-500/10 text-emerald-500", 
+        trend: "Shu oy", 
         trendColor: "text-emerald-500" 
       },
       { 
-        label: t.dashboard.activeWarehouses, 
-        value: (warehouses?.length || 0).toString(), 
-        icon: WarehouseIcon, 
-        color: "bg-purple-500/10 text-purple-500", 
-        trend: "Ishchi", 
-        trendColor: "text-amber-500" 
-      },
-      { 
-        label: t.dashboard.totalSalaryExpense, 
-        value: `${formatMoney(totalSalary)} so'm`, 
-        icon: Wallet, 
-        color: "bg-emerald-500/10 text-emerald-500", 
-        trend: `${employees?.length || 0} xodim`, 
-        trendColor: "text-blue-500" 
+        label: "Oylik Sof Foyda", 
+        value: `${formatMoney(netProfit)} so'm`, 
+        icon: DollarSign, 
+        color: netProfit >= 0 ? "bg-blue-500/10 text-blue-500" : "bg-rose-500/10 text-rose-500", 
+        trend: netProfit >= 0 ? "Musbat" : "Minus", 
+        trendColor: netProfit >= 0 ? "text-blue-500" : "text-rose-500" 
       },
       { 
         label: t.dashboard.lowStockAlerts, 
@@ -105,7 +146,7 @@ export default function DashboardPage() {
         trendColor: lowStock > 0 ? "text-rose-500" : "text-emerald-500" 
       }
     ];
-  }, [t, products, warehouses, employees]);
+  }, [t, products, movements, expenses, employees]);
 
   if (!mounted || isUserLoading) {
     return (
@@ -159,20 +200,19 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
           <Card className="lg:col-span-2 border-none glass-card bg-card/40 backdrop-blur-2xl rounded-[3rem] p-8">
-            <CardTitle className="font-headline font-black text-xl mb-6">{t.dashboard.stockMovements}</CardTitle>
-            <div className="h-[300px] w-full">
+            <CardTitle className="font-headline font-black text-xl mb-6">Zaxira Harakati Dinamikasi (6 oylik)</CardTitle>
+            <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[
-                  {month: 'Yanvar', in: 400, out: 240}, 
-                  {month: 'Fevral', in: 300, out: 139}, 
-                  {month: 'Mart', in: 200, out: 980}
-                ]}>
+                <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900}} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900}} />
                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900}} />
-                  <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'}} />
-                  <Bar dataKey="in" name="Kirim" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} barSize={32} />
-                  <Bar dataKey="out" name="Chiqim" fill="rgba(0,0,0,0.1)" radius={[8, 8, 0, 0]} barSize={32} />
+                  <Tooltip 
+                    cursor={{fill: 'rgba(0,0,0,0.02)'}}
+                    contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'}} 
+                  />
+                  <Bar dataKey="in" name="Kirim" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} barSize={24} />
+                  <Bar dataKey="out" name="Chiqim" fill="rgba(225, 29, 72, 0.6)" radius={[8, 8, 0, 0]} barSize={24} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -180,21 +220,25 @@ export default function DashboardPage() {
 
           <Card className="border-none glass-card bg-card/40 backdrop-blur-2xl rounded-[3rem] p-8">
             <CardTitle className="font-headline font-black text-xl mb-6 flex items-center gap-3">
-              <AlertTriangle className="w-6 h-6 text-rose-500" /> {t.dashboard.lowStockAlerts}
+              <AlertTriangle className="w-6 h-6 text-rose-500" /> Kam qoldiqlar
             </CardTitle>
             <div className="space-y-4">
-              {products?.filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).slice(0, 5).map((item: any) => (
-                <div key={item.id} className="flex items-center justify-between p-4 rounded-3xl bg-muted/10">
+              {products?.filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).slice(0, 6).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between p-4 rounded-3xl bg-muted/10 hover:bg-muted/20 transition-all">
                   <div className="min-w-0">
                     <p className="text-xs font-black truncate">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{item.unit || 'pcs'}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{item.sku}</p>
                   </div>
-                  <Badge variant="destructive" className="h-7 px-3 font-black rounded-xl">{item.stock}</Badge>
+                  <div className="flex flex-col items-end">
+                    <Badge variant="destructive" className="h-7 px-3 font-black rounded-xl">{item.stock}</Badge>
+                    <span className="text-[8px] font-black uppercase opacity-40 mt-1">{item.unit || 'pcs'}</span>
+                  </div>
                 </div>
               ))}
               {(!products || products.filter(p => (p.stock || 0) < (p.lowStockThreshold || 10)).length === 0) && (
-                <div className="py-10 text-center opacity-20">
-                  <p className="text-[10px] font-black uppercase">Hammasi joyida ✅</p>
+                <div className="py-20 text-center opacity-20 flex flex-col items-center">
+                  <PlusCircle className="w-12 h-12 mb-4" />
+                  <p className="text-[10px] font-black uppercase">Barcha mahsulotlar yetarli ✅</p>
                 </div>
               )}
             </div>
