@@ -16,5 +16,5 @@ export const ai = genkit({
   ],
 });
 
-// Google Gemini 1.5 Flash modeli - eng tezkor va barqaror model
+// Genkit 1.x uchun eng barqaror model nomi
 export const model = 'googleai/gemini-1.5-flash';
