@@ -1,6 +1,11 @@
+
 'use server';
 /**
- * @fileOverview Omborchi GPT - Aqlli yordamchi uchun ilg'or mantiq.
+ * @fileOverview Omborchi GPT - Aqlli yordamchi mantiqi.
+ * 
+ * - chatWithAI - AI bilan muloqot qilish funksiyasi.
+ * - checkProductStock - Ombordagi qoldiqlarni tekshirish asbobi.
+ * - listWarehouses - Omborlar ro'yxatini olish asbobi.
  */
 
 import { ai, model } from '@/ai/genkit';
@@ -43,7 +48,7 @@ const checkProductStock = ai.defineTool(
 const listWarehouses = ai.defineTool(
   {
     name: "listWarehouses",
-    description: "Tizimdagi barcha faol omborlar va ularning joylashuvi haqida ma'lumot beradi.",
+    description: "Tizimdagi barcha faol omborlar haqida ma'lumot beradi.",
     inputSchema: z.object({}),
     outputSchema: z.array(z.object({
       name: z.string(),
@@ -89,15 +94,19 @@ const chatPrompt = ai.definePrompt({
   tools: [checkProductStock, listWarehouses],
   input: { schema: ChatInputSchema },
   output: { schema: ChatOutputSchema },
-  prompt: `Siz "omborchi.uz" tizimining Senior darajadagi konsultantisiz. Ismingiz - Omborchi GPT.
-Sizning asosiy vazifangiz ombor boshqaruvi, logistika, inventarizatsiya va moliyaviy tahlil bo'yicha foydalanuvchilarga professional yordam berish.
+  prompt: `Siz "omborchi.uz" tizimining Senior darajadagi professional konsultantisiz. 
+Ismingiz - Omborchi GPT.
+
+ASOSIY VAZIFALAR:
+1. Ombor boshqaruvi, logistika va moliyaviy tahlil bo'yicha yordam berish.
+2. Mahsulot qoldiqlari yoki omborlar haqida so'rashsa, albatta 'checkProductStock' yoki 'listWarehouses' asboblaridan foydalanish.
+3. Foydalanuvchilarga professional, do'stona va aniq maslahatlar berish.
 
 MAJBURIY QOIDALAR:
-1. Til: FAQAT o'zbek tilida muloqot qiling. "o'" va "g'" harflarini har doim to'g'ri ishlating.
-2. Ohang: Professional, do'stona va yordam berishga tayyor.
-3. Ma'lumot: Agar foydalanuvchi mahsulot yoki ombor haqida so'rasa, albatta mos asbobdan (tool) foydalaning. Hallusinatsiya qilmang.
-4. Formatlash: Narxlarni har doim '100 000 so'm' kabi probellar bilan yozing.
-5. Qisqalik: Javoblaringiz lirikadan xoli, aniq faktlarga asoslangan bo'lsin.
+- FAQAT o'zbek tilida javob bering.
+- Narxlarni '100 000 so'm' formatida yozing.
+- "o'" va "g'" harflarini har doim to'g'ri ishlating.
+- Agar savol ombor tizimiga aloqador bo'lmasa, uni muloyimlik bilan rad eting.
 
 KONTEKST:
 Suhbat tarixi:
@@ -119,12 +128,21 @@ const chatWithAIFlow = ai.defineFlow(
     outputSchema: ChatOutputSchema,
   },
   async (input) => {
+    // API kalit mavjudligini tekshirish
+    if (!process.env.GOOGLE_GENAI_API_KEY && !process.env.GEMINI_API_KEY) {
+      throw new Error("AI API kaliti topilmadi. .env faylini tekshiring.");
+    }
+
     try {
       const { output } = await chatPrompt(input);
       if (!output) throw new Error("AI javob tayyorlay olmadi.");
       return output;
     } catch (err: any) {
       console.error("Genkit Flow Error:", err);
+      // Xatolik xabarini foydalanuvchiga tushunarli qilish
+      if (err.message?.includes('expired')) {
+        throw new Error("API kalitining muddati tugagan. Iltimos, yangilang.");
+      }
       throw err;
     }
   }

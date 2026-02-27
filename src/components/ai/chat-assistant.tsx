@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -15,7 +16,8 @@ import {
   Package,
   Warehouse,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,15 +70,15 @@ export function ChatAssistant() {
       setMessages(prev => [...prev, { role: 'model', content: response.response }]);
     } catch (error: any) {
       console.error('AI Chat Error:', error);
-      let errMsg = "Tizimda xatolik yuz berdi.";
+      let errMsg = "AI bilan bog'lanib bo'lmadi. Kalit yoki ulanishni tekshiring.";
       const errorStr = String(error?.message || "").toLowerCase();
       
-      if (errorStr.includes('api key expired')) {
-        errMsg = "API kalitining muddati tugagan. Iltimos, uni yangilang.";
+      if (errorStr.includes('expired')) {
+        errMsg = "API kalitining muddati tugagan. Iltimos, Google AI Studiodan yangi kalit oling.";
       } else if (errorStr.includes('429')) {
-        errMsg = "AI limiti tugadi. Iltimos, bir oz kuting.";
-      } else {
-        errMsg = "AI bilan bog'lanib bo'lmadi. Kalit yoki ulanishni tekshiring.";
+        errMsg = "AI so'rovlar limiti tugadi. Bir ozdan keyin urinib ko'ring.";
+      } else if (errorStr.includes('404')) {
+        errMsg = "Model topilmadi yoki API kalit noto'g'ri kiritilgan.";
       }
 
       setMessages(prev => [...prev, { role: 'model', content: errMsg, isError: true }]);
