@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Omborchi GPT - Aqlli yordamchi uchun Genkit flow.
@@ -108,6 +109,7 @@ Qoidalar:
 Suhbat tarixi:
 {{#each history}}
 {{role}}: {{{content}}}
+{{#if toolCalls}} (Used tools) {{/if}}
 {{/each}}
 
 Foydalanuvchi xabari: {{{message}}}`,
