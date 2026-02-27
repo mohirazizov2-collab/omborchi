@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -16,7 +17,9 @@ import {
   Table as TableIcon,
   TrendingUp,
   TrendingDown,
-  DollarSign
+  DollarSign,
+  FileText,
+  Download
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -83,16 +86,13 @@ export default function ReportsPage() {
     const days = reportPeriod === 'weekly' ? 7 : 30;
     const thresholdDate = now - (days * 24 * 60 * 60 * 1000);
 
-    // 1. Hisoblangan tushum (Sotuvlardan)
     let revenue = 0;
     movements.forEach(m => {
       if (m.movementType === 'StockOut' && new Date(m.movementDate).getTime() >= thresholdDate) {
-        // Miqdor manfiy bo'lgani uchun abs ishlatamiz
         revenue += Math.abs(m.quantityChange || 0) * (m.unitPrice || 0);
       }
     });
 
-    // 2. Operatsion xarajatlar
     let opsExpenses = 0;
     operationalExpenses?.forEach(ex => {
       if (new Date(ex.date).getTime() >= thresholdDate) {
@@ -100,7 +100,6 @@ export default function ReportsPage() {
       }
     });
 
-    // 3. Maosh xarajatlari (davrga nisbatan taqsimlangan)
     let salaryExpenses = 0;
     employees?.forEach(e => {
       const monthlyTotal = (e.baseSalary || 0);
@@ -147,6 +146,63 @@ export default function ReportsPage() {
     }
   }, [products, totalInventoryValue, warehouses, toast]);
 
+  const exportToExcel = async () => {
+    const XLSX = (await import("xlsx")).default;
+    const data = [
+      ["Hisobot turi", "Qiymat"],
+      ["Davr", reportPeriod === 'weekly' ? "Haftalik" : "Oylik"],
+      ["Sotuv tushumi", financials.revenue],
+      ["Xarajatlar", financials.expenses],
+      ["Sof foyda", financials.profit],
+      ["Jami zaxira qiymati", totalInventoryValue],
+      ["Mahsulot turlari", products?.length || 0],
+      ["Faol omborlar", warehouses?.length || 0]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
+    XLSX.writeFile(wb, `Hisobot_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast({ title: "Excel yuklandi" });
+  };
+
+  const exportToPDF = async () => {
+    const jsPDFLib = (await import("jspdf")).default;
+    const doc = new jsPDFLib();
+    
+    doc.setFontSize(20);
+    doc.text("MOLIYAVIY HISOBOT", 105, 20, { align: "center" });
+    doc.setFontSize(12);
+    doc.text(`Davr: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 20, 40);
+    doc.text(`Sana: ${new Date().toLocaleDateString()}`, 20, 47);
+
+    doc.line(20, 55, 190, 55);
+    doc.text(`Sotuv tushumi:`, 20, 65); doc.text(`${formatMoney(financials.revenue)} so'm`, 140, 65);
+    doc.text(`Xarajatlar:`, 20, 72); doc.text(`${formatMoney(financials.expenses)} so'm`, 140, 72);
+    doc.setFont("helvetica", "bold");
+    doc.text(`SOF FOYDA:`, 20, 82); doc.text(`${formatMoney(financials.profit)} so'm`, 140, 82);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Zaxira qiymati:`, 20, 95); doc.text(`${formatMoney(totalInventoryValue)} so'm`, 140, 95);
+
+    if (aiResult) {
+      doc.addPage();
+      doc.setFontSize(18);
+      doc.text("AI TAHLIL XULOSASI", 105, 20, { align: "center" });
+      doc.setFontSize(10);
+      const splitSummary = doc.splitTextToSize(aiResult.summary, 170);
+      doc.text(splitSummary, 20, 40);
+      
+      doc.text("TAVSIYALAR:", 20, 80);
+      aiResult.recommendations.forEach((rec, i) => {
+        doc.text(`${i+1}. ${rec}`, 20, 90 + (i * 7));
+      });
+    }
+
+    doc.save(`Hisobot_${Date.now()}.pdf`);
+    toast({ title: "PDF yuklandi" });
+  };
+
   const formatMoney = (val: number) => val.toLocaleString().replace(/,/g, ' ');
 
   if (!mounted || authLoading) {
@@ -185,6 +241,15 @@ export default function ReportsPage() {
                 onClick={() => setReportPeriod('monthly')}
               >
                 {t.reports.monthly}
+              </Button>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl" onClick={exportToExcel} title="Excel">
+                <TableIcon className="w-5 h-5 text-emerald-600" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl" onClick={exportToPDF} title="PDF">
+                <FileText className="w-5 h-5 text-rose-600" />
               </Button>
             </div>
             
