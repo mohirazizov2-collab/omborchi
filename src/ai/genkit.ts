@@ -1,19 +1,20 @@
+
 import { genkit } from 'genkit';
-import { openAI } from 'genkitx-openai';
+import { googleAI } from '@genkit-ai/google-genai';
 
 /**
- * @fileOverview AI konfiguratsiyasi (OpenAI).
+ * @fileOverview AI konfiguratsiyasi (Google Gemini).
  */
 
-const API_KEY = process.env.OPENAI_API_KEY || '';
+const API_KEY = process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || '';
 
 export const ai = genkit({
   plugins: [
-    openAI({
+    googleAI({
       apiKey: API_KEY,
     }),
   ],
 });
 
-// OpenAI gpt-4o-mini modeli
-export const model = 'openai/gpt-4o-mini';
+// Google Gemini 1.5 Flash modeli
+export const model = 'googleai/gemini-1.5-flash';

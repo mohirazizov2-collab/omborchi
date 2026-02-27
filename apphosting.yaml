@@ -8,5 +8,7 @@ runConfig:
   memoryPerInstance: 512Mi
 
 env:
-  - name: OPENAI_API_KEY
-    value: "Sizning_API_Kalitingiz"
+  - name: GOOGLE_GENAI_API_KEY
+    value: "AIzaSyDmQYr26NuWXot50VdN4Dk1wHrRDcW2kkk"
+  - name: GEMINI_API_KEY
+    value: "AIzaSyDmQYr26NuWXot50VdN4Dk1wHrRDcW2kkk"
