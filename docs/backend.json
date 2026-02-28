@@ -43,6 +43,41 @@
       },
       "required": ["id", "name", "sku", "unit"]
     },
+    "Recipe": {
+      "title": "Recipe",
+      "description": "Mahsulot tarkibi (Retsept): 1 birlik tayyor mahsulot uchun sarf-xarajatlar.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "outputProductId": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "components"]
+    },
+    "Production": {
+      "title": "Production",
+      "description": "Tayyorlash akti (Akt prigotovleniya) jurnali.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "recipeId": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "responsibleUserId": { "type": "string" }
+      }
+    },
     "WarehouseInventory": {
       "title": "WarehouseInventory",
       "description": "Muayyan ombordagi muayyan mahsulot qoldig'i.",
@@ -65,7 +100,7 @@
         "productId": { "type": "string" },
         "warehouseId": { "type": "string" },
         "quantityChange": { "type": "number" },
-        "movementType": { "type": "string", "enum": ["StockIn", "StockOut", "Transfer", "Adjustment"] },
+        "movementType": { "type": "string", "enum": ["StockIn", "StockOut", "Transfer", "Adjustment", "Production"] },
         "movementDate": { "type": "string", "format": "date-time" },
         "responsibleUserId": { "type": "string" },
         "responsibleUserName": { "type": "string" }
@@ -149,6 +184,14 @@
     "/products/{productId}": {
       "schema": "#/entities/Product",
       "description": "Mahsulotlar katalogi."
+    },
+    "/recipes/{recipeId}": {
+      "schema": "#/entities/Recipe",
+      "description": "Mahsulot tarkibi (Retseptlar)."
+    },
+    "/productions/{productionId}": {
+      "schema": "#/entities/Production",
+      "description": "Tayyorlash aktlari."
     },
     "/inventory/{inventoryId}": {
       "schema": "#/entities/WarehouseInventory",

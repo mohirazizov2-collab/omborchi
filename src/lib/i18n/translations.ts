@@ -1,3 +1,4 @@
+
 export type Language = 'uz' | 'ru' | 'en';
 
 export const translations = {
@@ -26,7 +27,10 @@ export const translations = {
       hrGroup: "Kadrlar",
       systemGroup: "Tizim ma'muriyati",
       financeGroup: "Moliya",
-      expenses: "Xarajatlar"
+      expenses: "Xarajatlar",
+      productionGroup: "Ishlab chiqarish",
+      recipes: "Retseptlar",
+      productionAct: "Tayyorlash akti"
     },
     units: {
       label: "O'lcham birligi",
@@ -43,6 +47,27 @@ export const translations = {
       bag: "Qop",
       box: "Karobka",
       pack: "Pachka"
+    },
+    production: {
+      title: "Tayyorlash akti",
+      description: "Retsept asosida materiallarni ombordan avtomatik yechish.",
+      selectRecipe: "Retseptni tanlang",
+      quantityToProduce: "Tayyorlanadigan miqdor",
+      neededMaterials: "Sarf qilinadigan materiallar",
+      process: "Tayyorlashni tasdiqlash",
+      stockError: "Omborda ba'zi materiallar yetishmaydi!",
+      success: "Tayyorlash akti muvaffaqiyatli bajarildi.",
+      noRecipes: "Hali retseptlar yaratilmagan. Avval retsept yarating."
+    },
+    recipes: {
+      title: "Mahsulot retseptlari",
+      description: "Tayyor mahsulot tarkibini va sarf-xarajat me'yorlarini belgilang.",
+      addNew: "Yangi retsept",
+      recipeName: "Retsept nomi",
+      outputProduct: "Tayyor mahsulot",
+      components: "Tarkibiy qismlar",
+      quantityPerUnit: "1 birlik uchun sarf",
+      saveSuccess: "Retsept muvaffaqiyatli saqlandi."
     },
     expenses: {
       title: "Xarajatlar nazorati",
@@ -312,7 +337,10 @@ export const translations = {
       hrGroup: "Кадры",
       systemGroup: "Администрирование",
       financeGroup: "Финансы",
-      expenses: "Расходы"
+      expenses: "Расходы",
+      productionGroup: "Производство",
+      recipes: "Рецепты (Состав)",
+      productionAct: "Акт приготовления"
     },
     units: {
       label: "Ед. измерения",
@@ -329,6 +357,27 @@ export const translations = {
       bag: "Мешок",
       box: "Коробка",
       pack: "Пачка"
+    },
+    production: {
+      title: "Акт приготовления",
+      description: "Автоматическое списание материалов со склада на основе рецепта.",
+      selectRecipe: "Выберите рецепт",
+      quantityToProduce: "Кол-во для приготовления",
+      neededMaterials: "Расход материалов",
+      process: "Подтвердить приготовление",
+      stockError: "На складе недостаточно некоторых материалов!",
+      success: "Акт приготовления успешно выполнен.",
+      noRecipes: "Рецепты еще не созданы. Сначала создайте рецепт."
+    },
+    recipes: {
+      title: "Рецепты продукции",
+      description: "Определите состав и нормы расхода материалов для готовой продукции.",
+      addNew: "Новый рецепт",
+      recipeName: "Название рецепта",
+      outputProduct: "Готовая продукция",
+      components: "Компоненты (Сырье)",
+      quantityPerUnit: "Расход на 1 единицу",
+      saveSuccess: "Рецепт успешно сохранен."
     },
     expenses: {
       title: "Контроль расходов",
@@ -598,7 +647,10 @@ export const translations = {
       hrGroup: "HR",
       systemGroup: "Administration",
       financeGroup: "Finance",
-      expenses: "Expenses"
+      expenses: "Expenses",
+      productionGroup: "Production",
+      recipes: "Recipes (BOM)",
+      productionAct: "Production Act"
     },
     units: {
       label: "Unit",
@@ -615,6 +667,27 @@ export const translations = {
       bag: "Bag",
       box: "Box",
       pack: "Pack"
+    },
+    production: {
+      title: "Production Act",
+      description: "Automatically deduct materials from warehouse based on recipe.",
+      selectRecipe: "Select Recipe",
+      quantityToProduce: "Quantity to Produce",
+      neededMaterials: "Materials Required",
+      process: "Confirm Production",
+      stockError: "Insufficient stock for some materials!",
+      success: "Production act completed successfully.",
+      noRecipes: "No recipes created yet. Create a recipe first."
+    },
+    recipes: {
+      title: "Product Recipes",
+      description: "Define the composition and consumption norms for finished goods.",
+      addNew: "New Recipe",
+      recipeName: "Recipe Name",
+      outputProduct: "Finished Product",
+      components: "Components (Raw Materials)",
+      quantityPerUnit: "Consumption per 1 Unit",
+      saveSuccess: "Recipe saved successfully."
     },
     expenses: {
       title: "Expense Control",

@@ -20,7 +20,9 @@ import {
   Globe,
   ChevronDown,
   WalletCards,
-  Coins
+  Coins,
+  FlaskConical,
+  Wrench
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -70,6 +72,12 @@ export function OmniSidebar() {
     { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
   ], [t, isAdmin]);
 
+  // Ishlab chiqarish guruhi
+  const productionNavigation = useMemo(() => [
+    { name: t.nav.recipes, href: "/recipes", icon: FlaskConical },
+    { name: t.nav.productionAct, href: "/production", icon: Wrench },
+  ], [t]);
+
   // Moliya Guruhi (Omborchi uchun butunlay yashiriladi)
   const financeNavigation = useMemo(() => [
     { name: t.nav.expenses, href: "/expenses", icon: WalletCards, hide: isOmborchi },
@@ -91,10 +99,11 @@ export function OmniSidebar() {
     if (analyticsNavigation.some(i => pathname === i.href)) return "analytics";
     if (invoiceNavigation.some(i => pathname === i.href)) return "invoices";
     if (inventoryNavigation.some(i => pathname === i.href)) return "inventory";
+    if (productionNavigation.some(i => pathname === i.href)) return "production";
     if (financeNavigation.some(i => pathname === i.href)) return "finance";
     if (adminNavigation.some(i => pathname === i.href)) return "admin";
     return "";
-  }, [pathname, analyticsNavigation, invoiceNavigation, inventoryNavigation, financeNavigation, adminNavigation]);
+  }, [pathname, analyticsNavigation, invoiceNavigation, inventoryNavigation, productionNavigation, financeNavigation, adminNavigation]);
 
   const renderAccordionItem = (value: string, label: string, icon: any, items: any[]) => {
     const visibleItems = items.filter(i => !i.hide);
@@ -175,6 +184,7 @@ export function OmniSidebar() {
           {renderAccordionItem("analytics", t.nav.analyticsGroup, BarChart3, analyticsNavigation)}
           {renderAccordionItem("invoices", t.nav.invoices, FileText, invoiceNavigation)}
           {renderAccordionItem("inventory", t.nav.inventoryGroup, Package, inventoryNavigation)}
+          {renderAccordionItem("production", t.nav.productionGroup, FlaskConical, productionNavigation)}
           {renderAccordionItem("finance", t.nav.financeGroup, Coins, financeNavigation)}
           {renderAccordionItem("admin", t.nav.systemGroup, Settings, adminNavigation)}
         </Accordion>
