@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
 export default function StockOutPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, assignedWarehouseId } = useUser();
@@ -55,7 +55,6 @@ export default function StockOutPage() {
 
   const isAdmin = role === "Super Admin" || role === "Admin";
 
-  // Agar foydalanuvchiga ombor biriktirilgan bo'lsa, uni avtomatik tanlash
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) {
       setWarehouseId(assignedWarehouseId);
@@ -216,10 +215,11 @@ export default function StockOutPage() {
         clientType,
         warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
         date: new Date().toLocaleString(),
-        items: invoiceItems
+        items: invoiceItems,
+        responsible: user?.displayName || user?.email || "Noma'lum"
       });
 
-      toast({ title: "Muvaffaqiyatli", description: "Chiqim nakladnoyi saqlandi." });
+      toast({ title: t.stockOut.title, description: "Muvaffaqiyatli bajarildi." });
       setIsSuccessOpen(true);
       setItems([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
       setOrderNumber("");
@@ -227,43 +227,47 @@ export default function StockOutPage() {
       if (isAdmin) setWarehouseId("");
     } catch (err) {
       console.error(err);
-      toast({ variant: "destructive", title: "Xatolik", description: "Saqlashda xato yuz berdi." });
+      toast({ variant: "destructive", title: "Xatolik" });
     } finally {
-      loading && setLoading(false);
+      setLoading(false);
     }
   };
 
   const handleDownloadPDF = async () => {
     if (!processedInvoice) return;
     const jsPDFLib = (await import("jspdf")).default;
+    // @ts-ignore
     await import("jspdf-autotable");
+    
     const doc = new jsPDFLib();
+    const currencyStr = t.settings.currency.split(' ')[0];
     
     doc.setFillColor(225, 29, 72); 
     doc.rect(0, 0, 210, 40, 'F');
     doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
-    doc.text("CHIQIM NAKLADNOYI", 105, 25, { align: "center" });
+    doc.text(t.nav.stockOut.toUpperCase(), 105, 25, { align: "center" });
     
     doc.setFontSize(10);
     doc.setTextColor(40, 40, 40);
-    doc.text(`Hujjat #: ${processedInvoice.orderNumber}`, 20, 50);
-    doc.text(`Mijoz: ${processedInvoice.recipient} (${processedInvoice.clientType === 'internal' ? 'Ichki' : 'Tashqi'})`, 20, 57);
-    doc.text(`Chiqarilgan ombor: ${processedInvoice.warehouse}`, 20, 64);
-    doc.text(`Sana: ${processedInvoice.date}`, 140, 50);
+    doc.text(`${t.stockOut.refNumber}: ${processedInvoice.orderNumber}`, 20, 50);
+    doc.text(`${t.common.client}: ${processedInvoice.recipient} (${processedInvoice.clientType === 'internal' ? t.stockOut.internal : t.stockOut.external})`, 20, 57);
+    doc.text(`${t.stockOut.sourceWarehouse}: ${processedInvoice.warehouse}`, 20, 64);
+    doc.text(`${t.warehouses.manager}: ${processedInvoice.responsible}`, 20, 71);
+    doc.text(`${t.common.date}: ${processedInvoice.date}`, 140, 50);
 
     const tableData = processedInvoice.items.map((it: any, i: number) => [
       i + 1,
       it.name,
       it.quantity,
       t.units[it.unit as keyof typeof t.units] || it.unit,
-      `${formatMoney(it.price)} so'm`,
-      `${formatMoney(it.quantity * it.price)} so'm`
+      `${formatMoney(it.price)} ${currencyStr}`,
+      `${formatMoney(it.quantity * it.price)} ${currencyStr}`
     ]);
 
     (doc as any).autoTable({
-      startY: 75,
-      head: [['#', 'Mahsulot nomi', 'Miqdor', 'Birlik', 'Narx', 'Jami']],
+      startY: 80,
+      head: [['#', t.products.productInfo, t.common.quantity, t.units.label, t.common.price, t.common.summary]],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [225, 29, 72] },
@@ -274,9 +278,9 @@ export default function StockOutPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`UMUMIY SUMMA: ${formatMoney(total)} so'm`, 140, finalY);
+    doc.text(`${t.expenses.total.toUpperCase()}: ${formatMoney(total)} ${currencyStr}`, 140, finalY);
 
-    doc.save(`Chiqim_Nakladnoy_${processedInvoice.orderNumber}.pdf`);
+    doc.save(`${t.nav.stockOut}_${processedInvoice.orderNumber}.pdf`);
   };
 
   return (
@@ -286,9 +290,9 @@ export default function StockOutPage() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
           <div>
             <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground flex items-center gap-3">
-              <FileOutput className="w-8 h-8 text-rose-600" /> Chiqim Nakladnoyi
+              <FileOutput className="w-8 h-8 text-rose-600" /> {t.stockOut.title}
             </h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">Ombordan tovarlarni chiqarish va sotuv.</p>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">{t.stockOut.description}</p>
           </div>
         </header>
 
@@ -297,7 +301,7 @@ export default function StockOutPage() {
             <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mijoz turi va nomi</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t.common.client}</Label>
                   <div className="flex flex-col md:flex-row gap-4">
                     <RadioGroup 
                       value={clientType} 
@@ -306,17 +310,17 @@ export default function StockOutPage() {
                     >
                       <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg cursor-pointer transition-all", clientType === 'external' ? "bg-background shadow-sm" : "opacity-50")}>
                         <RadioGroupItem value="external" id="external" />
-                        <Label htmlFor="external" className="cursor-pointer font-bold text-xs uppercase">Tashqi</Label>
+                        <Label htmlFor="external" className="cursor-pointer font-bold text-xs uppercase">{t.stockOut.external}</Label>
                       </div>
                       <div className={cn("flex items-center space-x-2 px-4 py-2 rounded-lg cursor-pointer transition-all", clientType === 'internal' ? "bg-background shadow-sm" : "opacity-50")}>
                         <RadioGroupItem value="internal" id="internal" />
-                        <Label htmlFor="internal" className="cursor-pointer font-bold text-xs uppercase">Ichki</Label>
+                        <Label htmlFor="internal" className="cursor-pointer font-bold text-xs uppercase">{t.stockOut.internal}</Label>
                       </div>
                     </RadioGroup>
                     <div className="relative flex-1">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-600/40" />
                       <Input 
-                        placeholder="Mijoz / Qabul qiluvchi nomi" 
+                        placeholder={t.stockOut.recipient} 
                         className="h-11 rounded-xl bg-background/50 border-border/40 font-bold pl-10" 
                         value={recipient} 
                         onChange={(e) => setRecipient(e.target.value)} 
@@ -326,12 +330,12 @@ export default function StockOutPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Chiqaruvchi ombor</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t.stockOut.sourceWarehouse}</Label>
                     <Select onValueChange={setWarehouseId} value={warehouseId} disabled={!isAdmin && !!assignedWarehouseId}>
                       <SelectTrigger className="h-11 rounded-xl bg-background/50 border-border/40 font-bold">
                         <div className="flex items-center gap-2">
                           <Warehouse className="w-4 h-4 text-rose-600/40" />
-                          <SelectValue placeholder="Tanlang" />
+                          <SelectValue placeholder={t.actions.filter} />
                         </div>
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
@@ -342,9 +346,9 @@ export default function StockOutPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Hujjat raqami</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t.stockOut.refNumber}</Label>
                     <Input 
-                      placeholder="SALE-00001" 
+                      placeholder="№ 00001" 
                       className="h-11 rounded-xl bg-background/50 border-border/40 font-bold" 
                       value={orderNumber} 
                       onChange={(e) => setOrderNumber(e.target.value)} 
@@ -358,10 +362,10 @@ export default function StockOutPage() {
           <Card className="border-none shadow-sm rounded-3xl bg-card/40 backdrop-blur-xl overflow-hidden">
             <div className="p-6 border-b border-border/10 flex justify-between items-center bg-muted/10">
               <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                <Package className="w-4 h-4 text-rose-600" /> Mahsulotlar ro'yxati
+                <Package className="w-4 h-4 text-rose-600" /> {t.stockIn.productItems}
               </h3>
               <Button onClick={addItem} size="sm" variant="outline" className="rounded-xl h-9 px-4 font-black uppercase text-[10px] tracking-widest border-rose-600/20 text-rose-600 hover:bg-rose-600/5">
-                <Plus className="w-3.5 h-3.5 mr-1.5" /> Yangi qator
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> {t.actions.addItem}
               </Button>
             </div>
             <CardContent className="p-0">
@@ -370,11 +374,11 @@ export default function StockOutPage() {
                   <thead className="bg-muted/30 text-[10px] uppercase font-black tracking-widest text-muted-foreground">
                     <tr>
                       <th className="px-6 py-4 w-12 text-center">№</th>
-                      <th className="px-4 py-4 min-w-[250px]">Mahsulot nomi</th>
-                      <th className="px-4 py-4 w-32 text-center">Qoldiq</th>
-                      <th className="px-4 py-4 w-32">Miqdor</th>
-                      <th className="px-4 py-4 w-40">Sotuv narxi (so'm)</th>
-                      <th className="px-4 py-4 w-40">Jami summasi</th>
+                      <th className="px-4 py-4 min-w-[250px]">{t.products.productInfo}</th>
+                      <th className="px-4 py-4 w-32 text-center">{t.products.stock}</th>
+                      <th className="px-4 py-4 w-32">{t.common.quantity}</th>
+                      <th className="px-4 py-4 w-40">{t.common.price}</th>
+                      <th className="px-4 py-4 w-40">{t.common.summary}</th>
                       <th className="px-6 py-4 w-12"></th>
                     </tr>
                   </thead>
@@ -409,14 +413,14 @@ export default function StockOutPage() {
                                     "h-10 rounded-lg bg-background/50 border-border/40 font-bold focus:ring-rose-600/20",
                                     !item.productId && "border-dashed"
                                   )}>
-                                    <SelectValue placeholder="Mahsulot tanlang..." />
+                                    <SelectValue placeholder={t.products.search} />
                                   </SelectTrigger>
                                   <SelectContent className="rounded-xl max-h-[300px]">
                                     <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
                                       <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                                         <Input 
-                                          placeholder="Nomi yoki kodi bo'yicha..." 
+                                          placeholder={t.products.search} 
                                           className="h-9 pl-9 text-xs rounded-lg bg-background/50 border-none"
                                           value={item.searchQuery}
                                           onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
@@ -468,7 +472,7 @@ export default function StockOutPage() {
                                   value={item.price}
                                   onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
                                 />
-                                {unitLabel && <p className="text-[9px] font-black text-muted-foreground uppercase opacity-50">1 {unitLabel} uchun</p>}
+                                {unitLabel && <p className="text-[9px] font-black text-muted-foreground uppercase opacity-50">1 {unitLabel}</p>}
                               </div>
                             </td>
                             <td className={cn(
@@ -498,13 +502,13 @@ export default function StockOutPage() {
             <CardFooter className="p-6 bg-muted/10 border-t border-border/10 flex justify-between items-center">
               <div className="flex gap-10">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Jami turlar</span>
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{t.common.totalItems}</span>
                   <span className="text-xl font-black">{items.filter(i => i.productId).length} ta</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Umumiy Sotuv Summasi</span>
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{t.common.totalValue}</span>
                   <span className={cn("text-2xl font-black font-headline", validation.isValid ? "text-rose-600" : "text-muted-foreground opacity-50")}>
-                    {formatMoney(totalValue)} <span className="text-xs">so'm</span>
+                    {formatMoney(totalValue)} <span className="text-xs">{t.settings.currency.split(' ')[0]}</span>
                   </span>
                 </div>
               </div>
@@ -514,64 +518,55 @@ export default function StockOutPage() {
                 disabled={loading || !validation.isValid}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileOutput className="w-5 h-5 mr-2" />}
-                Tasdiqlash va Chiqarish
+                {t.stockOut.dispatch}
               </Button>
             </CardFooter>
           </Card>
         </div>
 
-        {/* Confirmation Modal */}
         <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
           <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
             <DialogHeader>
               <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4">
                 <Info className="w-8 h-8" />
               </div>
-              <DialogTitle className="text-2xl font-black tracking-tight">Chiqimni tasdiqlang</DialogTitle>
+              <DialogTitle className="text-2xl font-black tracking-tight">{t.inventoryAudit.confirmAudit}</DialogTitle>
               <p className="text-muted-foreground font-medium pt-2">Operatsiyani yakunlashdan oldin barcha ma'lumotlarni tekshiring.</p>
             </DialogHeader>
             
             <div className="py-6 space-y-4">
               <div className="p-4 rounded-2xl bg-muted/20 space-y-3">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground font-bold">Qabul qiluvchi:</span>
+                  <span className="text-muted-foreground font-bold">{t.common.client}:</span>
                   <span className="font-black">{recipient}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground font-bold">Ombor:</span>
+                  <span className="text-muted-foreground font-bold">{t.common.warehouse}:</span>
                   <span className="font-black">{warehouses?.find(w => w.id === warehouseId)?.name}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm border-t border-white/5 pt-3">
-                  <span className="text-muted-foreground font-bold">Jami mahsulotlar:</span>
+                  <span className="text-muted-foreground font-bold">{t.common.totalItems}:</span>
                   <span className="font-black">{items.length} ta</span>
                 </div>
                 <div className="flex justify-between items-center pt-1">
-                  <span className="text-rose-600 font-black uppercase text-[10px] tracking-widest">Umumiy Summa</span>
-                  <span className="text-xl font-black text-rose-600 font-headline">{formatMoney(totalValue)} so'm</span>
+                  <span className="text-rose-600 font-black uppercase text-[10px] tracking-widest">{t.common.totalValue}</span>
+                  <span className="text-xl font-black text-rose-600 font-headline">{formatMoney(totalValue)} {t.settings.currency.split(' ')[0]}</span>
                 </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                <p className="text-[11px] font-bold text-emerald-600/80 leading-relaxed">
-                  Tasdiqlashni bossangiz, ombor qoldig'i avtomatik kamaytiriladi va tarixda saqlanadi.
-                </p>
               </div>
             </div>
 
             <DialogFooter className="gap-3">
-              <Button variant="ghost" onClick={() => setIsConfirmOpen(false)} className="rounded-2xl h-12 font-bold px-6">Bekor qilish</Button>
+              <Button variant="ghost" onClick={() => setIsConfirmOpen(false)} className="rounded-2xl h-12 font-bold px-6">{t.actions.cancel}</Button>
               <Button 
                 onClick={handleFinalProcess}
                 className="rounded-2xl h-12 flex-1 bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-2"
               >
-                Tasdiqlayman <ArrowRight className="w-4 h-4" />
+                {t.actions.process} <ArrowRight className="w-4 h-4" />
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Success Modal */}
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
           <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-md p-8 shadow-2xl text-center">
             <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6">
@@ -586,14 +581,14 @@ export default function StockOutPage() {
                 onClick={handleDownloadPDF}
                 className="w-full h-14 rounded-2xl bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-3"
               >
-                <Download className="w-4 h-4" /> PDF Nakladnoyni yuklab olish
+                <Download className="w-4 h-4" /> PDF {t.actions.downloadReport}
               </Button>
               <Button 
                 variant="ghost" 
                 onClick={() => setIsSuccessOpen(false)}
                 className="w-full h-12 rounded-2xl font-bold"
               >
-                Yopish
+                {t.actions.cancel}
               </Button>
             </DialogFooter>
           </DialogContent>

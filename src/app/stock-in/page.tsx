@@ -35,7 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
 export default function StockInPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, assignedWarehouseId } = useUser();
@@ -49,7 +49,6 @@ export default function StockInPage() {
 
   const isAdmin = role === "Super Admin" || role === "Admin";
 
-  // Agar foydalanuvchiga ombor biriktirilgan bo'lsa, uni avtomatik tanlash
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) {
       setWarehouseId(assignedWarehouseId);
@@ -173,18 +172,17 @@ export default function StockInPage() {
         responsible: currentUserName
       });
 
-      toast({ title: "Muvaffaqiyatli", description: "Kirim nakladnoyi saqlandi." });
+      toast({ title: t.stockIn.title, description: "Muvaffaqiyatli saqlandi." });
       setIsSuccessOpen(true);
       setItems([{ id: generateId(), productId: "", quantity: 1, price: 0, searchQuery: "" }]);
       setDnNumber("");
       setSupplier("");
-      // Faqat admin bo'lsa omborni tozalaymiz, aks holda u tanlangan qoladi
       if (isAdmin) setWarehouseId("");
     } catch (err) {
       console.error(err);
-      toast({ variant: "destructive", title: "Xatolik", description: "Saqlashda xato yuz berdi." });
+      toast({ variant: "destructive", title: "Xatolik" });
     } finally {
-      loading && setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -196,33 +194,34 @@ export default function StockInPage() {
     await import("jspdf-autotable");
     
     const doc = new jsPDFLib();
+    const currencyStr = t.settings.currency.split(' ')[0];
     
     doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, 210, 40, 'F');
     doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
-    doc.text("KIRIM NAKLADNOYI", 105, 25, { align: "center" });
+    doc.text(t.nav.stockIn.toUpperCase(), 105, 25, { align: "center" });
     
     doc.setFontSize(10);
     doc.setTextColor(40, 40, 40);
-    doc.text(`Nakladnoy #: ${processedInvoice.dnNumber}`, 20, 50);
-    doc.text(`Yetkazib beruvchi: ${processedInvoice.supplier}`, 20, 57);
-    doc.text(`Qabul qilgan ombor: ${processedInvoice.warehouse}`, 20, 64);
-    doc.text(`Mas'ul xodim: ${processedInvoice.responsible}`, 20, 71);
-    doc.text(`Sana: ${processedInvoice.date}`, 140, 50);
+    doc.text(`${t.stockIn.dnNumber}: ${processedInvoice.dnNumber}`, 20, 50);
+    doc.text(`${t.stockIn.supplier}: ${processedInvoice.supplier}`, 20, 57);
+    doc.text(`${t.stockIn.targetWarehouse}: ${processedInvoice.warehouse}`, 20, 64);
+    doc.text(`${t.warehouses.manager}: ${processedInvoice.responsible}`, 20, 71);
+    doc.text(`${t.common.date}: ${processedInvoice.date}`, 140, 50);
 
     const tableData = processedInvoice.items.map((it: any, i: number) => [
       i + 1,
       it.name,
       it.quantity,
       t.units[it.unit as keyof typeof t.units] || it.unit,
-      `${formatMoney(it.price)} so'm`,
-      `${formatMoney(it.quantity * it.price)} so'm`
+      `${formatMoney(it.price)} ${currencyStr}`,
+      `${formatMoney(it.quantity * it.price)} ${currencyStr}`
     ]);
 
     (doc as any).autoTable({
       startY: 80,
-      head: [['#', 'Mahsulot nomi', 'Miqdor', 'Birlik', 'Narx', 'Jami']],
+      head: [['#', t.products.productInfo, t.common.quantity, t.units.label, t.common.price, t.common.summary]],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [59, 130, 246] },
@@ -233,9 +232,9 @@ export default function StockInPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`UMUMIY SUMMA: ${formatMoney(total)} so'm`, 140, finalY);
+    doc.text(`${t.expenses.total.toUpperCase()}: ${formatMoney(total)} ${currencyStr}`, 140, finalY);
 
-    doc.save(`Kirim_Nakladnoy_${processedInvoice.dnNumber}.pdf`);
+    doc.save(`${t.nav.stockIn}_${processedInvoice.dnNumber}.pdf`);
   };
 
   const totalValue = useMemo(() => items.reduce((acc, item) => acc + ((item.quantity || 0) * (item.price || 0)), 0), [items]);
@@ -247,26 +246,25 @@ export default function StockInPage() {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
           <div>
             <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground flex items-center gap-3">
-              <FileInput className="w-8 h-8 text-primary" /> Kirim Nakladnoyi
+              <FileInput className="w-8 h-8 text-primary" /> {t.stockIn.title}
             </h1>
-            <p className="text-muted-foreground mt-1 font-medium text-sm">Yangi tovarlar kirimini rasmiylashtirish.</p>
+            <p className="text-muted-foreground mt-1 font-medium text-sm">{t.stockIn.description}</p>
           </div>
           
           <div className="flex gap-3">
             <Link href="/products">
               <Button variant="outline" className="rounded-xl h-11 px-5 font-bold text-xs">
-                <PackageSearch className="w-4 h-4 mr-2" /> Katalog
+                <PackageSearch className="w-4 h-4 mr-2" /> {t.nav.products}
               </Button>
             </Link>
           </div>
         </header>
 
         <div className="space-y-6">
-          {/* Metadata Section */}
           <Card className="border-none shadow-sm rounded-3xl bg-card/40 backdrop-blur-xl">
             <CardContent className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Nakladnoy raqami</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t.stockIn.dnNumber}</Label>
                 <div className="relative">
                   <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
                   <Input 
@@ -278,21 +276,21 @@ export default function StockInPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Yetkazib beruvchi</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t.stockIn.supplier}</Label>
                 <Input 
-                  placeholder="Kompaniya yoki shaxs" 
+                  placeholder="..." 
                   className="h-11 rounded-xl bg-background/50 border-border/40 font-bold" 
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Qabul qiluvchi ombor</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t.stockIn.targetWarehouse}</Label>
                 <Select onValueChange={setWarehouseId} value={warehouseId} disabled={!isAdmin && !!assignedWarehouseId}>
                   <SelectTrigger className="h-11 rounded-xl bg-background/50 border-border/40 font-bold">
                     <div className="flex items-center gap-2">
                       <Warehouse className="w-4 h-4 text-primary/40" />
-                      <SelectValue placeholder="Tanlang" />
+                      <SelectValue placeholder={t.actions.filter} />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -303,7 +301,7 @@ export default function StockInPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sana</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t.common.date}</Label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
                   <Input type="date" className="h-11 pl-10 rounded-xl bg-background/50 border-border/40 font-bold" defaultValue={new Date().toISOString().split('T')[0]} />
@@ -312,14 +310,13 @@ export default function StockInPage() {
             </CardContent>
           </Card>
 
-          {/* Items Table Section */}
           <Card className="border-none shadow-sm rounded-3xl bg-card/40 backdrop-blur-xl overflow-hidden">
             <div className="p-6 border-b border-border/10 flex justify-between items-center bg-muted/10">
               <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-primary" /> Mahsulotlar ro'yxati
+                <ShoppingCart className="w-4 h-4 text-primary" /> {t.stockIn.productItems}
               </h3>
               <Button onClick={addItem} size="sm" className="rounded-xl h-9 px-4 font-black uppercase text-[10px] tracking-widest bg-primary text-white border-none">
-                <Plus className="w-3.5 h-3.5 mr-1.5" /> Yangi qator
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> {t.actions.addItem}
               </Button>
             </div>
             <CardContent className="p-0">
@@ -328,10 +325,10 @@ export default function StockInPage() {
                   <thead className="bg-muted/30 text-[10px] uppercase font-black tracking-widest text-muted-foreground">
                     <tr>
                       <th className="px-6 py-4 w-12 text-center">№</th>
-                      <th className="px-4 py-4 min-w-[300px]">Mahsulot nomi</th>
-                      <th className="px-4 py-4 w-32">Miqdor</th>
-                      <th className="px-4 py-4 w-40">Narx (so'm)</th>
-                      <th className="px-4 py-4 w-40">Jami (so'm)</th>
+                      <th className="px-4 py-4 min-w-[300px]">{t.products.productInfo}</th>
+                      <th className="px-4 py-4 w-32">{t.common.quantity}</th>
+                      <th className="px-4 py-4 w-40">{t.common.price}</th>
+                      <th className="px-4 py-4 w-40">{t.common.summary}</th>
                       <th className="px-6 py-4 w-12"></th>
                     </tr>
                   </thead>
@@ -357,14 +354,14 @@ export default function StockInPage() {
                                 value={item.productId}
                               >
                                 <SelectTrigger className="h-10 rounded-lg bg-background/50 border-border/40 font-bold focus:ring-primary/20">
-                                  <SelectValue placeholder="Mahsulot tanlang..." />
+                                  <SelectValue placeholder={t.products.search} />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-xl max-h-[300px]">
                                   <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-2">
                                     <div className="relative">
                                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                                       <Input 
-                                        placeholder="Nomi yoki kodi bo'yicha..." 
+                                        placeholder={t.products.search} 
                                         className="h-9 pl-9 text-xs rounded-lg bg-background/50 border-none"
                                         value={item.searchQuery}
                                         onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
@@ -402,7 +399,7 @@ export default function StockInPage() {
                                   value={item.price}
                                   onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
                                 />
-                                {unitLabel && <p className="text-[9px] font-black text-muted-foreground uppercase opacity-50">1 {unitLabel} uchun</p>}
+                                {unitLabel && <p className="text-[9px] font-black text-muted-foreground uppercase opacity-50">1 {unitLabel}</p>}
                               </div>
                             </td>
                             <td className="px-4 py-3 font-black text-sm text-primary font-headline">
@@ -429,12 +426,12 @@ export default function StockInPage() {
             <CardFooter className="p-6 bg-muted/10 border-t border-border/10 flex justify-between items-center">
               <div className="flex gap-10">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Jami turlar</span>
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{t.common.totalItems}</span>
                   <span className="text-xl font-black">{items.filter(i => i.productId).length} ta</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Umumiy Summa</span>
-                  <span className="text-2xl font-black text-primary font-headline">{formatMoney(totalValue)} <span className="text-xs">so'm</span></span>
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{t.common.totalValue}</span>
+                  <span className="text-2xl font-black text-primary font-headline">{formatMoney(totalValue)} <span className="text-xs">{t.settings.currency.split(' ')[0]}</span></span>
                 </div>
               </div>
               <Button 
@@ -443,7 +440,7 @@ export default function StockInPage() {
                 disabled={loading}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                Saqlash va Yakunlash
+                {t.stockIn.process}
               </Button>
             </CardFooter>
           </Card>
@@ -463,14 +460,14 @@ export default function StockInPage() {
                 onClick={handleDownloadPDF}
                 className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px] gap-3"
               >
-                <Download className="w-4 h-4" /> PDF Nakladnoyni yuklab olish
+                <Download className="w-4 h-4" /> PDF {t.actions.downloadReport}
               </Button>
               <Button 
                 variant="ghost" 
                 onClick={() => setIsSuccessOpen(false)}
                 className="w-full h-12 rounded-2xl font-bold"
               >
-                Yopish
+                {t.actions.cancel}
               </Button>
             </DialogFooter>
           </DialogContent>
