@@ -35,13 +35,12 @@ import {
   ArrowLeft,
   PackagePlus,
   X,
-  Download,
   FileText,
   Table as TableIcon
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -121,8 +120,8 @@ export default function ProductsPage() {
 
   const exportToExcel = async () => {
     try {
-      const XLSX = await import("xlsx");
-      const excel = (XLSX.utils ? XLSX : (XLSX as any).default);
+      const XLSXModule = await import("xlsx");
+      const XLSX = (XLSXModule as any).default || XLSXModule;
       
       const exportData = filteredProducts.map(p => ({
         "Nomi": p.name,
@@ -132,10 +131,10 @@ export default function ProductsPage() {
         "Narx": p.salePrice
       }));
       
-      const ws = excel.utils.json_to_sheet(exportData);
-      const wb = excel.utils.book_new();
-      excel.utils.book_append_sheet(wb, ws, "Katalog");
-      excel.writeFile(wb, `Mahsulotlar_${Date.now()}.xlsx`);
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Katalog");
+      XLSX.writeFile(wb, `Mahsulotlar_${Date.now()}.xlsx`);
       toast({ title: "Excel yuklandi" });
     } catch (error) {
       console.error("Excel export error:", error);
@@ -145,10 +144,11 @@ export default function ProductsPage() {
 
   const exportToPDF = async () => {
     try {
-      const jsPDFLib = (await import("jspdf")).default;
+      const jsPDFModule = await import("jspdf");
+      const jsPDF = jsPDFModule.default;
       // @ts-ignore
       await import("jspdf-autotable");
-      const doc = new jsPDFLib();
+      const doc = new jsPDF();
       
       doc.setFontSize(18);
       doc.text("MAHSULOTLAR KATALOGI", 105, 20, { align: "center" });

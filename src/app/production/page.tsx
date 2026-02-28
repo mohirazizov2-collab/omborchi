@@ -67,12 +67,12 @@ export default function ProductionPage() {
       return {
         ...c,
         name: p?.name || 'Mahsulot',
-        unit: p?.unit || '',
+        unit: p?.unit ? (t.units[p.unit as keyof typeof t.units] || p.unit) : '',
         currentStock: inv?.stock || 0,
         totalNeeded: c.quantity * quantity
       };
     });
-  }, [selectedRecipe, quantity, products, inventory, warehouseId]);
+  }, [selectedRecipe, quantity, products, inventory, warehouseId, t.units]);
 
   const canProduce = useMemo(() => {
     if (neededMaterials.length === 0) return false;

@@ -33,6 +33,7 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/no
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { generateInvoicePDF } from "@/services/pdf-service";
 
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
@@ -172,7 +173,7 @@ export default function StockOutPage() {
           name: product?.name || "Noma'lum",
           quantity: item.quantity,
           price: item.price,
-          unit: product?.unit || "pcs"
+          unit: product?.unit ? (t.units[product.unit as keyof typeof t.units] || product.unit) : "pcs"
         });
 
         const movementData = {
@@ -235,121 +236,33 @@ export default function StockOutPage() {
 
   const handleDownloadPDF = async () => {
     if (!processedInvoice) return;
-    const jsPDFLib = (await import("jspdf")).default;
-    // @ts-ignore
-    await import("jspdf-autotable");
-    
-    const doc = new jsPDFLib();
     const currencyStr = t.settings.currency.split(' ')[0];
     
-    // --- Header Section ---
-    doc.setFontSize(24);
-    doc.setTextColor(225, 29, 72); // Rose color
-    doc.setFont("helvetica", "bold");
-    doc.text(t.nav.stockOut.toUpperCase(), 105, 20, { align: "center" });
-    
-    doc.setDrawColor(225, 29, 72);
-    doc.setLineWidth(0.5);
-    doc.line(20, 25, 190, 25);
-
-    // --- Info Section ---
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.setFont("helvetica", "normal");
-    
-    // Left side info
-    doc.text(`${t.stockOut.refNumber}:`, 20, 40);
-    doc.setTextColor(40, 40, 40);
-    doc.setFont("helvetica", "bold");
-    doc.text(`${processedInvoice.orderNumber}`, 60, 40);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${t.common.client}:`, 20, 47);
-    doc.setTextColor(40, 40, 40);
-    doc.setFont("helvetica", "bold");
-    doc.text(`${processedInvoice.recipient} (${processedInvoice.clientType === 'internal' ? t.stockOut.internal : t.stockOut.external})`, 60, 47);
-
-    // Right side info
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${t.common.date}:`, 130, 40);
-    doc.setTextColor(40, 40, 40);
-    doc.text(`${processedInvoice.date}`, 155, 40);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${t.common.warehouse}:`, 130, 47);
-    doc.setTextColor(40, 40, 40);
-    doc.text(`${processedInvoice.warehouse}`, 155, 47);
-
-    // --- Table Section ---
-    const tableData = processedInvoice.items.map((it: any, i: number) => [
-      i + 1,
-      it.name,
-      it.quantity,
-      t.units[it.unit as keyof typeof t.units] || it.unit,
-      `${formatMoney(it.price)}`,
-      `${formatMoney(it.quantity * it.price)}`
-    ]);
-
-    (doc as any).autoTable({
-      startY: 60,
-      head: [[
-        '#', 
-        t.products.productInfo, 
-        t.common.quantity, 
-        t.units.label, 
-        `${t.common.price} (${currencyStr})`, 
-        `${t.common.summary} (${currencyStr})`
-      ]],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { 
-        fillColor: [225, 29, 72],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10
-      },
-      styles: { 
-        fontSize: 9, 
-        font: "helvetica",
-        cellPadding: 4
-      },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 10 },
-        2: { halign: 'center', cellWidth: 20 },
-        3: { halign: 'center', cellWidth: 25 },
-        4: { halign: 'right' },
-        5: { halign: 'right' }
+    await generateInvoicePDF({
+      title: t.nav.stockOut,
+      type: 'out',
+      docNumber: processedInvoice.orderNumber,
+      date: processedInvoice.date,
+      partyName: `${processedInvoice.recipient} (${processedInvoice.clientType === 'internal' ? t.stockOut.internal : t.stockOut.external})`,
+      partyTypeLabel: t.pdf.recipient,
+      warehouseName: processedInvoice.warehouse,
+      responsibleName: processedInvoice.responsible,
+      items: processedInvoice.items,
+      currency: currencyStr,
+      labels: {
+        number: t.stockOut.refNumber,
+        date: t.common.date,
+        warehouse: t.common.warehouse,
+        product: t.products.productInfo,
+        qty: t.common.quantity,
+        unit: t.units.label,
+        price: t.common.price,
+        total: t.common.summary,
+        grandTotal: t.expenses.total,
+        shippedBy: t.pdf.shippedBy,
+        receivedBy: t.pdf.receivedBy
       }
     });
-
-    // --- Totals Section ---
-    const total = processedInvoice.items.reduce((acc: number, it: any) => acc + (it.quantity * it.price), 0);
-    const finalY = (doc as any).lastAutoTable.finalY + 15;
-    
-    doc.setFontSize(14);
-    doc.setTextColor(225, 29, 72);
-    doc.setFont("helvetica", "bold");
-    doc.text(`${t.expenses.total.toUpperCase()}:`, 120, finalY);
-    doc.text(`${formatMoney(total)} ${currencyStr}`, 190, finalY, { align: 'right' });
-
-    // --- Signature Section ---
-    const signY = finalY + 30;
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.setFont("helvetica", "normal");
-    
-    doc.text("Topshirdi (Menejer):", 20, signY);
-    doc.line(20, signY + 5, 80, signY + 5);
-    doc.text(processedInvoice.responsible, 20, signY + 10);
-
-    doc.text("Qabul qildi (Mijoz):", 130, signY);
-    doc.line(130, signY + 5, 190, signY + 5);
-    doc.text(processedInvoice.recipient, 130, signY + 10);
-
-    doc.save(`${t.nav.stockOut}_${processedInvoice.orderNumber}.pdf`);
   };
 
   return (
@@ -594,7 +507,7 @@ export default function StockOutPage() {
         </div>
 
         <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-lg p-8 shadow-2xl">
             <DialogHeader>
               <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4">
                 <Info className="w-8 h-8" />

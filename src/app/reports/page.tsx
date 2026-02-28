@@ -13,14 +13,11 @@ import {
   Wand2, 
   Sparkles, 
   Activity,
-  FileDown,
-  Table as TableIcon,
+  FileText,
   TrendingUp,
   TrendingDown,
   DollarSign,
-  FileText,
-  Download,
-  Calendar
+  Table as TableIcon
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -28,7 +25,7 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { startOfWeek, startOfMonth, subDays, isWithinInterval } from "date-fns";
+import { startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
 
 export default function ReportsPage() {
   const [mounted, setMounted] = useState(false);
@@ -139,8 +136,8 @@ export default function ReportsPage() {
 
   const exportToExcel = async () => {
     try {
-      const XLSX = await import("xlsx");
-      const excel = (XLSX.utils ? XLSX : (XLSX as any).default);
+      const XLSXModule = await import("xlsx");
+      const XLSX = (XLSXModule as any).default || XLSXModule;
       
       const data = [
         ["MOLIYAVIY HISOBOT", ""],
@@ -159,10 +156,10 @@ export default function ReportsPage() {
         ["Faol omborlar", warehouses?.length || 0]
       ];
 
-      const ws = excel.utils.aoa_to_sheet(data);
-      const wb = excel.utils.book_new();
-      excel.utils.book_append_sheet(wb, ws, "Financial Report");
-      excel.writeFile(wb, `Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
+      XLSX.writeFile(wb, `Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`);
       toast({ title: "Excel yuklandi" });
     } catch (error) {
       console.error("Excel export error:", error);
@@ -172,8 +169,9 @@ export default function ReportsPage() {
 
   const exportToPDF = async () => {
     try {
-      const jsPDFLib = (await import("jspdf")).default;
-      const doc = new jsPDFLib();
+      const jsPDFModule = await import("jspdf");
+      const jsPDF = jsPDFModule.default;
+      const doc = new jsPDF();
       
       doc.setFontSize(22);
       doc.setTextColor(59, 130, 246);

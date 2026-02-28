@@ -48,6 +48,12 @@ export const translations = {
       box: "Karobka",
       pack: "Pachka"
     },
+    pdf: {
+      shippedBy: "Topshirdi",
+      receivedBy: "Qabul qildi",
+      supplier: "Yetkazib beruvchi",
+      recipient: "Mijoz (Qabul qiluvchi)"
+    },
     production: {
       title: "Tayyorlash akti",
       description: "Retsept asosida materiallarni ombordan avtomatik yechish.",
@@ -358,6 +364,12 @@ export const translations = {
       box: "Коробка",
       pack: "Пачка"
     },
+    pdf: {
+      shippedBy: "Отправил",
+      receivedBy: "Получил",
+      supplier: "Поставщик",
+      recipient: "Клиент (Получатель)"
+    },
     production: {
       title: "Акт приготовления",
       description: "Автоматическое списание материалов со склада на основе рецепта.",
@@ -667,6 +679,12 @@ export const translations = {
       bag: "Bag",
       box: "Box",
       pack: "Pack"
+    },
+    pdf: {
+      shippedBy: "Shipped By",
+      receivedBy: "Received By",
+      supplier: "Supplier",
+      recipient: "Client (Recipient)"
     },
     production: {
       title: "Production Act",
