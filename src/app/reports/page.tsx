@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -138,8 +139,8 @@ export default function ReportsPage() {
 
   const exportToExcel = async () => {
     try {
-      const XLSXModule = await import("xlsx");
-      const XLSX = XLSXModule.default || XLSXModule;
+      const XLSX = await import("xlsx");
+      const excel = (XLSX.utils ? XLSX : (XLSX as any).default);
       
       const data = [
         ["MOLIYAVIY HISOBOT", ""],
@@ -158,10 +159,10 @@ export default function ReportsPage() {
         ["Faol omborlar", warehouses?.length || 0]
       ];
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
-      XLSX.writeFile(wb, `Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const ws = excel.utils.aoa_to_sheet(data);
+      const wb = excel.utils.book_new();
+      excel.utils.book_append_sheet(wb, ws, "Financial Report");
+      excel.writeFile(wb, `Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`);
       toast({ title: "Excel yuklandi" });
     } catch (error) {
       console.error("Excel export error:", error);

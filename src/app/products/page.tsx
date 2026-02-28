@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -120,8 +121,8 @@ export default function ProductsPage() {
 
   const exportToExcel = async () => {
     try {
-      const XLSXModule = await import("xlsx");
-      const XLSX = XLSXModule.default || XLSXModule;
+      const XLSX = await import("xlsx");
+      const excel = (XLSX.utils ? XLSX : (XLSX as any).default);
       
       const exportData = filteredProducts.map(p => ({
         "Nomi": p.name,
@@ -131,10 +132,10 @@ export default function ProductsPage() {
         "Narx": p.salePrice
       }));
       
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Katalog");
-      XLSX.writeFile(wb, `Mahsulotlar_${Date.now()}.xlsx`);
+      const ws = excel.utils.json_to_sheet(exportData);
+      const wb = excel.utils.book_new();
+      excel.utils.book_append_sheet(wb, ws, "Katalog");
+      excel.writeFile(wb, `Mahsulotlar_${Date.now()}.xlsx`);
       toast({ title: "Excel yuklandi" });
     } catch (error) {
       console.error("Excel export error:", error);

@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   ArrowRight,
   Package,
-  ClipboardList
+  ClipboardList,
+  FlaskConical
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";

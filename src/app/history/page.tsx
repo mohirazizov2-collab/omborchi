@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -94,8 +95,8 @@ export default function HistoryPage() {
 
   const exportDayToExcel = async (day: string, data: any) => {
     try {
-      const XLSXModule = await import("xlsx");
-      const XLSX = XLSXModule.default || XLSXModule;
+      const XLSX = await import("xlsx");
+      const excel = (XLSX.utils ? XLSX : (XLSX as any).default);
       
       const records = data.allMovements.map((m: any) => ({
         "Sana": format(new Date(m.movementDate), 'HH:mm'),
@@ -107,10 +108,10 @@ export default function HistoryPage() {
         "Mas'ul": m.responsibleUserName
       }));
       
-      const ws = XLSX.utils.json_to_sheet(records);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, day);
-      XLSX.writeFile(wb, `Harakatlar_${day}.xlsx`);
+      const ws = excel.utils.json_to_sheet(records);
+      const wb = excel.utils.book_new();
+      excel.utils.book_append_sheet(wb, ws, day);
+      excel.writeFile(wb, `Harakatlar_${day}.xlsx`);
       toast({ title: "Excel tayyor" });
     } catch (error) {
       console.error("Excel export error:", error);
