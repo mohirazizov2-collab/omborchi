@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -138,81 +137,93 @@ export default function ReportsPage() {
   }, [products, totalInventoryValue, warehouses, toast]);
 
   const exportToExcel = async () => {
-    const XLSX = (await import("xlsx")).default;
-    const data = [
-      ["MOLIYAVIY HISOBOT", ""],
-      ["Davr", reportPeriod === 'weekly' ? "Haftalik" : "Oylik"],
-      ["Sana", new Date().toLocaleDateString()],
-      ["", ""],
-      ["Sotuv tushumi", financials.revenue],
-      ["Operatsion xarajatlar", financials.opsExpenses],
-      ["Maosh xarajatlari", financials.salaryExp],
-      ["Jami xarajatlar", financials.expenses],
-      ["Sof foyda", financials.profit],
-      ["", ""],
-      ["OMBOR HOLATI", ""],
-      ["Jami zaxira qiymati", totalInventoryValue],
-      ["Mahsulot turlari", products?.length || 0],
-      ["Faol omborlar", warehouses?.length || 0]
-    ];
+    try {
+      const XLSXModule = await import("xlsx");
+      const XLSX = XLSXModule.default || XLSXModule;
+      
+      const data = [
+        ["MOLIYAVIY HISOBOT", ""],
+        ["Davr", reportPeriod === 'weekly' ? "Haftalik" : "Oylik"],
+        ["Sana", new Date().toLocaleDateString()],
+        ["", ""],
+        ["Sotuv tushumi", financials.revenue],
+        ["Operatsion xarajatlar", financials.opsExpenses],
+        ["Maosh xarajatlari", financials.salaryExp],
+        ["Jami xarajatlar", financials.expenses],
+        ["Sof foyda", financials.profit],
+        ["", ""],
+        ["OMBOR HOLATI", ""],
+        ["Jami zaxira qiymati", totalInventoryValue],
+        ["Mahsulot turlari", products?.length || 0],
+        ["Faol omborlar", warehouses?.length || 0]
+      ];
 
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
-    XLSX.writeFile(wb, `Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast({ title: "Excel yuklandi" });
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
+      XLSX.writeFile(wb, `Hisobot_${reportPeriod}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: "Excel yuklandi" });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast({ variant: "destructive", title: "Excel eksportida xatolik" });
+    }
   };
 
   const exportToPDF = async () => {
-    const jsPDFLib = (await import("jspdf")).default;
-    const doc = new jsPDFLib();
-    
-    doc.setFontSize(22);
-    doc.setTextColor(59, 130, 246);
-    doc.text("MOLIYAVIY HISOBOT", 105, 25, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Davr: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 20, 40);
-    doc.text(`Tayyorlangan sana: ${new Date().toLocaleString()}`, 20, 47);
-
-    doc.setDrawColor(230);
-    doc.line(20, 55, 190, 55);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(40);
-    doc.text(`Sotuv tushumi:`, 20, 70); doc.text(`${formatMoney(financials.revenue)} so'm`, 140, 70);
-    doc.text(`Maoshlar:`, 20, 78); doc.text(`- ${formatMoney(financials.salaryExp)} so'm`, 140, 78);
-    doc.text(`Boshqa xarajatlar:`, 20, 86); doc.text(`- ${formatMoney(financials.opsExpenses)} so'm`, 140, 86);
-    
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(financials.profit >= 0 ? 16 : 225, financials.profit >= 0 ? 185 : 29, financials.profit >= 0 ? 129 : 72);
-    doc.text(`SOF FOYDA:`, 20, 100); doc.text(`${formatMoney(financials.profit)} so'm`, 140, 100);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    doc.text(`Ombordagi jami zaxira qiymati:`, 20, 115); doc.text(`${formatMoney(totalInventoryValue)} so'm`, 140, 115);
-
-    if (aiResult) {
-      doc.addPage();
-      doc.setFontSize(18);
+    try {
+      const jsPDFLib = (await import("jspdf")).default;
+      const doc = new jsPDFLib();
+      
+      doc.setFontSize(22);
       doc.setTextColor(59, 130, 246);
-      doc.text("AI TAHLIL XULOSASI", 105, 25, { align: "center" });
-      doc.setFontSize(11);
-      doc.setTextColor(60);
-      const splitSummary = doc.splitTextToSize(aiResult.summary, 170);
-      doc.text(splitSummary, 20, 45);
+      doc.text("MOLIYAVIY HISOBOT", 105, 25, { align: "center" });
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Davr: ${reportPeriod === 'weekly' ? 'Haftalik' : 'Oylik'}`, 20, 40);
+      doc.text(`Tayyorlangan sana: ${new Date().toLocaleString()}`, 20, 47);
+
+      doc.setDrawColor(230);
+      doc.line(20, 55, 190, 55);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(40);
+      doc.text(`Sotuv tushumi:`, 20, 70); doc.text(`${formatMoney(financials.revenue)} so'm`, 140, 70);
+      doc.text(`Maoshlar:`, 20, 78); doc.text(`- ${formatMoney(financials.salaryExp)} so'm`, 140, 78);
+      doc.text(`Boshqa xarajatlar:`, 20, 86); doc.text(`- ${formatMoney(financials.opsExpenses)} so'm`, 140, 86);
       
       doc.setFont("helvetica", "bold");
-      doc.text("STRATEGIK TAVSIYALAR:", 20, 90);
+      doc.setTextColor(financials.profit >= 0 ? 16 : 225, financials.profit >= 0 ? 185 : 29, financials.profit >= 0 ? 129 : 72);
+      doc.text(`SOF FOYDA:`, 20, 100); doc.text(`${formatMoney(financials.profit)} so'm`, 140, 100);
+      
       doc.setFont("helvetica", "normal");
-      aiResult.recommendations.forEach((rec, i) => {
-        doc.text(`${i+1}. ${rec}`, 20, 100 + (i * 8));
-      });
-    }
+      doc.setTextColor(100);
+      doc.text(`Ombordagi jami zaxira qiymati:`, 20, 115); doc.text(`${formatMoney(totalInventoryValue)} so'm`, 140, 115);
 
-    doc.save(`Omborchi_Hisobot_${Date.now()}.pdf`);
-    toast({ title: "PDF yuklandi" });
+      if (aiResult) {
+        doc.addPage();
+        doc.setFontSize(18);
+        doc.setTextColor(59, 130, 246);
+        doc.text("AI TAHLIL XULOSASI", 105, 25, { align: "center" });
+        doc.setFontSize(11);
+        doc.setTextColor(60);
+        const splitSummary = doc.splitTextToSize(aiResult.summary, 170);
+        doc.text(splitSummary, 20, 45);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("STRATEGIK TAVSIYALAR:", 20, 90);
+        doc.setFont("helvetica", "normal");
+        aiResult.recommendations.forEach((rec, i) => {
+          doc.text(`${i+1}. ${rec}`, 20, 100 + (i * 8));
+        });
+      }
+
+      doc.save(`Omborchi_Hisobot_${Date.now()}.pdf`);
+      toast({ title: "PDF yuklandi" });
+    } catch (error) {
+      console.error("PDF export error:", error);
+      toast({ variant: "destructive", title: "PDF eksportida xatolik" });
+    }
   };
 
   const formatMoney = (val: number) => Math.floor(val).toLocaleString().replace(/,/g, ' ');

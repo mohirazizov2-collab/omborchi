@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -120,49 +119,62 @@ export default function ProductsPage() {
   }, [products, searchQuery, selectedCategoryId]);
 
   const exportToExcel = async () => {
-    const XLSX = (await import("xlsx")).default;
-    const exportData = filteredProducts.map(p => ({
-      "Nomi": p.name,
-      "SKU": p.sku,
-      "Zaxira": p.stock,
-      "Birlik": p.unit,
-      "Narx": p.salePrice
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Katalog");
-    XLSX.writeFile(wb, `Mahsulotlar_${Date.now()}.xlsx`);
-    toast({ title: "Excel yuklandi" });
+    try {
+      const XLSXModule = await import("xlsx");
+      const XLSX = XLSXModule.default || XLSXModule;
+      
+      const exportData = filteredProducts.map(p => ({
+        "Nomi": p.name,
+        "SKU": p.sku,
+        "Zaxira": p.stock,
+        "Birlik": p.unit,
+        "Narx": p.salePrice
+      }));
+      
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Katalog");
+      XLSX.writeFile(wb, `Mahsulotlar_${Date.now()}.xlsx`);
+      toast({ title: "Excel yuklandi" });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast({ variant: "destructive", title: "Excel eksportida xatolik" });
+    }
   };
 
   const exportToPDF = async () => {
-    const jsPDFLib = (await import("jspdf")).default;
-    // @ts-ignore
-    await import("jspdf-autotable");
-    const doc = new jsPDFLib();
-    
-    doc.setFontSize(18);
-    doc.text("MAHSULOTLAR KATALOGI", 105, 20, { align: "center" });
-    
-    const tableData = filteredProducts.map((p, i) => [
-      i + 1,
-      p.name,
-      p.sku,
-      p.stock,
-      p.unit,
-      `${p.salePrice.toLocaleString()} so'm`
-    ]);
+    try {
+      const jsPDFLib = (await import("jspdf")).default;
+      // @ts-ignore
+      await import("jspdf-autotable");
+      const doc = new jsPDFLib();
+      
+      doc.setFontSize(18);
+      doc.text("MAHSULOTLAR KATALOGI", 105, 20, { align: "center" });
+      
+      const tableData = filteredProducts.map((p, i) => [
+        i + 1,
+        p.name,
+        p.sku,
+        p.stock,
+        p.unit,
+        `${p.salePrice.toLocaleString()} so'm`
+      ]);
 
-    (doc as any).autoTable({
-      startY: 30,
-      head: [['#', 'Nomi', 'SKU', 'Zaxira', 'Birlik', 'Narxi']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246] }
-    });
+      (doc as any).autoTable({
+        startY: 30,
+        head: [['#', 'Nomi', 'SKU', 'Zaxira', 'Birlik', 'Narxi']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] }
+      });
 
-    doc.save(`Mahsulotlar_Katalog_${Date.now()}.pdf`);
-    toast({ title: "PDF yuklandi" });
+      doc.save(`Mahsulotlar_Katalog_${Date.now()}.pdf`);
+      toast({ title: "PDF yuklandi" });
+    } catch (error) {
+      console.error("PDF export error:", error);
+      toast({ variant: "destructive", title: "PDF eksportida xatolik" });
+    }
   };
 
   const handleSave = () => {

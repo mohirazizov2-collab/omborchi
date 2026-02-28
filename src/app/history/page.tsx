@@ -93,21 +93,29 @@ export default function HistoryPage() {
   }, [movements, searchQuery]);
 
   const exportDayToExcel = async (day: string, data: any) => {
-    const XLSX = (await import("xlsx")).default;
-    const records = data.allMovements.map((m: any) => ({
-      "Sana": format(new Date(m.movementDate), 'HH:mm'),
-      "Turi": m.movementType,
-      "Mahsulot": m.productName,
-      "Miqdor": m.quantityChange,
-      "Birlik": m.unit,
-      "Ombor": m.warehouseName,
-      "Mas'ul": m.responsibleUserName
-    }));
-    const ws = XLSX.utils.json_to_sheet(records);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, day);
-    XLSX.writeFile(wb, `Harakatlar_${day}.xlsx`);
-    toast({ title: "Excel tayyor" });
+    try {
+      const XLSXModule = await import("xlsx");
+      const XLSX = XLSXModule.default || XLSXModule;
+      
+      const records = data.allMovements.map((m: any) => ({
+        "Sana": format(new Date(m.movementDate), 'HH:mm'),
+        "Turi": m.movementType,
+        "Mahsulot": m.productName,
+        "Miqdor": m.quantityChange,
+        "Birlik": m.unit,
+        "Ombor": m.warehouseName,
+        "Mas'ul": m.responsibleUserName
+      }));
+      
+      const ws = XLSX.utils.json_to_sheet(records);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, day);
+      XLSX.writeFile(wb, `Harakatlar_${day}.xlsx`);
+      toast({ title: "Excel tayyor" });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast({ variant: "destructive", title: "Excel eksportida xatolik" });
+    }
   };
 
   const handleDelete = async (movementItems: any[]) => {
