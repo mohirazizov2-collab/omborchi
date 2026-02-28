@@ -196,14 +196,18 @@ export default function StockInPage() {
     const doc = new jsPDFLib();
     const currencyStr = t.settings.currency.split(' ')[0];
     
+    // Header
     doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, 210, 40, 'F');
     doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
     doc.text(t.nav.stockIn.toUpperCase(), 105, 25, { align: "center" });
     
+    // Details
     doc.setFontSize(10);
     doc.setTextColor(40, 40, 40);
+    doc.setFont("helvetica", "normal");
     doc.text(`${t.stockIn.dnNumber}: ${processedInvoice.dnNumber}`, 20, 50);
     doc.text(`${t.stockIn.supplier}: ${processedInvoice.supplier}`, 20, 57);
     doc.text(`${t.stockIn.targetWarehouse}: ${processedInvoice.warehouse}`, 20, 64);
@@ -221,11 +225,18 @@ export default function StockInPage() {
 
     (doc as any).autoTable({
       startY: 80,
-      head: [['#', t.products.productInfo, t.common.quantity, t.units.label, t.common.price, t.common.summary]],
+      head: [[
+        '#', 
+        t.products.productInfo, 
+        t.common.quantity, 
+        t.units.label, 
+        t.common.price, 
+        t.common.summary
+      ]],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 9 }
+      styles: { fontSize: 9, font: "helvetica" }
     });
 
     const total = processedInvoice.items.reduce((acc: number, it: any) => acc + (it.quantity * it.price), 0);

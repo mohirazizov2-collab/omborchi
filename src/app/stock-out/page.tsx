@@ -242,14 +242,18 @@ export default function StockOutPage() {
     const doc = new jsPDFLib();
     const currencyStr = t.settings.currency.split(' ')[0];
     
+    // Header
     doc.setFillColor(225, 29, 72); 
     doc.rect(0, 0, 210, 40, 'F');
     doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
     doc.text(t.nav.stockOut.toUpperCase(), 105, 25, { align: "center" });
     
+    // Details
     doc.setFontSize(10);
     doc.setTextColor(40, 40, 40);
+    doc.setFont("helvetica", "normal");
     doc.text(`${t.stockOut.refNumber}: ${processedInvoice.orderNumber}`, 20, 50);
     doc.text(`${t.common.client}: ${processedInvoice.recipient} (${processedInvoice.clientType === 'internal' ? t.stockOut.internal : t.stockOut.external})`, 20, 57);
     doc.text(`${t.stockOut.sourceWarehouse}: ${processedInvoice.warehouse}`, 20, 64);
@@ -267,11 +271,18 @@ export default function StockOutPage() {
 
     (doc as any).autoTable({
       startY: 80,
-      head: [['#', t.products.productInfo, t.common.quantity, t.units.label, t.common.price, t.common.summary]],
+      head: [[
+        '#', 
+        t.products.productInfo, 
+        t.common.quantity, 
+        t.units.label, 
+        t.common.price, 
+        t.common.summary
+      ]],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [225, 29, 72] },
-      styles: { fontSize: 9 }
+      styles: { fontSize: 9, font: "helvetica" }
     });
 
     const total = processedInvoice.items.reduce((acc: number, it: any) => acc + (it.quantity * it.price), 0);
