@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * Professional PDF Invoice Generator Service
- * Handles unified design for StockIn and StockOut documents with Unicode support.
+ * Handles unified design for StockIn and StockOut documents with best-effort Unicode support.
  */
 
 export interface InvoiceItem {
