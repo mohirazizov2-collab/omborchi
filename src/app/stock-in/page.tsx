@@ -188,7 +188,6 @@ export default function StockInPage() {
 
   const handleDownloadPDF = async () => {
     if (!processedInvoice) return;
-    
     const jsPDFLib = (await import("jspdf")).default;
     // @ts-ignore
     await import("jspdf-autotable");
@@ -196,54 +195,100 @@ export default function StockInPage() {
     const doc = new jsPDFLib();
     const currencyStr = t.settings.currency.split(' ')[0];
     
-    // Header
-    doc.setFillColor(59, 130, 246);
-    doc.rect(0, 0, 210, 40, 'F');
-    doc.setFontSize(22);
-    doc.setTextColor(255, 255, 255);
+    // --- Header ---
+    doc.setFontSize(24);
+    doc.setTextColor(59, 130, 246); // Blue color
     doc.setFont("helvetica", "bold");
-    doc.text(t.nav.stockIn.toUpperCase(), 105, 25, { align: "center" });
+    doc.text(t.nav.stockIn.toUpperCase(), 105, 20, { align: "center" });
     
-    // Details
-    doc.setFontSize(10);
-    doc.setTextColor(40, 40, 40);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${t.stockIn.dnNumber}: ${processedInvoice.dnNumber}`, 20, 50);
-    doc.text(`${t.stockIn.supplier}: ${processedInvoice.supplier}`, 20, 57);
-    doc.text(`${t.stockIn.targetWarehouse}: ${processedInvoice.warehouse}`, 20, 64);
-    doc.text(`${t.warehouses.manager}: ${processedInvoice.responsible}`, 20, 71);
-    doc.text(`${t.common.date}: ${processedInvoice.date}`, 140, 50);
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(0.5);
+    doc.line(20, 25, 190, 25);
 
+    // --- Details ---
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "normal");
+    
+    doc.text(`${t.stockIn.dnNumber}:`, 20, 40);
+    doc.setTextColor(40, 40, 40);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${processedInvoice.dnNumber}`, 60, 40);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${t.stockIn.supplier}:`, 20, 47);
+    doc.setTextColor(40, 40, 40);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${processedInvoice.supplier}`, 60, 47);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${t.common.date}:`, 130, 40);
+    doc.setTextColor(40, 40, 40);
+    doc.text(`${processedInvoice.date}`, 155, 40);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${t.stockIn.targetWarehouse}:`, 130, 47);
+    doc.setTextColor(40, 40, 40);
+    doc.text(`${processedInvoice.warehouse}`, 155, 47);
+
+    // --- Table ---
     const tableData = processedInvoice.items.map((it: any, i: number) => [
       i + 1,
       it.name,
       it.quantity,
       t.units[it.unit as keyof typeof t.units] || it.unit,
-      `${formatMoney(it.price)} ${currencyStr}`,
-      `${formatMoney(it.quantity * it.price)} ${currencyStr}`
+      `${formatMoney(it.price)}`,
+      `${formatMoney(it.quantity * it.price)}`
     ]);
 
     (doc as any).autoTable({
-      startY: 80,
+      startY: 60,
       head: [[
         '#', 
         t.products.productInfo, 
         t.common.quantity, 
         t.units.label, 
-        t.common.price, 
-        t.common.summary
+        `${t.common.price} (${currencyStr})`, 
+        `${t.common.summary} (${currencyStr})`
       ]],
       body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 9, font: "helvetica" }
+      theme: 'striped',
+      headStyles: { 
+        fillColor: [59, 130, 246],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold'
+      },
+      styles: { fontSize: 9, font: "helvetica", cellPadding: 4 },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 10 },
+        2: { halign: 'center', cellWidth: 20 },
+        3: { halign: 'center', cellWidth: 25 },
+        4: { halign: 'right' },
+        5: { halign: 'right' }
+      }
     });
 
     const total = processedInvoice.items.reduce((acc: number, it: any) => acc + (it.quantity * it.price), 0);
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(12);
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
+    doc.setTextColor(59, 130, 246);
     doc.setFont("helvetica", "bold");
-    doc.text(`${t.expenses.total.toUpperCase()}: ${formatMoney(total)} ${currencyStr}`, 140, finalY);
+    doc.text(`${t.expenses.total.toUpperCase()}:`, 120, finalY);
+    doc.text(`${formatMoney(total)} ${currencyStr}`, 190, finalY, { align: 'right' });
+
+    // --- Signatures ---
+    const signY = finalY + 30;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Topshirdi (Yetkazib beruvchi):", 20, signY);
+    doc.line(20, signY + 5, 80, signY + 5);
+    
+    doc.text("Qabul qildi (Menejer):", 130, signY);
+    doc.line(130, signY + 5, 190, signY + 5);
+    doc.text(processedInvoice.responsible, 130, signY + 10);
 
     doc.save(`${t.nav.stockIn}_${processedInvoice.dnNumber}.pdf`);
   };
