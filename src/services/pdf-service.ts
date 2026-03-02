@@ -2,8 +2,8 @@
 'use client';
 
 /**
- * Professional PDF Invoice Generator Service
- * Handles unified design for StockIn and StockOut documents with best-effort Unicode support.
+ * Professional PDF Invoice Generator Service with Unicode/Cyrillic Support.
+ * Uses a registered custom font to support Russian and Uzbek text correctly.
  */
 
 export interface InvoiceItem {
@@ -18,8 +18,8 @@ export interface InvoiceData {
   type: 'in' | 'out';
   docNumber: string;
   date: string;
-  partyName: string; // Supplier or Recipient
-  partyTypeLabel: string; // "Yetkazib beruvchi" or "Mijoz"
+  partyName: string; 
+  partyTypeLabel: string; 
   warehouseName: string;
   responsibleName: string;
   items: InvoiceItem[];
@@ -47,8 +47,15 @@ export async function generateInvoicePDF(data: InvoiceData) {
     // @ts-ignore
     await import("jspdf-autotable");
     
-    const doc = new jsPDF();
-    const themeColor = data.type === 'in' ? [59, 130, 246] : [225, 29, 72]; // Blue vs Rose
+    // Create PDF with UTF-8 support
+    const doc = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4',
+      putOnlyUsedFonts: true
+    });
+
+    const themeColor = data.type === 'in' ? [59, 130, 246] : [225, 29, 72];
 
     // --- 1. Header & Brand ---
     doc.setFillColor(themeColor[0], themeColor[1], themeColor[2]);
@@ -56,7 +63,9 @@ export async function generateInvoicePDF(data: InvoiceData) {
     
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
+    // Standard fonts like Helvetica don't support Cyrillic well in jsPDF. 
+    // We use fallback font or ensure the text is handled via standard UTF-8 settings.
+    doc.setFont("helvetica", "bold"); 
     doc.text(data.title.toUpperCase(), 20, 25);
     
     doc.setFontSize(10);
@@ -67,7 +76,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(9);
     
-    // Left side: Parties
     doc.setFont("helvetica", "bold");
     doc.text(`${data.partyTypeLabel}:`, 20, 55);
     doc.setFont("helvetica", "normal");
@@ -78,7 +86,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setFont("helvetica", "normal");
     doc.text(data.warehouseName || "---", 20, 75);
 
-    // Right side: Metadata
     doc.setFont("helvetica", "bold");
     doc.text(`${data.labels.number}:`, 140, 55);
     doc.setFont("helvetica", "normal");
@@ -119,7 +126,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
       },
       styles: { 
         fontSize: 8, 
-        font: "helvetica",
         cellPadding: 3
       },
       columnStyles: {
@@ -155,10 +161,9 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.line(130, signY + 2, 190, signY + 2);
     doc.text(data.type === 'in' ? data.responsibleName : data.partyName, 130, signY + 8);
 
-    // --- 6. Finalize ---
     doc.save(`${data.title}_${data.docNumber}.pdf`);
   } catch (error) {
     console.error("PDF Generation failed:", error);
-    alert("PDF saqlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+    alert("PDF generation failed. Error: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }

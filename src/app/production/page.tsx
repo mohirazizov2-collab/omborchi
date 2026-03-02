@@ -87,18 +87,16 @@ export default function ProductionPage() {
       const userName = user?.displayName || user?.email || "Noma'lum";
       const whName = warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum";
 
-      // Har bir komponentni ombordan yechish
+      // Each component from warehouse
       for (const mat of neededMaterials) {
         const invId = `${warehouseId}_${mat.productId}`;
         const invRef = doc(db, "inventory", invId);
         
-        // 1. Ombor qoldig'ini yangilash
         updateDocumentNonBlocking(invRef, {
           stock: mat.currentStock - mat.totalNeeded,
           updatedAt: new Date().toISOString()
         });
 
-        // 2. Katalog umumiy qoldig'ini yangilash
         const p = products?.find(prod => prod.id === mat.productId);
         if (p) {
           updateDocumentNonBlocking(doc(db, "products", p.id), {
@@ -107,7 +105,6 @@ export default function ProductionPage() {
           });
         }
 
-        // 3. Harakat tarixiga yozish
         const movementData = {
           productId: mat.productId,
           productName: mat.name,
