@@ -311,7 +311,7 @@ export default function ProductsPage() {
                     <Plus className="w-4 h-4" /> {t.products.addNew}
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="rounded-[2.5rem] border-white/5 bg-black/90 backdrop-blur-3xl text-white max-w-lg p-8">
+                <DialogContent className="rounded-[2.5rem] border-white/5 bg-black/90 backdrop-blur-3xl text-white max-lg p-8">
                   <DialogHeader className="mb-6"><DialogTitle className="text-2xl font-black flex items-center gap-3"><Package className="text-primary w-6 h-6" /> {editingProduct ? t.actions.edit : t.products.addNew}</DialogTitle></DialogHeader>
                   <div className="space-y-6">
                     <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest pl-1 text-white/50">Mahsulot nomi</Label><Input className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-bold" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="Nomini yozing..." /></div>

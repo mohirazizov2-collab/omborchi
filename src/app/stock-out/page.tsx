@@ -237,7 +237,10 @@ export default function StockOutPage() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!processedInvoice) return;
+    if (!processedInvoice) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Hujjat ma'lumotlari topilmadi." });
+      return;
+    }
     
     const currencyStr = t.settings.currency.split(' ')[0];
     
