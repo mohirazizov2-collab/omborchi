@@ -38,7 +38,7 @@ import { generateInvoicePDF } from "@/services/pdf-service";
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
 export default function StockOutPage() {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, assignedWarehouseId } = useUser();
@@ -237,13 +237,8 @@ export default function StockOutPage() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!processedInvoice) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Hujjat ma'lumotlari topilmadi." });
-      return;
-    }
-    
+    if (!processedInvoice) return;
     const currencyStr = t.settings.currency.split(' ')[0];
-    
     await generateInvoicePDF({
       title: t.nav.stockOut,
       type: 'out',

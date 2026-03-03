@@ -5,51 +5,39 @@ Rasmiy havola: [https://omborchi.uz](https://omborchi.uz)
 
 ---
 
+## 🌐 Domen olish va ulash bo'yicha qo'llanma
+
+### 1. Domen sotib olish (Getting a Domain)
+Firebase domenlarni to'g'ridan-to'g'ri sotmaydi. Domen sotib olish uchun quyidagi xizmatlardan foydalanishingiz mumkin:
+*   **O'zbekistonda**: [uzinfocom.uz](https://cctld.uz), [webname.uz](https://webname.uz), [arsenal-d.uz](https://www.as.uz) ( .UZ domenlar uchun).
+*   **Xalqaro**: [Namecheap](https://namecheap.com), [GoDaddy](https://godaddy.com) ( .COM, .NET, .ORG uchun).
+
+### 2. Domenni Firebase-ga ulash
+Domen sotib olganingizdan so'ng:
+1.  Firebase Console-ga kiring -> **Hosting** bo'limini tanlang.
+2.  **Add Custom Domain** tugmasini bosing.
+3.  O'z domeningizni (`omborchi.uz`) yozing.
+4.  Firebase sizga **TXT** va **A record** ma'lumotlarini beradi.
+
+### 3. DNS sozlamalari (omborchi.uz uchun)
+Domen sotib olgan joyingizdagi boshqaruv paneliga quyidagi 2 ta yozuvni kiriting:
+
+**A Record (Asosiy IP):**
+*   **Type**: `A`
+*   **Host**: `@`
+*   **Value**: `199.36.158.100`
+
+**TXT Record (Egalikni tasdiqlash):**
+*   **Type**: `TXT`
+*   **Host**: `@`
+*   **Value**: `hosting-site=studio-4209846898-d5885`
+
+---
+
 ## 🛠️ Texnologiyalar
-Ushbu tizim eng zamonaviy texnologiyalar asosida qurilgan:
 *   **Frontend**: Next.js 15 (App Router)
 *   **Backend**: Firebase Auth & Firestore
 *   **AI**: Google Gemini (Genkit)
 *   **Hosting**: Firebase Hosting
-
----
-
-## 🌐 Domenni (omborchi.uz) ulash uchun DNS sozlamalari
-
-Domeningizni Firebase-ga bog'lash uchun DNS provayderingiz (domenni sotib olgan joyingiz, masalan: Uzinfocom, Arsenal-D, Webname va h.k.) boshqaruv paneliga quyidagi 2 ta yozuvni kiriting.
-
-### ❓ Domen paneli nima va qayerda?
-Domen paneli - bu siz domenni sotib olgan saytdagi shaxsiy kabinetdir. U yerda "DNS boshqaruvi" yoki "DNS tahrirlash" degan bo'lim bo'ladi. Shu bo'limga quyidagi ma'lumotlarni kiriting:
-
-**Muhim:** Eski barcha `A` yoki `CNAME` yozuvlarini o'chirib tashlang!
-
-### 1. A Record (Asosiy IP manzil):
-*   **Type (Turi)**: `A`
-*   **Host (Nomi)**: `@`
-*   **Value (Qiymati)**: `199.36.158.100`
-
-### 2. TXT Record (Egalikni tasdiqlash uchun):
-*   **Type (Turi)**: `TXT`
-*   **Host (Nomi)**: `@`
-*   **Value (Qiymati)**: `hosting-site=studio-4209846898-d5885`  <-- **DIQQAT: `=` belgisi bo'lishi shart!**
-
----
-
-## ⚠️ DNS Xatoligini hal qilish (Troubleshooting)
-
-Agar "DNS request failed" yoki "Needs setup" xatosi chiqsa, quyidagilarni tekshiring:
-
-1.  **Konfliktlar**: Paneldagi barcha eski IP manzillarni va ayniqsa `CNAME` yozuvlarini o'chirib tashlang. Root domenda (`omborchi.uz`) ham `A`, ham `CNAME` yozuvi bo'lishi mumkin emas.
-2.  **Host qismi**: Ko'p panellarda "Host" degan joyga domen nomini emas, shunchaki `@` belgisini yozish kerak.
-3.  **Tenglik belgisi**: TXT qiymati aynan `hosting-site=...` ko'rinishida ekanini tekshiring. Agar o'rtada `=` o'rniga `-` bo'lsa, Firebase tasdiqlamaydi.
-4.  **Kutish vaqti**: DNS o'zgarishi butun dunyoga tarqalishi uchun **1 soatdan 24 soatgacha** vaqt ketishi mumkin.
-
----
-
-## 🌍 Loyihani yangilash (Deploy)
-
-Terminalda:
-1. `firebase login`
-2. `firebase deploy`
 
 Created by **X e M team** © 2026

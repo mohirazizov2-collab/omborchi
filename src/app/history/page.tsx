@@ -76,10 +76,7 @@ export default function HistoryPage() {
       const type = m.movementType as keyof typeof groups[string];
       const docId = m.dnNumber || m.orderNumber || m.saleId || m.movementDate.substring(0, 16); 
       
-      if (!groups[dateKey][type]) {
-        // Fallback for missing types
-        return;
-      }
+      if (!groups[dateKey][type]) return;
 
       if (!groups[dateKey][type][docId]) {
         groups[dateKey][type][docId] = {
