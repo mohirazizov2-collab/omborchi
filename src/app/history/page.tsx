@@ -99,7 +99,7 @@ export default function HistoryPage() {
 
   const exportDayToExcel = async (day: string, data: any) => {
     try {
-      const { utils, book_new, book_append_sheet, writeFile } = await import("xlsx");
+      const XLSX = await import("xlsx");
       
       const records = data.allMovements.map((m: any) => ({
         "Sana": format(new Date(m.movementDate), 'HH:mm'),
@@ -111,10 +111,10 @@ export default function HistoryPage() {
         "Mas'ul": m.responsibleUserName
       }));
       
-      const ws = utils.json_to_sheet(records);
-      const wb = book_new();
-      book_append_sheet(wb, ws, day);
-      writeFile(wb, `Harakatlar_${day}.xlsx`);
+      const ws = XLSX.utils.json_to_sheet(records);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, day);
+      XLSX.writeFile(wb, `Harakatlar_${day}.xlsx`);
       toast({ title: "Excel tayyor" });
     } catch (error) {
       console.error("Excel export error:", error);

@@ -508,7 +508,7 @@ export default function StockOutPage() {
         </div>
 
         <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-lg p-8 shadow-2xl">
+          <DialogContent className="rounded-[2.5rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
             <DialogHeader>
               <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4">
                 <Info className="w-8 h-8" />

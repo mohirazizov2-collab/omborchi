@@ -5,20 +5,20 @@ Rasmiy havola: [https://omborchi.uz](https://omborchi.uz)
 
 ---
 
-## 🛠️ Loyihani Git-provayderga yuklash (GitHub/GitLab)
+## 🛠️ GitLab Repozitoriyasiga ulash
 
-Loyihangizni GitHub yoki boshqa provayderga yuklash uchun quyidagi buyruqlarni Terminalda bajaring:
+Loyihangizni GitLab-ga (`omborchi-group/omborchi-project`) yuklash uchun quyidagi buyruqlarni terminalda ketma-ket bajaring:
 
-### 1. Git-ni ishga tushirish
+### 1. Loyihani tayyorlash
 ```bash
 git init
 git add .
 git commit -m "Initial commit: Professional Warehouse Management System"
 ```
 
-### 2. GitHub-da yangi repozitoriya oching va bog'lang
+### 2. GitLab-ga bog'lash va yuklash
 ```bash
-git remote add origin https://github.com/USERNAME/REPO_NAME.git
+git remote add origin https://gitlab.com/omborchi-group/omborchi-project.git
 git branch -M main
 git push -u origin main
 ```
@@ -31,7 +31,7 @@ git push -u origin main
 Firebase Hosting sizga avtomatik ravishda bepul SSL sertifikati bilan `project-id.web.app` subdomenini beradi.
 
 ### 2. Custom Domen (omborchi.uz) ulanishi
-Agar sizda xususiy domen bo'lsa, Firebase Console -> Hosting -> "Add Custom Domain" bo'limiga o'ting va quyidagi DNS yozuvlarini kiriting:
+Agar sizda xususiy domen bo'lsa, Firebase Console -> Hosting bo'limiga o'ting va quyidagi DNS yozuvlarini kiriting:
 
 **A Record:**
 *   **Host**: `@`

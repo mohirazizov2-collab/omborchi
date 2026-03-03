@@ -3,7 +3,7 @@
 
 /**
  * Professional Multilingual PDF Invoice Generator Service.
- * Supports O'zbek, Russian, and English.
+ * Optimized for O'zbek, Russian, and English.
  */
 
 export interface InvoiceItem {
@@ -54,44 +54,47 @@ export async function generateInvoicePDF(data: InvoiceData) {
       putOnlyUsedFonts: true
     });
 
+    // Theme color based on operation type
     const themeColor = data.type === 'in' ? [59, 130, 246] : [225, 29, 72];
 
-    // --- 1. Clean Header ---
+    // --- 1. Header Design ---
     doc.setFillColor(themeColor[0], themeColor[1], themeColor[2]);
-    doc.rect(0, 0, 210, 35, 'F');
+    doc.rect(0, 0, 210, 40, 'F');
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(24);
     doc.setFont("helvetica", "bold"); 
-    doc.text(data.title.toUpperCase(), 15, 20);
+    doc.text(data.title.toUpperCase(), 15, 22);
     
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("omborchi.uz | Professional Inventory Management", 15, 28);
-
-    // --- 2. Information Section ---
-    doc.setTextColor(40, 40, 40);
     doc.setFontSize(10);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text(`${data.partyTypeLabel}:`, 15, 50);
     doc.setFont("helvetica", "normal");
-    doc.text(data.partyName || "N/A", 15, 56);
+    doc.text("omborchi.uz | Professional Inventory Management System", 15, 32);
+
+    // --- 2. Info Section (Grid Layout) ---
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(9);
+    
+    // Left Column
+    doc.setFont("helvetica", "bold");
+    doc.text(`${data.partyTypeLabel}:`, 15, 55);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.partyName || "N/A", 15, 61);
 
     doc.setFont("helvetica", "bold");
-    doc.text(`${data.labels.warehouse}:`, 15, 68);
+    doc.text(`${data.labels.warehouse}:`, 15, 72);
     doc.setFont("helvetica", "normal");
-    doc.text(data.warehouseName || "N/A", 15, 74);
+    doc.text(data.warehouseName || "N/A", 15, 78);
     
+    // Right Column
     doc.setFont("helvetica", "bold");
-    doc.text(`${data.labels.number}:`, 130, 50);
+    doc.text(`${data.labels.number}:`, 130, 55);
     doc.setFont("helvetica", "normal");
-    doc.text(data.docNumber || "---", 130, 56);
+    doc.text(data.docNumber || "---", 130, 61);
 
     doc.setFont("helvetica", "bold");
-    doc.text(`${data.labels.date}:`, 130, 68);
+    doc.text(`${data.labels.date}:`, 130, 72);
     doc.setFont("helvetica", "normal");
-    doc.text(data.date || "---", 130, 74);
+    doc.text(data.date || "---", 130, 78);
 
     // --- 3. Items Table ---
     const tableRows = data.items.map((it, i) => [
@@ -104,7 +107,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
     ]);
 
     (doc as any).autoTable({
-      startY: 85,
+      startY: 90,
       head: [[
         '#',
         data.labels.product,
@@ -114,58 +117,64 @@ export async function generateInvoicePDF(data: InvoiceData) {
         data.labels.total
       ]],
       body: tableRows,
-      theme: 'grid',
+      theme: 'striped',
       headStyles: {
         fillColor: themeColor,
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 9,
+        fontSize: 10,
         halign: 'center'
       },
       styles: { 
-        fontSize: 8, 
-        cellPadding: 3,
+        fontSize: 9, 
+        cellPadding: 4,
         font: 'helvetica'
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
         1: { halign: 'left' },
         2: { halign: 'center', cellWidth: 20 },
-        3: { halign: 'center', cellWidth: 20 },
-        4: { halign: 'right', cellWidth: 30 },
-        5: { halign: 'right', cellWidth: 35 }
+        3: { halign: 'center', cellWidth: 25 },
+        4: { halign: 'right', cellWidth: 35 },
+        5: { halign: 'right', cellWidth: 40 }
       }
     });
 
-    const total = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    // --- 4. Totals ---
+    const totalValue = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     const finalY = (doc as any).lastAutoTable.finalY + 15;
 
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
-    doc.text(`${data.labels.grandTotal}: ${total.toLocaleString().replace(/,/g, ' ')} ${data.currency}`, 195, finalY, { align: 'right' });
+    doc.text(`${data.labels.grandTotal}: ${totalValue.toLocaleString().replace(/,/g, ' ')} ${data.currency}`, 195, finalY, { align: 'right' });
 
-    const signY = 260;
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
+    // --- 5. Signatures ---
+    const signY = 250;
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    
+    // Shipped By
     doc.setFont("helvetica", "bold");
-
     doc.text(`${data.labels.shippedBy}:`, 15, signY);
     doc.line(15, signY + 2, 85, signY + 2);
     doc.setFont("helvetica", "normal");
-    doc.text(data.type === 'out' ? data.responsibleName : data.partyName, 15, signY + 8);
+    doc.text(data.type === 'out' ? data.responsibleName : data.partyName, 15, signY + 10);
 
+    // Received By
     doc.setFont("helvetica", "bold");
     doc.text(`${data.labels.receivedBy}:`, 125, signY);
     doc.line(125, signY + 2, 195, signY + 2);
     doc.setFont("helvetica", "normal");
-    doc.text(data.type === 'in' ? data.responsibleName : data.partyName, 125, signY + 8);
+    doc.text(data.type === 'in' ? data.responsibleName : data.partyName, 125, signY + 10);
 
-    doc.setFontSize(7);
-    doc.text(`Generated by omborchi.uz at ${new Date().toLocaleString()}`, 105, 285, { align: 'center' });
+    // Footer note
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Generated automatically by omborchi.uz System at ${new Date().toLocaleString()}`, 105, 285, { align: 'center' });
 
     doc.save(`${data.title}_${data.docNumber}.pdf`);
   } catch (error) {
-    console.error("PDF Generation failed:", error);
+    console.error("Professional PDF Generation failed:", error);
   }
 }
