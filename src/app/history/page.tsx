@@ -51,10 +51,12 @@ export default function HistoryPage() {
     if (!movements) return {};
 
     const filtered = movements.filter(m => {
-      const bizId = m.dnNumber || m.orderNumber || m.id;
+      const bizId = m.dnNumber || m.orderNumber || m.id || "";
+      const prodName = m.productName || "";
+      const respName = m.responsibleUserName || "";
       return bizId.toLowerCase().includes(searchQuery.toLowerCase()) || 
-             (m.productName && m.productName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-             (m.responsibleUserName && m.responsibleUserName.toLowerCase().includes(searchQuery.toLowerCase()));
+             prodName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             respName.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
     const groups: Record<string, any> = {};
@@ -74,6 +76,11 @@ export default function HistoryPage() {
       const type = m.movementType as keyof typeof groups[string];
       const docId = m.dnNumber || m.orderNumber || m.saleId || m.movementDate.substring(0, 16); 
       
+      if (!groups[dateKey][type]) {
+        // Fallback for missing types
+        return;
+      }
+
       if (!groups[dateKey][type][docId]) {
         groups[dateKey][type][docId] = {
           id: docId,
@@ -196,7 +203,7 @@ export default function HistoryPage() {
 
 function TypeFolder({ title, icon: Icon, color, data, onDelete, isDeleting, isAdmin }: any) {
   const [isOpen, setIsOpen] = useState(false);
-  const docs = Object.values(data);
+  const docs = Object.values(data || {});
   const count = docs.length;
   if (count === 0) return null;
 
