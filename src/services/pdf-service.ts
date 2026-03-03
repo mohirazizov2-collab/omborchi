@@ -2,8 +2,8 @@
 'use client';
 
 /**
- * Professional PDF Invoice Generator Service with Unicode/Cyrillic Support.
- * Optimized for professional warehouse documentation.
+ * Professional Multilingual PDF Invoice Generator Service.
+ * Optimized for O'zbek, Russian (Cyrillic), and English.
  */
 
 export interface InvoiceItem {
@@ -47,7 +47,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     // @ts-ignore
     await import("jspdf-autotable");
     
-    // Use putOnlyUsedFonts to keep PDF small.
     const doc = new jsPDF({
       orientation: 'p',
       unit: 'mm',
@@ -57,37 +56,44 @@ export async function generateInvoicePDF(data: InvoiceData) {
 
     const themeColor = data.type === 'in' ? [59, 130, 246] : [225, 29, 72];
 
-    // --- 1. Header with Background Bar ---
+    // --- 1. Clean Header ---
     doc.setFillColor(themeColor[0], themeColor[1], themeColor[2]);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.rect(0, 0, 210, 35, 'F');
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(24);
     doc.setFont("helvetica", "bold"); 
-    doc.text(data.title.toUpperCase(), 15, 22);
+    doc.text(data.title.toUpperCase(), 15, 20);
     
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("omborchi.uz | Modern Inventory Solutions", 15, 30);
+    doc.text("omborchi.uz | Professional Inventory Management", 15, 28);
 
-    // --- 2. Info Grid ---
+    // --- 2. Information Section ---
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(10);
     
-    // Header Info Labels
+    // Party & Warehouse (Left Column)
     doc.setFont("helvetica", "bold");
-    doc.text(`${data.partyTypeLabel}:`, 15, 55);
-    doc.text(`${data.labels.warehouse}:`, 15, 75);
-    
-    doc.text(`${data.labels.number}:`, 130, 55);
-    doc.text(`${data.labels.date}:`, 130, 75);
-
-    // Header Info Values
+    doc.text(`${data.partyTypeLabel}:`, 15, 50);
     doc.setFont("helvetica", "normal");
-    doc.text(data.partyName || "---", 15, 62);
-    doc.text(data.warehouseName || "---", 15, 82);
-    doc.text(data.docNumber || "---", 130, 62);
-    doc.text(data.date || "---", 130, 82);
+    doc.text(data.partyName || "N/A", 15, 56);
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`${data.labels.warehouse}:`, 15, 68);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.warehouseName || "N/A", 15, 74);
+    
+    // Doc Number & Date (Right Column)
+    doc.setFont("helvetica", "bold");
+    doc.text(`${data.labels.number}:`, 130, 50);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.docNumber || "---", 130, 56);
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`${data.labels.date}:`, 130, 68);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.date || "---", 130, 74);
 
     // --- 3. Items Table ---
     const tableRows = data.items.map((it, i) => [
@@ -100,14 +106,14 @@ export async function generateInvoicePDF(data: InvoiceData) {
     ]);
 
     (doc as any).autoTable({
-      startY: 95,
+      startY: 85,
       head: [[
         '#',
         data.labels.product,
         data.labels.qty,
         data.labels.unit,
-        `${data.labels.price}`,
-        `${data.labels.total}`
+        data.labels.price,
+        data.labels.total
       ]],
       body: tableRows,
       theme: 'grid',
@@ -115,7 +121,8 @@ export async function generateInvoicePDF(data: InvoiceData) {
         fillColor: themeColor,
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 9
+        fontSize: 9,
+        halign: 'center'
       },
       styles: { 
         fontSize: 8, 
@@ -124,39 +131,46 @@ export async function generateInvoicePDF(data: InvoiceData) {
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
-        2: { halign: 'center', cellWidth: 15 },
-        3: { halign: 'center', cellWidth: 15 },
+        1: { halign: 'left' },
+        2: { halign: 'center', cellWidth: 20 },
+        3: { halign: 'center', cellWidth: 20 },
         4: { halign: 'right', cellWidth: 30 },
         5: { halign: 'right', cellWidth: 35 }
       }
     });
 
-    // --- 4. Summary ---
+    // --- 4. Total Summary ---
     const total = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     const finalY = (doc as any).lastAutoTable.finalY + 15;
 
-    doc.setFontSize(12);
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
     doc.text(`${data.labels.grandTotal}: ${total.toLocaleString().replace(/,/g, ' ')} ${data.currency}`, 195, finalY, { align: 'right' });
 
     // --- 5. Footer & Signatures ---
-    const signY = 265;
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.setFont("helvetica", "normal");
+    const signY = 260;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "bold");
 
-    // Signature 1
+    // Shipper
     doc.text(`${data.labels.shippedBy}:`, 15, signY);
     doc.line(15, signY + 2, 85, signY + 2);
-    doc.text(data.type === 'out' ? data.responsibleName : data.partyName, 15, signY + 7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.type === 'out' ? data.responsibleName : data.partyName, 15, signY + 8);
 
-    // Signature 2
+    // Receiver
+    doc.setFont("helvetica", "bold");
     doc.text(`${data.labels.receivedBy}:`, 125, signY);
     doc.line(125, signY + 2, 195, signY + 2);
-    doc.text(data.type === 'in' ? data.responsibleName : data.partyName, 125, signY + 7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.type === 'in' ? data.responsibleName : data.partyName, 125, signY + 8);
 
-    // Save
+    // Metadata
+    doc.setFontSize(7);
+    doc.text(`Generated by omborchi.uz at ${new Date().toLocaleString()}`, 105, 285, { align: 'center' });
+
     doc.save(`${data.title}_${data.docNumber}.pdf`);
   } catch (error) {
     console.error("PDF Generation failed:", error);
