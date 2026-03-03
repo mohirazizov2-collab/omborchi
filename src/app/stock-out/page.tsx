@@ -513,10 +513,9 @@ export default function StockOutPage() {
               <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4">
                 <Info className="w-8 h-8" />
               </div>
-              <DialogTitle className="text-2xl font-black tracking-tight">{t.inventoryAudit.confirmAudit}</DialogTitle>
-              <p className="text-muted-foreground font-medium pt-2">Operatsiyani yakunlashdan oldin barcha ma'lumotlarni tekshiring.</p>
+              <DialogTitle className="text-2xl font-black tracking-tight">Tasdiqlash</DialogTitle>
+              <p className="text-muted-foreground font-medium pt-2">Operatsiyani yakunlashdan oldin ma'lumotlarni tekshiring.</p>
             </DialogHeader>
-            
             <div className="py-6 space-y-4">
               <div className="p-4 rounded-2xl bg-muted/20 space-y-3">
                 <div className="flex justify-between items-center text-sm">
@@ -527,24 +526,16 @@ export default function StockOutPage() {
                   <span className="text-muted-foreground font-bold">{t.common.warehouse}:</span>
                   <span className="font-black">{warehouses?.find(w => w.id === warehouseId)?.name}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm border-t border-white/5 pt-3">
-                  <span className="text-muted-foreground font-bold">{t.common.totalItems}:</span>
-                  <span className="font-black">{items.filter(i => i.productId).length} ta</span>
-                </div>
-                <div className="flex justify-between items-center pt-1">
+                <div className="flex justify-between items-center pt-1 border-t border-white/5 mt-3">
                   <span className="text-rose-600 font-black uppercase text-[10px] tracking-widest">{t.common.totalValue}</span>
                   <span className="text-xl font-black text-rose-600 font-headline">{formatMoney(totalValue)} {t.settings.currency.split(' ')[0]}</span>
                 </div>
               </div>
             </div>
-
             <DialogFooter className="gap-3">
               <Button variant="ghost" onClick={() => setIsConfirmOpen(false)} className="rounded-2xl h-12 font-bold px-6">{t.actions.cancel}</Button>
-              <Button 
-                onClick={handleFinalProcess}
-                className="rounded-2xl h-12 flex-1 bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-2"
-              >
-                {t.actions.process} <ArrowRight className="w-4 h-4" />
+              <Button onClick={handleFinalProcess} className="rounded-2xl h-12 flex-1 bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-2">
+                Tasdiqlash <ArrowRight className="w-4 h-4" />
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -5,37 +5,48 @@ Rasmiy havola: [https://omborchi.uz](https://omborchi.uz)
 
 ---
 
-## 🌐 Domen olish va ulash bo'yicha qo'llanma
+## 🛠️ Loyihani Git-provayderga yuklash (GitHub/GitLab)
 
-### 1. Tekin domen bormi?
-Firebase Hosting sizga doimiy **bepul** subdomenlarni taqdim etadi:
-*   `project-id.web.app`
-*   `project-id.firebaseapp.com`
+Loyihangizni GitHub yoki boshqa provayderga yuklash uchun quyidagi buyruqlarni Terminalda bajaring:
 
-Agar sizga `.uz` yoki `.com` kabi xususiy domen kerak bo'lsa, ularni sotib olishingiz kerak bo'ladi. Talabalar uchun **GitHub Student Developer Pack** orqali ba'zi xalqaro domenlarni 1 yilga tekin olish imkoniyati mavjud.
+### 1. Git-ni ishga tushirish
+```bash
+git init
+git add .
+git commit -m "Initial commit: Professional Warehouse Management System"
+```
 
-### 2. Domen sotib olish (Custom Domain)
-Domen sotib olish uchun quyidagi xizmatlardan foydalanishingiz mumkin:
-*   **O'zbekistonda**: [uzinfocom.uz](https://cctld.uz), [webname.uz](https://webname.uz), [arsenal-d.uz](https://www.as.uz).
-*   **Xalqaro**: [Namecheap](https://namecheap.com), [GoDaddy](https://godaddy.com).
+### 2. GitHub-da yangi repozitoriya oching va bog'lang
+```bash
+git remote add origin https://github.com/USERNAME/REPO_NAME.git
+git branch -M main
+git push -u origin main
+```
 
-### 3. DNS sozlamalari (omborchi.uz uchun)
-Domen sotib olgan joyingizdagi boshqaruv paneliga quyidagi yozuvlarni kiriting:
+---
+
+## 🌐 Domen va Hosting sozlamalari
+
+### 1. Tekin subdomen
+Firebase Hosting sizga avtomatik ravishda bepul SSL sertifikati bilan `project-id.web.app` subdomenini beradi.
+
+### 2. Custom Domen (omborchi.uz) ulanishi
+Agar sizda xususiy domen bo'lsa, Firebase Console -> Hosting -> "Add Custom Domain" bo'limiga o'ting va quyidagi DNS yozuvlarini kiriting:
 
 **A Record:**
 *   **Host**: `@`
 *   **Value**: `199.36.158.100`
 
-**TXT Record (Egalikni tasdiqlash):**
+**TXT Record (Tasdiqlash):**
 *   **Host**: `@`
 *   **Value**: `hosting-site=studio-4209846898-d5885`
 
 ---
 
-## 🛠️ Texnologiyalar
+## 🚀 Texnologiyalar
 *   **Frontend**: Next.js 15 (App Router)
 *   **Backend**: Firebase Auth & Firestore
 *   **AI**: Google Gemini (Genkit)
-*   **Hosting**: Firebase Hosting
+*   **Kutubxonalar**: ShadCN UI, Lucide Icons, Recharts, jsPDF, XLSX
 
 Created by **X e M team** © 2026

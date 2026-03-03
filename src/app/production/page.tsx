@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -87,7 +87,6 @@ export default function ProductionPage() {
       const userName = user?.displayName || user?.email || "Noma'lum";
       const whName = warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum";
 
-      // Each component from warehouse
       for (const mat of neededMaterials) {
         const invId = `${warehouseId}_${mat.productId}`;
         const invRef = doc(db, "inventory", invId);
