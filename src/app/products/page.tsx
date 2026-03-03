@@ -41,8 +41,6 @@ import {
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -139,42 +137,6 @@ export default function ProductsPage() {
     } catch (error) {
       console.error("Excel export error:", error);
       toast({ variant: "destructive", title: "Excel eksportida xatolik" });
-    }
-  };
-
-  const exportToPDF = async () => {
-    try {
-      const jsPDFModule = await import("jspdf");
-      const jsPDF = jsPDFModule.default;
-      // @ts-ignore
-      await import("jspdf-autotable");
-      const doc = new jsPDF();
-      
-      doc.setFontSize(18);
-      doc.text("MAHSULOTLAR KATALOGI", 105, 20, { align: "center" });
-      
-      const tableData = filteredProducts.map((p, i) => [
-        i + 1,
-        p.name,
-        p.sku,
-        p.stock,
-        p.unit,
-        `${p.salePrice.toLocaleString()} so'm`
-      ]);
-
-      (doc as any).autoTable({
-        startY: 30,
-        head: [['#', 'Nomi', 'SKU', 'Zaxira', 'Birlik', 'Narxi']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [59, 130, 246] }
-      });
-
-      doc.save(`Mahsulotlar_Katalog_${Date.now()}.pdf`);
-      toast({ title: "PDF yuklandi" });
-    } catch (error) {
-      console.error("PDF export error:", error);
-      toast({ variant: "destructive", title: "PDF eksportida xatolik" });
     }
   };
 
@@ -291,9 +253,6 @@ export default function ProductsPage() {
               <div className="flex gap-2">
                 <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl" onClick={exportToExcel} title="Excel">
                   <TableIcon className="w-5 h-5 text-emerald-600" />
-                </Button>
-                <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl" onClick={exportToPDF} title="PDF">
-                  <FileText className="w-5 h-5 text-rose-600" />
                 </Button>
               </div>
             )}
@@ -412,7 +371,7 @@ export default function ProductsPage() {
                     <Card className="cursor-pointer hover:bg-primary/[0.03] hover:-translate-y-1 transition-all border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] relative" onClick={() => setSelectedCategoryId(cat.id)}>
                       <CardContent className="p-10 flex flex-col items-center text-center gap-6">
                         <div className="w-24 h-24 rounded-[2rem] bg-primary/10 flex items-center justify-center text-primary shadow-inner"><Folder className="w-12 h-12 fill-primary/20" /></div>
-                        <div><h3 className="font-black text-2xl tracking-tight">{cat.name}</h3><p className="text-[10px] font-black uppercase opacity-40 mt-2">{products?.filter(p => p.categoryId === cat.id).length || 0} ta mahsulot</p></div>
+                        <div><h3 className="font-black text-2xl tracking-tight">{cat.name}</h3><p className="text-[10px] font-black uppercase mt-2">{products?.filter(p => p.categoryId === cat.id).length || 0} ta mahsulot</p></div>
                         <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100"><div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center"><ChevronRight className="w-5 h-5" /></div></div>
                       </CardContent>
                     </Card>

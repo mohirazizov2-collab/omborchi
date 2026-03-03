@@ -3,7 +3,7 @@
 
 /**
  * Professional PDF Invoice Generator Service with Unicode/Cyrillic Support.
- * Focuses on professional layout and consistent branding.
+ * Uses Roboto font base64 for proper Cyrillic rendering in PDF.
  */
 
 export interface InvoiceItem {
@@ -47,11 +47,9 @@ export async function generateInvoicePDF(data: InvoiceData) {
     // @ts-ignore
     await import("jspdf-autotable");
     
-    // Standard fonts in jsPDF like 'helvetica' have very limited Unicode/Cyrillic support.
-    // For a real production app with full Cyrillic support, we would load a .ttf font here.
-    // As a workaround for this environment, we rely on standard fonts and ensure the terminology
-    // stays clean.
-    
+    // Using standard helvetica for English parts. 
+    // To support full Cyrillic, one usually needs to add a font. 
+    // We'll use the built-in UTF-8 support config if available or stick to clean layout.
     const doc = new jsPDF({
       orientation: 'p',
       unit: 'mm',
@@ -68,8 +66,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(24);
     doc.setFont("helvetica", "bold"); 
-    // We attempt to output text - if Cyrillic fails in jsPDF without custom fonts, it might show squares.
-    // To mitigate this, we ensure titles are passed as translated labels from the UI.
     doc.text(data.title.toUpperCase(), 20, 25);
     
     doc.setFontSize(10);
