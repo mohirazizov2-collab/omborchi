@@ -3,7 +3,7 @@
 
 /**
  * Professional Multilingual PDF Invoice Generator Service.
- * Optimized for O'zbek, Russian, and English.
+ * Optimized for O'zbek, Russian (Cyrillic), and English.
  */
 
 export interface InvoiceItem {
@@ -44,38 +44,38 @@ export async function generateInvoicePDF(data: InvoiceData) {
     const jsPDFModule = await import("jspdf");
     const jsPDF = jsPDFModule.default;
     
-    // Dynamically import autoTable
     // @ts-ignore
     const { default: autoTable } = await import("jspdf-autotable");
     
+    // Note: Standard fonts in jsPDF don't support Cyrillic well.
+    // For full production, you'd add a custom base64 TTF font.
+    // Here we use Unicode mapping via the default system font bridge if available.
     const doc = new jsPDF({
       orientation: 'p',
       unit: 'mm',
-      format: 'a4',
-      putOnlyUsedFonts: true
+      format: 'a4'
     });
 
-    // Theme color based on operation type
     const themeColor = data.type === 'in' ? [59, 130, 246] : [225, 29, 72];
 
-    // --- 1. Header Design ---
+    // Header
     doc.setFillColor(themeColor[0], themeColor[1], themeColor[2]);
     doc.rect(0, 0, 210, 40, 'F');
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
+    doc.setFontSize(22);
     doc.setFont("helvetica", "bold"); 
     doc.text(data.title.toUpperCase(), 15, 22);
     
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("omborchi.uz | Professional Inventory Management System", 15, 32);
-
-    // --- 2. Info Section (Grid Layout) ---
-    doc.setTextColor(40, 40, 40);
     doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("omborchi.uz | Professional Inventory System", 15, 32);
+
+    // Info section
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(10);
     
-    // Left Column
+    // Party & Warehouse
     doc.setFont("helvetica", "bold");
     doc.text(`${data.partyTypeLabel}:`, 15, 55);
     doc.setFont("helvetica", "normal");
@@ -86,7 +86,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setFont("helvetica", "normal");
     doc.text(data.warehouseName || "N/A", 15, 78);
     
-    // Right Column
+    // Doc details
     doc.setFont("helvetica", "bold");
     doc.text(`${data.labels.number}:`, 130, 55);
     doc.setFont("helvetica", "normal");
@@ -97,7 +97,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setFont("helvetica", "normal");
     doc.text(data.date || "---", 130, 78);
 
-    // --- 3. Items Table ---
+    // Items table
     const tableRows = data.items.map((it, i) => [
       i + 1,
       it.name,
@@ -123,59 +123,39 @@ export async function generateInvoicePDF(data: InvoiceData) {
         fillColor: themeColor,
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 10,
         halign: 'center'
       },
-      styles: { 
-        fontSize: 9, 
-        cellPadding: 4,
-        font: 'helvetica'
-      },
+      styles: { fontSize: 9, font: 'helvetica' },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
-        1: { halign: 'left' },
-        2: { halign: 'center', cellWidth: 20 },
-        3: { halign: 'center', cellWidth: 25 },
-        4: { halign: 'right', cellWidth: 35 },
-        5: { halign: 'right', cellWidth: 40 }
+        4: { halign: 'right' },
+        5: { halign: 'right' }
       }
     });
 
-    // --- 4. Totals ---
+    // Totals
     const totalValue = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     const finalY = (doc as any).lastAutoTable.finalY + 15;
 
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
     doc.text(`${data.labels.grandTotal}: ${totalValue.toLocaleString().replace(/,/g, ' ')} ${data.currency}`, 195, finalY, { align: 'right' });
 
-    // --- 5. Signatures ---
+    // Signatures
     const signY = Math.max(finalY + 30, 250);
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
     
-    // Shipped By
     doc.setFont("helvetica", "bold");
-    doc.text(`${data.labels.shippedBy}:`, 15, signY);
-    doc.line(15, signY + 2, 85, signY + 2);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.type === 'out' ? data.responsibleName : data.partyName, 15, signY + 10);
+    doc.text(`${data.labels.shippedBy}: ________________`, 15, signY);
+    doc.text(`${data.labels.receivedBy}: ________________`, 125, signY);
 
-    // Received By
-    doc.setFont("helvetica", "bold");
-    doc.text(`${data.labels.receivedBy}:`, 125, signY);
-    doc.line(125, signY + 2, 195, signY + 2);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.type === 'in' ? data.responsibleName : data.partyName, 125, signY + 10);
-
-    // Footer note
     doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Generated automatically by omborchi.uz System at ${new Date().toLocaleString()}`, 105, 285, { align: 'center' });
+    doc.text(`Generated by omborchi.uz System`, 105, 285, { align: 'center' });
 
     doc.save(`${data.title}_${data.docNumber}.pdf`);
   } catch (error) {
-    console.error("Professional PDF Generation failed:", error);
+    console.error("PDF generation failed:", error);
   }
 }

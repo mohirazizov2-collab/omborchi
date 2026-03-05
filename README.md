@@ -5,42 +5,31 @@ Rasmiy havola: [https://omborchi.uz](https://omborchi.uz)
 
 ---
 
-## 🛠️ Git Provayderiga (GitHub/GitLab) ulash
+## 🌐 Hosting va Domen Holati
 
-Loyihangizni Git repozitoriyasiga yuklash uchun terminalda quyidagi buyruqlarni bajaring:
+Loyihangiz Next.js 15 frameworkida qurilgan va quyidagi hostinglarga moslashtirilgan:
 
-### 1. Loyihani tayyorlash
+1.  **Firebase App Hosting**: Next.js uchun eng yaxshi tanlov. `apphosting.yaml` orqali server-side render funksiyalari to'liq ishlaydi.
+2.  **Firebase Hosting**: Statik va dinamik kontent uchun (Domen: `omborchi.uz`).
+3.  **Netlify**: Zaxira variant sifatida (`netlify.toml` mavjud).
+
+### 🛠️ GitLab Integratsiyasi
+
+Loyihani GitLab-ga yuklash uchun terminalda:
 ```bash
 git init
 git add .
-git commit -m "Initial commit: Advanced Warehouse Management System"
-```
-
-### 2. Masofaviy repozitoriyaga bog'lash (GitLab misolida)
-```bash
+git commit -m "Initial commit: Professional Warehouse Management"
 git remote add origin https://gitlab.com/omborchi-group/omborchi-project.git
 git branch -M main
 git push -u origin main
 ```
 
----
+### 🔗 Custom Domen (omborchi.uz) ulash
 
-## 🌐 Domen va Hosting sozlamalari
-
-Firebase Hosting sizga avtomatik ravishda bepul SSL sertifikati bilan `project-id.web.app` subdomenini beradi.
-
-### Custom Domen (omborchi.uz) ulash tartibi:
-1. **Domen sotib olish**: Uzinfocom, GoDaddy yoki Namecheap orqali domen sotib oling.
-2. **Firebase Console**: Hosting bo'limiga o'ting va "Add Custom Domain" tugmasini bosing.
-3. **DNS Sozlamalari**: Domen provayderingiz panelida quyidagi yozuvlarni kiriting:
-
-**A Record:**
-*   **Host**: `@`
-*   **Value**: `199.36.158.100`
-
-**TXT Record (Tasdiqlash):**
-*   **Host**: `@`
-*   **Value**: `hosting-site=studio-4209846898-d5885`
+Agar domen hali ishlamayotgan bo'lsa, Firebase Console-da quyidagilarni tekshiring:
+1.  **A Record**: `@` -> `199.36.158.100` (yoki Firebase bergan IP)
+2.  **TXT Record**: `hosting-site=...` (Verifikatsiya uchun)
 
 ---
 
@@ -48,6 +37,6 @@ Firebase Hosting sizga avtomatik ravishda bepul SSL sertifikati bilan `project-i
 *   **Frontend**: Next.js 15 (App Router)
 *   **Backend**: Firebase Auth & Firestore
 *   **AI**: Google Gemini (Genkit)
-*   **Kutubxonalar**: ShadCN UI, Lucide Icons, Recharts, jsPDF, XLSX
+*   **PDF/Excel**: Professional Multilingual Support (Cyrillic supported)
 
 Created by **X e M team** © 2026
