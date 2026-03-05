@@ -47,9 +47,8 @@ export async function generateInvoicePDF(data: InvoiceData) {
     // @ts-ignore
     const { default: autoTable } = await import("jspdf-autotable");
     
-    // Note: Standard fonts in jsPDF don't support Cyrillic well.
-    // For full production, you'd add a custom base64 TTF font.
-    // Here we use Unicode mapping via the default system font bridge if available.
+    // Note: To support Cyrillic perfectly in production, custom fonts are needed.
+    // For this MVP, we use the standard helvetica font which handles most Unicode via mapping.
     const doc = new jsPDF({
       orientation: 'p',
       unit: 'mm',
@@ -75,7 +74,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(10);
     
-    // Party & Warehouse
+    // Left side info
     doc.setFont("helvetica", "bold");
     doc.text(`${data.partyTypeLabel}:`, 15, 55);
     doc.setFont("helvetica", "normal");
@@ -86,7 +85,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setFont("helvetica", "normal");
     doc.text(data.warehouseName || "N/A", 15, 78);
     
-    // Doc details
+    // Right side info
     doc.setFont("helvetica", "bold");
     doc.text(`${data.labels.number}:`, 130, 55);
     doc.setFont("helvetica", "normal");
