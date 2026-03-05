@@ -44,8 +44,9 @@ export async function generateInvoicePDF(data: InvoiceData) {
     const jsPDFModule = await import("jspdf");
     const jsPDF = jsPDFModule.default;
     
+    // Dynamically import autoTable
     // @ts-ignore
-    await import("jspdf-autotable");
+    const { default: autoTable } = await import("jspdf-autotable");
     
     const doc = new jsPDF({
       orientation: 'p',
@@ -150,7 +151,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.text(`${data.labels.grandTotal}: ${totalValue.toLocaleString().replace(/,/g, ' ')} ${data.currency}`, 195, finalY, { align: 'right' });
 
     // --- 5. Signatures ---
-    const signY = 250;
+    const signY = Math.max(finalY + 30, 250);
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
     
