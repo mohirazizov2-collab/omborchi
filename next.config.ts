@@ -9,10 +9,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   poweredByHeader: false,
-  devIndicators: {
-    appIsrStatus: false,
-    buildActivity: false,
-  },
+  devIndicators: false, // Disables the Next.js development overlay indicators (like the "N" icon)
   images: {
     remotePatterns: [
       {

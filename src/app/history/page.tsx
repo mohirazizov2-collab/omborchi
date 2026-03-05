@@ -99,7 +99,8 @@ export default function HistoryPage() {
 
   const exportDayToExcel = async (day: string, data: any) => {
     try {
-      const XLSX = await import("xlsx");
+      const XLSXModule = await import("xlsx");
+      const XLSX = (XLSXModule as any).default || XLSXModule;
       
       const records = data.allMovements.map((m: any) => ({
         "Sana": format(new Date(m.movementDate), 'HH:mm'),

@@ -44,8 +44,9 @@ export async function generateInvoicePDF(data: InvoiceData) {
     const jsPDFModule = await import("jspdf");
     const jsPDF = jsPDFModule.default;
     
-    // @ts-ignore
-    const { default: autoTable } = await import("jspdf-autotable");
+    // Dynamically import jspdf-autotable to handle build environments
+    const autoTableModule = await import("jspdf-autotable");
+    const autoTable = autoTableModule.default || autoTableModule;
     
     const doc = new jsPDF({
       orientation: 'p',
