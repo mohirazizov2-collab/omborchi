@@ -13,16 +13,17 @@ Loyihangiz Next.js 15 frameworkida qurilgan va quyidagi hostinglarga moslashtiri
 2.  **Firebase Hosting**: Statik va dinamik kontent uchun (Domen: `omborchi.uz`).
 3.  **Netlify**: Zaxira variant sifatida (`netlify.toml` mavjud).
 
-### 🛠️ GitLab Integratsiyasi
+### 🛠️ GitHub Integratsiyasi
 
-Loyihani GitLab-ga yuklash uchun terminalda quyidagi buyruqlarni bajaring:
+Loyihani GitHub-ga yuklash uchun terminalda quyidagi buyruqlarni bajaring:
 
 ```bash
 git init
-git remote add origin https://gitlab.com/omborchi-group/omborchi-project.git
 git add .
-git commit -m "Initial commit: Professional Warehouse Management"
+git commit -m "Initial commit: Professional Warehouse Management System"
 git branch -M main
+# GitHub-da yaratilgan repozitoriy linkini qo'ying:
+git remote add origin https://github.com/FOYDALANUVCHI_NOMI/omborchi-project.git
 git push -u origin main
 ```
 

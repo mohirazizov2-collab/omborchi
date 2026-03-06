@@ -44,8 +44,9 @@ export async function generateInvoicePDF(data: InvoiceData) {
     const jsPDFModule = await import("jspdf");
     const jsPDF = jsPDFModule.default;
     
+    // Dynamically import autoTable to avoid build time issues with types
     const autoTableModule = await import("jspdf-autotable");
-    const autoTable = autoTableModule.default || autoTableModule;
+    const autoTable = (autoTableModule as any).default || autoTableModule;
     
     const doc = new jsPDF({
       orientation: 'p',
@@ -60,13 +61,13 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.rect(0, 0, 210, 45, 'F');
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
+    doc.setFontSize(22);
     doc.setFont("helvetica", "bold"); 
     doc.text(data.title.toUpperCase(), 15, 25);
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("omborchi.uz | Professional Warehouse Management", 15, 35);
+    doc.text("omborchi.uz | Professional Warehouse Management System", 15, 35);
 
     // Metadata Section
     doc.setTextColor(40, 40, 40);
@@ -108,6 +109,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
       (it.quantity * it.price).toLocaleString().replace(/,/g, ' ')
     ]);
 
+    // Use autoTable properly
     (doc as any).autoTable({
       startY: 100,
       head: [[
@@ -145,6 +147,7 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
     doc.text(`${data.labels.grandTotal}: ${totalValue.toLocaleString().replace(/,/g, ' ')} ${data.currency}`, 195, finalY, { align: 'right' });
 
+    // Footer signatures
     const signY = Math.max(finalY + 35, 250);
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
