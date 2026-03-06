@@ -15,12 +15,13 @@ Loyihangiz Next.js 15 frameworkida qurilgan va quyidagi hostinglarga moslashtiri
 
 ### 🛠️ GitLab Integratsiyasi
 
-Loyihani GitLab-ga yuklash uchun terminalda:
+Loyihani GitLab-ga yuklash uchun terminalda quyidagi buyruqlarni bajaring:
+
 ```bash
 git init
+git remote add origin https://gitlab.com/omborchi-group/omborchi-project.git
 git add .
 git commit -m "Initial commit: Professional Warehouse Management"
-git remote add origin https://gitlab.com/omborchi-group/omborchi-project.git
 git branch -M main
 git push -u origin main
 ```
