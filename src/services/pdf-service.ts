@@ -44,7 +44,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     const jsPDFModule = await import("jspdf");
     const jsPDF = jsPDFModule.default;
     
-    // Dynamically import jspdf-autotable to handle build environments
     const autoTableModule = await import("jspdf-autotable");
     const autoTable = autoTableModule.default || autoTableModule;
     
@@ -73,7 +72,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(10);
     
-    // Grid alignment
     const col1 = 15;
     const col2 = 130;
     
@@ -97,7 +95,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setFont("helvetica", "normal");
     doc.text(data.date || "---", col2, 84);
 
-    // Line separator
     doc.setDrawColor(200, 200, 200);
     doc.line(15, 92, 195, 92);
 
@@ -140,7 +137,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
       }
     });
 
-    // Summary
     const totalValue = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     const finalY = (doc as any).lastAutoTable.finalY + 15;
 
@@ -149,7 +145,6 @@ export async function generateInvoicePDF(data: InvoiceData) {
     doc.setTextColor(themeColor[0], themeColor[1], themeColor[2]);
     doc.text(`${data.labels.grandTotal}: ${totalValue.toLocaleString().replace(/,/g, ' ')} ${data.currency}`, 195, finalY, { align: 'right' });
 
-    // Footer Signatures
     const signY = Math.max(finalY + 35, 250);
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
