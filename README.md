@@ -1,44 +1,43 @@
 
 # 🚀 omborchi.uz - Professional Ombor Boshqaruvi Tizimi
 
-Rasmiy havola: [https://omborchi.uz](https://omborchi.uz)
+Rasmiy havola: [https://mohirazizov2-collab.github.io/omborchi/](https://mohirazizov2-collab.github.io/omborchi/)
 
 ---
 
-## 🌐 Hosting va Domen Holati
+## 🌐 GitHub Pages Deployment
 
-Loyihangiz Next.js 15 frameworkida qurilgan va quyidagi hostinglarga moslashtirilgan:
+Loyihangiz GitHub Pages-da `/omborchi/` sub-path ostida ishlashi uchun sozlangan. Har qanday o'zgarishdan keyin quyidagi amallarni bajaring:
 
-1.  **Firebase App Hosting**: Next.js uchun eng yaxshi tanlov. `apphosting.yaml` orqali server-side render funksiyalari to'liq ishlaydi.
-2.  **Firebase Hosting**: Statik va dinamik kontent uchun (Domen: `omborchi.uz`).
-3.  **Netlify**: Zaxira variant sifatida (`netlify.toml` mavjud).
+1.  **Build va Export**:
+    Terminalda loyihani build qiling:
+    ```bash
+    npm run build
+    ```
+    Bu buyruq `out` nomli papka yaratadi. GitHub Pages aynan shu papka ichidagi fayllarni ko'rsatishi kerak.
 
-### 🛠️ GitHub Integratsiyasi
+2.  **GitHub Settings**:
+    - GitHub-da loyiha sozlamalariga (Settings) kiring.
+    - **Pages** bo'limiga o'ting.
+    - **Build and deployment** qismida "Static HTML" yoki "GitHub Actions" orqali deployment-ni tanlang.
+    - Agar statik yuklayotgan bo'lsangiz, `out` papkasini `gh-pages` branchiga yuklang.
 
-Loyihani GitHub-ga yuklash uchun terminalda quyidagi buyruqlarni bajaring:
+### 🛠️ GitHub-ga yuklash buyruqlari:
 
 ```bash
-git init
 git add .
-git commit -m "Initial commit: Professional Warehouse Management System"
-git branch -M main
-# GitHub-da yaratilgan repozitoriy linkini qo'ying:
-git remote add origin https://mohirazizov2-collab.github.io/omborchi/
-git push -u origin main
+git commit -m "Update: GitHub Pages configuration and bug fixes"
+git push origin main
 ```
-
-### 🔗 Custom Domen (omborchi.uz) ulash
-
-Agar domen hali ishlamayotgan bo'lsa, Firebase Console-da quyidagilarni tekshiring:
-1.  **A Record**: `@` -> `199.36.158.100` (yoki Firebase bergan IP)
-2.  **TXT Record**: `hosting-site=...` (Verifikatsiya uchun)
 
 ---
 
 ## 🚀 Texnologiyalar
-*   **Frontend**: Next.js 15 (App Router)
+*   **Frontend**: Next.js 15 (App Router, Static Export)
 *   **Backend**: Firebase Auth & Firestore
 *   **AI**: Google Gemini (Genkit)
-*   **PDF/Excel**: Professional Multilingual Support (Cyrillic supported)
+*   **PDF/Excel**: Professional Multilingual Support
+
+**Eslatma**: GitHub Pages faqat statik fayllarni qo'llab-quvvatlaydi. Genkit AI funksiyalari (Server Actions) ishlashi uchun Firebase App Hosting-dan foydalanish tavsiya etiladi.
 
 Created by **X e M team** © 2026

@@ -2,15 +2,17 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  poweredByHeader: false,
-  devIndicators: false, // Disables the Next.js development overlay indicators (like the "N" icon)
+  // GitHub Pages uchun basePath va assetPrefix sozlamalari
+  // Loyihangiz /omborchi/ manzili ostida bo'lgani uchun:
+  basePath: '/omborchi',
+  assetPrefix: '/omborchi/',
+  
+  // Statik sayt sifatida eksport qilish
+  output: 'export',
+  
+  // GitHub Pages-da rasmlarni optimallashtirish serveri yo'qligi sababli
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -32,6 +34,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  poweredByHeader: false,
+  devIndicators: false, // O'sha "N" belgisini o'chiradi
 };
 
 export default nextConfig;
