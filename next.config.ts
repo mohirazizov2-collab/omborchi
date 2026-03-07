@@ -42,7 +42,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   poweredByHeader: false,
-  devIndicators: false, // O'sha "N" belgisini o'chiradi
+  devIndicators: false, // Next.js dev indikatorini o'chirish
 };
 
 export default nextConfig;
