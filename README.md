@@ -23,7 +23,7 @@ git add .
 git commit -m "Initial commit: Professional Warehouse Management System"
 git branch -M main
 # GitHub-da yaratilgan repozitoriy linkini qo'ying:
-git remote add origin https://github.com/FOYDALANUVCHI_NOMI/omborchi-project.git
+git remote add origin https://mohirazizov2-collab.github.io/omborchi/
 git push -u origin main
 ```
 

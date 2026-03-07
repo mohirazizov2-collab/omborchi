@@ -10,7 +10,4 @@
   NODE_VERSION = "20"
   NEXT_USE_NETLIFY_EDGE = "false"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Removed basic redirect to index.html to allow Next.js App Router to handle routes
