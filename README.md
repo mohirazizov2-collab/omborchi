@@ -26,7 +26,7 @@ Loyihangiz GitHub Pages-da `/omborchi/` sub-path ostida ishlashi uchun sozlangan
 
 ```bash
 git add .
-git commit -m "Update: GitHub Pages configuration and bug fixes"
+git commit -m "Fix: Preview and GitHub Pages configurations"
 git push origin main
 ```
 
@@ -38,6 +38,6 @@ git push origin main
 *   **AI**: Google Gemini (Genkit)
 *   **PDF/Excel**: Professional Multilingual Support
 
-**Eslatma**: GitHub Pages faqat statik fayllarni qo'llab-quvvatlaydi. Genkit AI funksiyalari (Server Actions) ishlashi uchun Firebase App Hosting-dan foydalanish tavsiya etiladi.
+**Eslatma**: GitHub Pages faqat statik fayllarni qo'llab-quvvatlaydi. Genkit AI funksiyalari (Server Actions) ishlashi uchun Firebase App Hosting-dan foydalanish tavsiya etiladi. Preview rejimida muammo bo'lmasligi uchun `next.config.ts` faylida `basePath` shartli ravishda sozlangan.
 
 Created by **X e M team** © 2026

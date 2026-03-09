@@ -3,9 +3,9 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   // GitHub Pages uchun basePath va assetPrefix sozlamalari
-  // Loyihangiz /omborchi/ manzili ostida bo'lgani uchun:
-  basePath: '/omborchi',
-  assetPrefix: '/omborchi/',
+  // Local preview (development) vaqtida root rejimida ishlashi uchun shartli tekshiruv
+  basePath: process.env.NODE_ENV === 'production' ? '/omborchi' : '',
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/omborchi/' : '',
   
   // Statik sayt sifatida eksport qilish
   output: 'export',
@@ -42,7 +42,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   poweredByHeader: false,
-  devIndicators: false, // Next.js dev indikatorini o'chirish
+  devIndicators: false, // Ekrandagi Next.js "N" belgisini o'chirish
 };
 
 export default nextConfig;
