@@ -1,9 +1,8 @@
-
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Warehouse,
@@ -22,7 +21,9 @@ import {
   WalletCards,
   Coins,
   FlaskConical,
-  Wrench
+  Wrench,
+  Menu,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -47,44 +48,39 @@ export function OmniSidebar() {
   const pathname = usePathname();
   const { t, language, setLanguage } = useLanguage();
   const { user, role } = useUser();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isSuperAdmin = role === "Super Admin";
   const isAdmin = role === "Admin" || isSuperAdmin;
   const isOmborchi = role === "Omborchi";
 
-  // Analitika Guruhi
   const analyticsNavigation = useMemo(() => [
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
     { name: t.nav.history, href: "/history", icon: History },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
   ], [t, isOmborchi]);
 
-  // Nakladnolar Guruhi
   const invoiceNavigation = useMemo(() => [
     { name: t.nav.stockIn, href: "/stock-in", icon: FileInput },
     { name: t.nav.stockOut, href: "/stock-out", icon: FileOutput },
   ], [t]);
 
-  // Inventar Boshqaruvi Guruhi
   const inventoryNavigation = useMemo(() => [
     { name: t.nav.products, href: "/products", icon: Package },
     { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse },
     { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
   ], [t, isAdmin]);
 
-  // Ishlab chiqarish guruhi
   const productionNavigation = useMemo(() => [
     { name: t.nav.recipes, href: "/recipes", icon: FlaskConical },
     { name: t.nav.productionAct, href: "/production", icon: Wrench },
   ], [t]);
 
-  // Moliya Guruhi (Omborchi uchun butunlay yashiriladi)
   const financeNavigation = useMemo(() => [
     { name: t.nav.expenses, href: "/expenses", icon: WalletCards, hide: isOmborchi },
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
   ], [t, isAdmin, isOmborchi]);
 
-  // Ma'muriyat Guruhi
   const adminNavigation = useMemo(() => [
     { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isSuperAdmin },
     { name: t.nav.settings, href: "/settings", icon: Settings, hide: !isAdmin },
@@ -94,7 +90,6 @@ export function OmniSidebar() {
     ? user.displayName.split(' ').map(n => n[0]).join('')
     : (user?.email ? user.email[0].toUpperCase() : 'U'), [user]);
 
-  // Qaysi guruh ochiq turishini aniqlash
   const activeGroup = useMemo(() => {
     if (analyticsNavigation.some(i => pathname === i.href)) return "analytics";
     if (invoiceNavigation.some(i => pathname === i.href)) return "invoices";
@@ -130,6 +125,7 @@ export function OmniSidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={() => setMobileOpen(false)}
                 className={cn(
                   "flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all duration-200",
                   isSubActive 
@@ -147,10 +143,10 @@ export function OmniSidebar() {
     );
   };
 
-  return (
-    <div className="flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
       <div className="flex items-center px-6 h-20 border-b shrink-0">
-        <Link href="/" className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group" onClick={() => setMobileOpen(false)}>
           <div className="w-11 h-11 rounded-[0.9rem] bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 10L12 4L21 10V20H3V10Z" />
@@ -191,7 +187,7 @@ export function OmniSidebar() {
       </div>
 
       <div className="p-4 border-t shrink-0">
-        <Link href="/profile">
+        <Link href="/profile" onClick={() => setMobileOpen(false)}>
           <div className="flex items-center gap-3 p-3 rounded-2xl hover:bg-muted transition-all cursor-pointer group bg-muted/20">
             <Avatar className="h-9 w-9 ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
               <AvatarFallback className="bg-primary/10 text-primary text-xs font-black">{userInitials}</AvatarFallback>
@@ -204,5 +200,50 @@ export function OmniSidebar() {
         </Link>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-16 bg-card border-b">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10L12 4L21 10V20H3V10Z" />
+              <path d="M8 12H16" />
+              <path d="M8 15H16" />
+            </svg>
+          </div>
+          <span className="font-black text-lg tracking-tighter">omborchi.uz</span>
+        </Link>
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-2 rounded-xl hover:bg-muted transition-colors"
+        >
+          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
+
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar */}
+      <div className={cn(
+        "md:hidden fixed top-16 left-0 bottom-0 z-50 w-72 bg-card border-r transition-transform duration-300",
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <SidebarContent />
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
+        <SidebarContent />
+      </div>
+    </>
   );
 }
