@@ -1,18 +1,7 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  // GitHub Pages uchun basePath va assetPrefix sozlamalari
-  // Local preview (development) vaqtida root rejimida ishlashi uchun shartli tekshiruv
-  basePath: process.env.NODE_ENV === 'production' ? '/omborchi' : '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/omborchi/' : '',
-  
-  // Statik sayt sifatida eksport qilish
-  output: 'export',
-  
-  // GitHub Pages-da rasmlarni optimallashtirish serveri yo'qligi sababli
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -34,7 +23,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -42,7 +30,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   poweredByHeader: false,
-  devIndicators: false, // Ekrandagi Next.js "N" belgisini o'chirish
+  devIndicators: false,
 };
 
 export default nextConfig;
