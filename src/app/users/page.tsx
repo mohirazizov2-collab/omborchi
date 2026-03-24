@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -136,7 +135,7 @@ export default function UsersPage() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!db || !confirm("Ushbu foydalanuvchi profilini o'chirishni tasdiqlaysizmi? (Eslatma: Bu faqat Firestore profilini o'chiradi)")) return;
+    if (!db || !confirm("Ushbu foydalanuvchi profilini o'chirishni tasdiqlaysizmi?")) return;
     
     setIsDeleting(userId);
     try {
@@ -146,6 +145,14 @@ export default function UsersPage() {
       toast({ variant: "destructive", title: "Xatolik", description: "O'chirishda xato yuz berdi." });
     } finally {
       setIsDeleting(null);
+    }
+  };
+
+  const getRoleBadgeStyle = (userRole: string) => {
+    switch (userRole) {
+      case "Admin": return "bg-amber-500/10 text-amber-500";
+      case "Sotuvchi": return "bg-green-500/10 text-green-500";
+      default: return "bg-blue-500/10 text-blue-500";
     }
   };
 
@@ -239,9 +246,11 @@ export default function UsersPage() {
                       <SelectTrigger className="h-12 rounded-2xl bg-background/50 border-border/40 font-bold">
                         <SelectValue placeholder="Rolni tanlang" />
                       </SelectTrigger>
+                      {/* ✅ Sotuvchi roli qo'shildi */}
                       <SelectContent className="rounded-2xl border-border/40">
                         <SelectItem value="Admin" className="font-bold">Admin</SelectItem>
                         <SelectItem value="Omborchi" className="font-bold">Omborchi</SelectItem>
+                        <SelectItem value="Sotuvchi" className="font-bold">Sotuvchi</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -312,10 +321,7 @@ export default function UsersPage() {
                           </td>
                           <td className="px-6 py-6">
                             <div className="flex items-center gap-2">
-                              <div className={cn(
-                                "p-1.5 rounded-lg",
-                                u.role === "Admin" ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
-                              )}>
+                              <div className={cn("p-1.5 rounded-lg", getRoleBadgeStyle(u.role))}>
                                 <ShieldCheck className="w-4 h-4" />
                               </div>
                               <span className="text-xs font-black uppercase tracking-wider">{u.role || 'Omborchi'}</span>
