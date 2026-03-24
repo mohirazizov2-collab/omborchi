@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -30,15 +29,15 @@ export default function InventoryAuditPage() {
   const [auditData, setAuditData] = useState<Record<string, number>>({});
 
   const isAdmin = role === "Super Admin" || role === "Admin";
+  const isSotuvchi = role === "Sotuvchi";
+  const canAccess = isAdmin || isSotuvchi;
 
-  // Faqat adminlar kira oladi
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && !canAccess) {
       router.push("/");
     }
-  }, [isAdmin, isUserLoading, router]);
+  }, [canAccess, isUserLoading, router]);
 
-  // Agar foydalanuvchiga ombor biriktirilgan bo'lsa, uni avtomatik tanlash
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) {
       setSelectedWarehouseId(assignedWarehouseId);
@@ -65,9 +64,8 @@ export default function InventoryAuditPage() {
 
   const filteredProducts = useMemo(() => {
     if (!products || !selectedWarehouseId) return [];
-    
     return products.filter(p => {
-      const matchesSearch = 
+      const matchesSearch =
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesSearch;
@@ -99,7 +97,7 @@ export default function InventoryAuditPage() {
 
     const currentWhStock = product.warehouseStock;
     const discrepancy = physicalCount - currentWhStock;
-    
+
     if (discrepancy === 0) {
       toast({ title: "Xabar", description: "Zaxira miqdori allaqachon to'g'ri." });
       return;
@@ -108,7 +106,6 @@ export default function InventoryAuditPage() {
     setIsSaving(product.id);
     try {
       const selectedWhName = warehouses?.find(w => w.id === selectedWarehouseId)?.name || "Noma'lum";
-      
       const movementData = {
         productId: product.id,
         productName: product.name,
@@ -122,11 +119,9 @@ export default function InventoryAuditPage() {
         description: `Inventarizatsiya: Tizimda ${currentWhStock}, Haqiqatda ${physicalCount}`,
         unit: product.unit || "pcs"
       };
-      
-      // 1. Tarixga yozish
+
       addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
 
-      // 2. Ombor qoldig'ini yangilash (Mavjud bo'lmasa yaratadi)
       const invId = `${selectedWarehouseId}_${product.id}`;
       const invRef = doc(db, "inventory", invId);
       setDocumentNonBlocking(invRef, {
@@ -137,7 +132,6 @@ export default function InventoryAuditPage() {
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
-      // 3. Umumiy katalog zaxirasini yangilash
       const productRef = doc(db, "products", product.id);
       updateDocumentNonBlocking(productRef, {
         stock: (product.stock || 0) + discrepancy,
@@ -149,7 +143,6 @@ export default function InventoryAuditPage() {
         description: `${product.name} zaxirasi ${physicalCount} ga to'g'irlandi.`,
       });
 
-      // Formani tozalash
       const newAuditData = { ...auditData };
       delete newAuditData[product.id];
       setAuditData(newAuditData);
@@ -167,12 +160,12 @@ export default function InventoryAuditPage() {
     </div>
   );
 
-  if (!isAdmin) return null;
+  if (!canAccess) return null;
 
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
-      <motion.main 
+      <motion.main
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex-1 p-6 md:p-10 overflow-y-auto page-transition"
@@ -206,9 +199,9 @@ export default function InventoryAuditPage() {
             <Label className="text-[10px] font-black uppercase tracking-widest pl-2 opacity-50 mb-2 block">Mahsulot qidiruvi</Label>
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
-                placeholder="Nomi yoki tavar kodi bo'yicha..." 
-                className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50" 
+              <Input
+                placeholder="Nomi yoki tavar kodi bo'yicha..."
+                className="pl-12 h-12 rounded-2xl bg-background/50 border-border/40 focus:border-primary/50"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 disabled={!selectedWarehouseId}
@@ -234,7 +227,7 @@ export default function InventoryAuditPage() {
                 const discrepancy = physical - (p.warehouseStock || 0);
                 const unitLabel = t.units[p.unit as keyof typeof t.units] || p.unit || '';
                 const isItemSaving = isSaving === p.id;
-                
+
                 return (
                   <motion.div
                     key={p.id}
@@ -266,7 +259,7 @@ export default function InventoryAuditPage() {
                           <div className="w-32">
                             <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 mb-1">Amalda (Haqiqiy)</p>
                             <div className="relative">
-                              <Input 
+                              <Input
                                 type="number"
                                 className="h-10 rounded-xl bg-background/50 border-border/40 font-black text-center focus:ring-primary/20"
                                 value={auditData[p.id] ?? ""}
@@ -287,7 +280,7 @@ export default function InventoryAuditPage() {
                             </p>
                           </div>
 
-                          <Button 
+                          <Button
                             onClick={() => handleReconcile(p)}
                             disabled={discrepancy === 0 || isItemSaving}
                             className={cn(
