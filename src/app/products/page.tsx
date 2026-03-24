@@ -64,6 +64,7 @@ export default function ProductsPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
 
   const canEdit = role === "Super Admin" || role === "Admin";
+const canAdd = canEdit || role === "Sotuvchi";
 
   const [formData, setFormData] = useState({
     name: "",
