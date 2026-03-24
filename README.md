@@ -29,4 +29,4 @@ git push origin main
 **Eslatma**: GitHub Pages faqat statik fayllarni qo'llab-quvvatlaydi. Genkit AI funksiyalari (Server Actions) ishlashi uchun Firebase App Hosting-dan foydalanish tavsiya etiladi. Preview rejimida muammo bo'lmasligi uchun `next.config.ts` faylida `basePath` shartli ravishda sozlangan.
 Created by **X e M team** © 2026
 
-Last updated: 2026-03-24
+Last updated: 2026-03-24 v2
