@@ -85,7 +85,7 @@ export default function ProductsPage() {
     if (!products) return [];
     const q = searchQuery.toLowerCase().trim();
     let list = products.filter((p) => {
-      const matchCat = selectedCategoryId === "all" || p.categoryId === selectedCategoryId;
+      const matchCat = selectedCategoryId === "all" || (selectedCategoryId === "none" ? !p.categoryId : p.categoryId === selectedCategoryId);
       const matchQ = !q || p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q);
       return matchCat && matchQ;
     });
@@ -149,6 +149,7 @@ export default function ProductsPage() {
     }
     setDoc(productRef, data, { merge: true })
       .then(() => { handleCloseDialog(); toast({ title: "Muvaffaqiyatli saqlandi" }); })
+      .catch(() => toast({ variant: "destructive", title: "Xatolik yuz berdi" }))
       .finally(() => setIsSaving(false));
   };
 
@@ -160,7 +161,7 @@ export default function ProductsPage() {
 
   const handleAddNewClick = () => {
     setEditingProduct(null);
-    setFormData({ name: "", sku: calculateNextSku(), unit: "pcs", categoryId: selectedCategoryId !== "all" ? selectedCategoryId : "", salePrice: 0, lowStockThreshold: 10 });
+    setFormData({ name: "", sku: calculateNextSku(), unit: "pcs", categoryId: selectedCategoryId !== "all" && selectedCategoryId !== "none" ? selectedCategoryId : "", salePrice: 0, lowStockThreshold: 10 });
     setIsDialogOpen(true);
   };
 
@@ -182,6 +183,8 @@ export default function ProductsPage() {
     try {
       for (const id of selectedIds) await deleteDoc(doc(db, "products", id));
       setSelectedIds([]); toast({ title: "Muvaffaqiyatli o'chirildi" });
+    } catch {
+      toast({ variant: "destructive", title: "Xatolik yuz berdi" });
     } finally { setIsBulkDeleting(false); }
   };
 
@@ -202,14 +205,20 @@ export default function ProductsPage() {
       });
       setNewCategoryName(""); setIsCategoryDialogOpen(false); setEditingCategory(null);
       toast({ title: editingCategory ? "Guruh yangilandi" : "Guruh yaratildi" });
+    } catch {
+      toast({ variant: "destructive", title: "Xatolik yuz berdi" });
     } finally { setIsSaving(false); }
   };
 
   const handleDeleteCategory = async (id: string, name: string) => {
     if (!db || !confirm(`"${name}" guruhini o'chirmoqchimisiz?`)) return;
-    await deleteDoc(doc(db, "categories", id));
-    if (selectedCategoryId === id) setSelectedCategoryId("all");
-    toast({ title: "Guruh o'chirildi" });
+    try {
+      await deleteDoc(doc(db, "categories", id));
+      if (selectedCategoryId === id) setSelectedCategoryId("all");
+      toast({ title: "Guruh o'chirildi" });
+    } catch {
+      toast({ variant: "destructive", title: "Xatolik yuz berdi" });
+    }
   };
 
   const formatMoney = (v: number) => v?.toLocaleString("ru-RU") ?? "0";
@@ -233,10 +242,16 @@ export default function ProductsPage() {
           <h1 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
             <Package className="w-5 h-5 text-primary" />
             {t.products.title}
-            {selectedCategoryId !== "all" && (
+            {selectedCategoryId !== "all" && selectedCategoryId !== "none" && (
               <span className="text-muted-foreground font-normal text-sm flex items-center gap-1">
                 <ChevronRight className="w-4 h-4" />
                 {categories?.find((c) => c.id === selectedCategoryId)?.name}
+              </span>
+            )}
+            {selectedCategoryId === "none" && (
+              <span className="text-muted-foreground font-normal text-sm flex items-center gap-1">
+                <ChevronRight className="w-4 h-4" />
+                Guruhlanmagan
               </span>
             )}
           </h1>
@@ -331,7 +346,7 @@ export default function ProductsPage() {
                 )}
               >
                 <Folder className="w-3.5 h-3.5 shrink-0 opacity-40" />
-                <span className="flex-1 truncate">Guruhlenmagan</span>
+                <span className="flex-1 truncate">Guruhlanmagan</span>
                 <span className={cn("text-[10px] font-black shrink-0", selectedCategoryId === "none" ? "text-white/70" : "text-muted-foreground")}>
                   {products?.filter((p) => !p.categoryId).length || 0}
                 </span>
@@ -443,7 +458,7 @@ export default function ProductsPage() {
                         const isSelected = selectedIds.includes(p.id);
                         const isLow = (p.stock || 0) > 0 && (p.stock || 0) <= (p.lowStockThreshold || 10);
                         const isOut = (p.stock || 0) <= 0;
-                        const unitLabel = t.units[p.unit as keyof typeof t.units] || p.unit;
+                        const unitLabel = t.units?.[p.unit as keyof typeof t.units] || p.unit;
 
                         return (
                           <motion.tr
@@ -553,7 +568,7 @@ export default function ProductsPage() {
                       <tr>
                         {canEdit && <td />}
                         <td colSpan={3} className="px-3 py-2.5 text-xs font-black text-muted-foreground">
-                          Jami {filteredProducts.length} та mahsulot
+                          Jami {filteredProducts.length} ta mahsulot
                         </td>
                         <td colSpan={2} />
                         <td className="px-3 py-2.5 text-center text-xs font-black text-emerald-600">
@@ -622,7 +637,7 @@ export default function ProductsPage() {
                   <SelectContent className="rounded-xl">
                     {["pcs", "kg", "g", "m", "l", "set", "box"].map((u) => (
                       <SelectItem key={u} value={u} className="text-sm font-bold">
-                        {t.units[u as keyof typeof t.units] || u}
+                        {t.units?.[u as keyof typeof t.units] || u}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -633,10 +648,10 @@ export default function ProductsPage() {
                 <Label className="w-36 text-xs text-right text-muted-foreground shrink-0">Guruh:</Label>
                 <Select value={formData.categoryId || "none"} onValueChange={(v) => setFormData({ ...formData, categoryId: v === "none" ? "" : v })}>
                   <SelectTrigger className="h-9 flex-1 text-sm bg-background/80 border-border/40 rounded-lg font-bold">
-                    <SelectValue placeholder="Guruhlenmagan" />
+                    <SelectValue placeholder="Guruhlanmagan" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    <SelectItem value="none" className="text-sm font-bold">Guruhlenmagan</SelectItem>
+                    <SelectItem value="none" className="text-sm font-bold">Guruhlanmagan</SelectItem>
                     {categories?.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id} className="text-sm font-bold">{cat.name}</SelectItem>
                     ))}
