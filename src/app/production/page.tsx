@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -15,10 +14,7 @@ import {
   CheckCircle2, 
   Warehouse, 
   AlertTriangle,
-  ArrowRight,
-  Package,
-  ClipboardList,
-  FlaskConical
+  Package
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -27,13 +23,13 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/no
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-export default function ProductionPage() {
+export default function FactoryProductionPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, assignedWarehouseId, role } = useUser();
   const [loading, setLoading] = useState(false);
-  const [selectedRecipeId, setSelectedRecipeId] = useState("");
+  const [selectedProcedureId, setSelectedProcedureId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [warehouseId, setWarehouseId] = useState("");
 
@@ -45,8 +41,8 @@ export default function ProductionPage() {
     }
   }, [isAdmin, assignedWarehouseId]);
 
-  const recipesQuery = useMemoFirebase(() => db ? collection(db, "recipes") : null, [db]);
-  const { data: recipes } = useCollection(recipesQuery);
+  const proceduresQuery = useMemoFirebase(() => db ? collection(db, "procedures") : null, [db]);
+  const { data: procedures } = useCollection(proceduresQuery);
 
   const productsQuery = useMemoFirebase(() => db ? collection(db, "products") : null, [db]);
   const { data: products } = useCollection(productsQuery);
@@ -57,22 +53,22 @@ export default function ProductionPage() {
   const warehousesQuery = useMemoFirebase(() => db ? collection(db, "warehouses") : null, [db]);
   const { data: warehouses } = useCollection(warehousesQuery);
 
-  const selectedRecipe = useMemo(() => recipes?.find(r => r.id === selectedRecipeId), [recipes, selectedRecipeId]);
+  const selectedProcedure = useMemo(() => procedures?.find(r => r.id === selectedProcedureId), [procedures, selectedProcedureId]);
 
   const neededMaterials = useMemo(() => {
-    if (!selectedRecipe) return [];
-    return selectedRecipe.components.map((c: any) => {
+    if (!selectedProcedure) return [];
+    return selectedProcedure.components.map((c: any) => {
       const p = products?.find(prod => prod.id === c.productId);
       const inv = inventory?.find(i => i.warehouseId === warehouseId && i.productId === c.productId);
       return {
         ...c,
-        name: p?.name || 'Mahsulot',
+        name: p?.name || 'Material',
         unit: p?.unit ? (t.units[p.unit as keyof typeof t.units] || p.unit) : '',
         currentStock: inv?.stock || 0,
         totalNeeded: c.quantity * quantity
       };
     });
-  }, [selectedRecipe, quantity, products, inventory, warehouseId, t.units]);
+  }, [selectedProcedure, quantity, products, inventory, warehouseId, t.units]);
 
   const canProduce = useMemo(() => {
     if (neededMaterials.length === 0) return false;
@@ -80,7 +76,7 @@ export default function ProductionPage() {
   }, [neededMaterials]);
 
   const handleProduction = async () => {
-    if (!db || !selectedRecipe || !warehouseId || !canProduce) return;
+    if (!db || !selectedProcedure || !warehouseId || !canProduce) return;
 
     setLoading(true);
     try {
@@ -114,14 +110,14 @@ export default function ProductionPage() {
           movementDate: new Date().toISOString(),
           responsibleUserId: user?.uid,
           responsibleUserName: userName,
-          description: `Tayyorlash akti: ${selectedRecipe.name} (x${quantity})`,
+          description: `Jarayon: ${selectedProcedure.name} (x${quantity})`,
           unit: mat.unit
         };
         addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
       }
 
-      toast({ title: t.production.success });
-      setSelectedRecipeId("");
+      toast({ title: t.factory.success });
+      setSelectedProcedureId("");
       setQuantity(1);
     } catch (e) {
       toast({ variant: "destructive", title: "Xatolik" });
@@ -136,22 +132,24 @@ export default function ProductionPage() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto page-transition">
         <header className="mb-10">
           <h1 className="text-3xl font-black font-headline tracking-tighter text-foreground flex items-center gap-3">
-            <Wrench className="text-primary w-8 h-8" /> {t.production.title}
+            <Wrench className="text-primary w-8 h-8" /> {t.factory.productionTitle}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1 font-medium">{t.production.description}</p>
+          <p className="text-sm text-muted-foreground mt-1 font-medium">{t.factory.productionDescription}</p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Sozlamalar paneli */}
           <div className="lg:col-span-5 space-y-6">
             <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden">
               <CardHeader className="p-8">
                 <CardTitle className="text-xl font-black flex items-center gap-3">
-                  <ClipboardList className="w-5 h-5 text-primary" /> Sozlamalar
+                  <Wrench className="w-5 h-5 text-primary" /> {t.factory.selectProcedure}
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-8 pb-8 space-y-6">
+                {/* Zavod ombori tanlash */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">Ombor</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">Zavod Ombori</Label>
                   <Select onValueChange={setWarehouseId} value={warehouseId} disabled={!isAdmin && !!assignedWarehouseId}>
                     <SelectTrigger className="h-12 rounded-2xl bg-background/50 font-bold">
                       <div className="flex items-center gap-2">
@@ -164,21 +162,21 @@ export default function ProductionPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
+                {/* Jarayonni tanlash */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">{t.production.selectRecipe}</Label>
-                  <Select onValueChange={setSelectedRecipeId} value={selectedRecipeId}>
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">{t.factory.selectProcedure}</Label>
+                  <Select onValueChange={setSelectedProcedureId} value={selectedProcedureId}>
                     <SelectTrigger className="h-12 rounded-2xl bg-background/50 font-bold">
-                      <SelectValue placeholder="Retseptni tanlang" />
+                      <SelectValue placeholder="Jarayonni tanlang" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
-                      {recipes?.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                      {procedures?.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-
+                {/* Miqdorni belgilash */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">{t.production.quantityToProduce}</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-50">{t.factory.quantityToProduce}</Label>
                   <Input 
                     type="number"
                     className="h-12 rounded-2xl bg-background/50 font-black text-lg"
@@ -190,12 +188,13 @@ export default function ProductionPage() {
             </Card>
           </div>
 
+          {/* Kerakli materiallar va ishlab chiqarish */}
           <div className="lg:col-span-7">
-            {selectedRecipe ? (
+            {selectedProcedure ? (
               <Card className="border-none glass-card bg-card/40 backdrop-blur-xl rounded-[2.5rem] overflow-hidden h-full flex flex-col">
                 <CardHeader className="p-8 border-b border-white/5">
                   <CardTitle className="text-xl font-black flex items-center gap-3">
-                    <Package className="w-5 h-5 text-primary" /> {t.production.neededMaterials}
+                    <Package className="w-5 h-5 text-primary" /> {t.factory.neededMaterials}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 flex-1 overflow-y-auto">
@@ -231,14 +230,14 @@ export default function ProductionPage() {
                     onClick={handleProduction}
                   >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                    {t.production.process}
+                    {t.factory.process}
                   </Button>
                 </CardFooter>
               </Card>
             ) : (
               <div className="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-[3rem] border-muted/20 opacity-30 p-12 text-center">
-                <FlaskConical className="w-16 h-16 mb-4" />
-                <p className="font-black uppercase tracking-[0.3em] text-sm">Retseptni tanlang</p>
+                <Package className="w-16 h-16 mb-4" />
+                <p className="font-black uppercase tracking-[0.3em] text-sm">Jarayonni tanlang</p>
               </div>
             )}
           </div>
