@@ -1,428 +1,369 @@
-"use client";
 
+
+"use client"; import React, { useState, useMemo, useEffect } from "react"; import { useRouter } from "next/navigation"; import { OmniSidebar } from "@/components/layout/sidebar"; import { Button } from "@/components/ui/button"; import { Input } from "@/components/ui/input"; import { Dialo
+
+pasted
+
+
+rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { // ─── HELPER FUNCTIONS ──────────────────────────────────────────────────── function isAuthenticated() { return request.auth != null; } // f2472839@gmail.com — har qanday ro
+
+pasted
+
+qara bu  user add qismi bu yerga qilinish kerak bolgan ish iiko logikasidaka bolish kerak  va  web dastur userlariga qays bolim kimga ruxsat etilishini ozim hal qilishim kerak 
+agar kerak bolsa firebase rulesniham tashlab qoydim
+
+02:04
+Tushundim! Siz iiko tizimidagi kabi rol + ruxsat asosida foydalanuvchi boshqaruvi tizimini xohlayapsiz. Qanday qilmoqchisiz aniqlashtirish uchun bir nechta savol:
+
+Q: Qaysi qismni birinchi qilaylik?
+A: Foydalanuvchi qo'shish + rol/ruxsat tizimi (to'liq qayta yozish)
+
+Q: Ruxsat tizimi qanday ishlashi kerak?
+A: Faqat rol asosida (checkbox yo'q, rol = ruxsat)
+
+Q: Firebase Rules ham yangilansinmi?
+A: Ha, permissions field asosida Rules yozilsin
+
+02:05
+Yaxshi! To'liq qayta yozaman. Avval skill faylini o'qib chiqaman.
+
+
+Reading frontend design skill
+Reading frontend design skill
+Endi to'liq tizimni yozaman — users page + Firebase Rules:
+
+
+Full users management page with role-based permissions system
+Full users management page with role-based permissions system
+
+Full users management page with role-based permissions system
+users-page.tsx
+Done
+Endi Firebase Rules:
+
+
+Created a file, ran a command, read a file
+Created a file, ran a command, read a file
+Ikkala fayl tayyor. Nima qilindi:
+
+users-page.tsx — yangi tizim:
+
+Checkbox yo'q — faqat rol tanlanadi, ruxsatlar avtomatik
+Rol tanlashda preview ko'rinadi — qaysi bo'limlarga kirish bor/yo'q real vaqtda ko'rsatiladi
+Rol statistikasi — yuqorida har bir roldan nechtasi bor (iiko panel kabi)
+Foydalanuvchi kartasini ochsangiz — o'sha rolning ruxsatlari chiroyli ko'rinadi
+usePermission("products") hook eksport qilingan — sidebar va sahifalarda ishlatish uchun
+firestore.rules — permissions asosida:
+
+hasPerm("products") — Firestore da foydalanuvchining permissions.products == true ekanligini tekshiradi
+Rol o'zgarganda permissions field ham yangilanadi — Rules shu field ni o'qiydi
+Foydalanuvchi o'z roleId va permissions ni o'zgartira olmaydi (faqat admin)
+Master email hamma narsaga kiradi
+Sidebar/sahifalarda qo'llash:
+
+tsx
+const canSeeProducts = usePermission("products");
+// yoki
+const { role } = useUser();
+const perms = getPermissions(role);
+if (!perms.stockIn) return <Redirect to="/" />;
+Users page
+Code · TSX 
+Firestore
+RULES 
+
+You are out of free messages until 7:00 AM
+Upgrade
+
+
+
+Claude is AI and can make mistakes. Please double-check responses.
+Users page · TSX
+Copy
+
+"use client";
+ 
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   UserPlus, Trash2, Loader2, ChevronDown, ChevronUp,
   AlertTriangle, Package, Truck, TrendingUp, Building2,
-  History, FileText, DollarSign, Users, Settings, Check, Shield,
-  Crown, Edit2, Save, X, RefreshCw
+  History, FileText, DollarSign, Users, Settings,
+  Check, Shield, Crown, Edit2, RefreshCw, Search, X,
 } from "lucide-react";
-
+ 
 import { useFirestore, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, getDocs, query, updateDoc, writeBatch } from "firebase/firestore";
+import {
+  collection, doc, setDoc, deleteDoc, getDocs,
+  query, updateDoc,
+} from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { firebaseConfig } from "@/firebase/config";
-
-// ===================== SECTIONS =====================
-const SECTIONS = [
-  { id: "products",   label: "Товары",       icon: Package, description: "Mahsulotlarni boshqarish" },
-  { id: "stockIn",    label: "Поступление",  icon: Truck, description: "Kirim qilish" },
+ 
+// ─── SECTIONS ───────────────────────────────────────────────────────────────
+ 
+export const SECTIONS = [
+  { id: "products",   label: "Товары",       icon: Package,    description: "Mahsulotlarni boshqarish" },
+  { id: "stockIn",    label: "Поступление",  icon: Truck,      description: "Kirim qilish" },
   { id: "stockOut",   label: "Списание",     icon: TrendingUp, description: "Chiqim qilish" },
-  { id: "warehouses", label: "Склады",       icon: Building2, description: "Skladlarni boshqarish" },
-  { id: "movements",  label: "Движения",     icon: History, description: "Harakatlar tarixi" },
-  { id: "reports",    label: "Отчеты",       icon: FileText, description: "Hisobotlar" },
+  { id: "warehouses", label: "Склады",       icon: Building2,  description: "Skladlarni boshqarish" },
+  { id: "movements",  label: "Движения",     icon: History,    description: "Harakatlar tarixi" },
+  { id: "reports",    label: "Отчеты",       icon: FileText,   description: "Hisobotlar" },
   { id: "expenses",   label: "Расходы",      icon: DollarSign, description: "Xarajatlar" },
-  { id: "users",      label: "Пользователи", icon: Users, description: "Foydalanuvchilar" },
-  { id: "settings",   label: "Настройки",    icon: Settings, description: "Tizim sozlamalari" },
+  { id: "users",      label: "Пользователи", icon: Users,      description: "Foydalanuvchilar" },
+  { id: "settings",   label: "Настройки",    icon: Settings,   description: "Tizim sozlamalari" },
 ];
-
-// ===================== ROLES =====================
-const ROLES = [
-  { 
-    id: "super_admin", 
-    label: "Super Admin", 
-    color: "bg-purple-100 text-purple-700",
+ 
+// ─── ROLES ───────────────────────────────────────────────────────────────────
+// Har bir rol = aniq ruxsatlar to'plami (iiko mantiqiga o'xshash)
+ 
+export const ROLES = [
+  {
+    id: "super_admin",
+    label: "Super Admin",
+    color: "bg-purple-100 text-purple-700 border-purple-200",
+    dotColor: "bg-purple-500",
     icon: Crown,
-    description: "To'liq boshqaruv",
-    defaultPermissions: SECTIONS.map(s => s.id)
+    description: "Barcha bo'limlarga to'liq kirish",
+    permissions: {
+      products: true, stockIn: true, stockOut: true, warehouses: true,
+      movements: true, reports: true, expenses: true, users: true, settings: true,
+    },
   },
-  { 
-    id: "admin", 
-    label: "Admin", 
-    color: "bg-blue-100 text-blue-700",
+  {
+    id: "admin",
+    label: "Admin",
+    color: "bg-blue-100 text-blue-700 border-blue-200",
+    dotColor: "bg-blue-500",
     icon: Shield,
-    description: "Deyarli hamma narsa",
-    defaultPermissions: SECTIONS.filter(s => !["settings"].includes(s.id)).map(s => s.id)
+    description: "Settings va Users bundan mustasno",
+    permissions: {
+      products: true, stockIn: true, stockOut: true, warehouses: true,
+      movements: true, reports: true, expenses: true, users: false, settings: false,
+    },
   },
-  { 
-    id: "warehouse_manager", 
-    label: "Omborchi", 
-    color: "bg-green-100 text-green-700",
+  {
+    id: "warehouse_manager",
+    label: "Omborchi",
+    color: "bg-green-100 text-green-700 border-green-200",
+    dotColor: "bg-green-500",
     icon: Package,
-    description: "Sklad va mahsulotlar",
-    defaultPermissions: ["products", "stockIn", "stockOut", "movements", "warehouses", "reports"]
+    description: "Sklad, mahsulot va hisobotlar",
+    permissions: {
+      products: true, stockIn: true, stockOut: true, warehouses: true,
+      movements: true, reports: true, expenses: false, users: false, settings: false,
+    },
   },
-  { 
-    id: "seller", 
-    label: "Sotuvchi", 
-    color: "bg-yellow-100 text-yellow-700",
+  {
+    id: "seller",
+    label: "Sotuvchi",
+    color: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    dotColor: "bg-yellow-500",
     icon: TrendingUp,
-    description: "Sotish operatsiyalari",
-    defaultPermissions: ["products", "stockOut", "movements", "reports"]
+    description: "Faqat sotish va mahsulotlarni ko'rish",
+    permissions: {
+      products: true, stockIn: false, stockOut: true, warehouses: false,
+      movements: true, reports: false, expenses: false, users: false, settings: false,
+    },
   },
-  { 
-    id: "accountant", 
-    label: "Buxgalter", 
-    color: "bg-orange-100 text-orange-700",
+  {
+    id: "accountant",
+    label: "Buxgalter",
+    color: "bg-orange-100 text-orange-700 border-orange-200",
+    dotColor: "bg-orange-500",
     icon: DollarSign,
-    description: "Moliyaviy operatsiyalar",
-    defaultPermissions: ["expenses", "reports", "movements"]
+    description: "Xarajatlar va moliyaviy hisobotlar",
+    permissions: {
+      products: false, stockIn: false, stockOut: false, warehouses: false,
+      movements: true, reports: true, expenses: true, users: false, settings: false,
+    },
   },
-  { 
-    id: "observer", 
-    label: "Kuzatuvchi", 
-    color: "bg-gray-100 text-gray-600",
+  {
+    id: "observer",
+    label: "Kuzatuvchi",
+    color: "bg-gray-100 text-gray-600 border-gray-200",
+    dotColor: "bg-gray-400",
     icon: FileText,
-    description: "Faqat ko'rish",
-    defaultPermissions: ["products", "movements", "reports"]
+    description: "Faqat ko'rish huquqi",
+    permissions: {
+      products: true, stockIn: false, stockOut: false, warehouses: false,
+      movements: true, reports: true, expenses: false, users: false, settings: false,
+    },
   },
 ];
-
-// Role name mapping for old data
-const ROLE_NAME_MAPPING: Record<string, string> = {
-  "Super Admin": "super_admin",
-  "Администратор": "admin",
-  "Кладовщик": "warehouse_manager",
-  "Omborchi": "warehouse_manager",
-  "Продавец": "seller",
-  "Sotuvchi": "seller",
-  "Бухгалтер": "accountant",
-  "Buxgalter": "accountant",
-  "Наблюдатель": "observer",
-  "Kuzatuvchi": "observer",
-};
-
-function getDefaultPermissions(roleId: string): Record<string, boolean> {
-  const role = ROLES.find(r => r.id === roleId);
-  if (!role) return {};
-  
-  const perms: Record<string, boolean> = {};
-  SECTIONS.forEach(section => {
-    perms[section.id] = role.defaultPermissions.includes(section.id);
-  });
-  return perms;
+ 
+export type RoleId = typeof ROLES[number]["id"];
+ 
+export function getRoleById(roleId: string) {
+  return ROLES.find(r => r.id === roleId) ?? ROLES[2];
 }
-
-// ===================== PAGE =====================
+ 
+export function getPermissions(roleId: string): Record<string, boolean> {
+  const role = getRoleById(roleId);
+  return { ...role.permissions };
+}
+ 
+/**
+ * usePermission – sidebar va sahifalarda ruxsatni tekshirish uchun hook
+ * Misol: const canView = usePermission("products");
+ */
+export function usePermission(sectionId: string): boolean {
+  const { role } = useUser();
+  const roleData = getRoleById(role ?? "observer");
+  return roleData.permissions[sectionId] ?? false;
+}
+ 
+// ─── PAGE ────────────────────────────────────────────────────────────────────
+ 
 export default function UsersPage() {
   const { toast } = useToast();
   const db = useFirestore();
   const { role: currentUserRole, isUserLoading, uid: currentUserId } = useUser();
   const router = useRouter();
-
+ 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+ 
   const [formData, setFormData] = useState({
     displayName: "",
     email: "",
     password: "",
     roleId: "warehouse_manager",
-    permissions: getDefaultPermissions("warehouse_manager"),
   });
-  const [usersList, setUsersList] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
+ 
   const isSuperAdmin = currentUserRole === "super_admin";
-
+  const isAdminOrSuper = isSuperAdmin || currentUserRole === "admin";
+ 
   // Auth guard
   useEffect(() => {
     if (isUserLoading) return;
-    if (!isSuperAdmin && currentUserRole !== "admin") {
-      router.replace("/");
-    }
-  }, [isSuperAdmin, currentUserRole, isUserLoading, router]);
-
-  // Migrate old users
-  const migrateOldUsers = async () => {
-    if (!db) return;
-    setIsMigrating(true);
-    
-    try {
-      const usersRef = collection(db, "users");
-      const querySnapshot = await getDocs(usersRef);
-      const batch = writeBatch(db);
-      let updatedCount = 0;
-      
-      for (const docSnapshot of querySnapshot.docs) {
-        const userData = docSnapshot.data();
-        const needsUpdate = !userData.roleId || !userData.permissions || Object.keys(userData.permissions || {}).length === 0;
-        
-        if (needsUpdate) {
-          // Convert old role to new roleId
-          let newRoleId = userData.roleId;
-          if (!newRoleId && userData.role) {
-            newRoleId = ROLE_NAME_MAPPING[userData.role] || "warehouse_manager";
-          }
-          if (!newRoleId) newRoleId = "warehouse_manager";
-          
-          // Get default permissions for the role
-          const defaultPerms = getDefaultPermissions(newRoleId);
-          
-          // Update user document
-          const userRef = doc(db, "users", docSnapshot.id);
-          batch.update(userRef, {
-            roleId: newRoleId,
-            permissions: defaultPerms,
-            migrated: true,
-            migratedAt: new Date().toISOString()
-          });
-          updatedCount++;
-        }
-      }
-      
-      if (updatedCount > 0) {
-        await batch.commit();
-        toast({ title: `${updatedCount} ta foydalanuvchi yangilandi ✓` });
-        await loadUsers();
-      } else {
-        toast({ title: "Barcha foydalanuvchilar yangi versiyaga mos" });
-      }
-    } catch (error) {
-      console.error("Migration error:", error);
-      toast({ variant: "destructive", title: "Migratsiyada xatolik" });
-    } finally {
-      setIsMigrating(false);
-    }
-  };
-
+    if (!isAdminOrSuper) router.replace("/");
+  }, [isAdminOrSuper, isUserLoading, router]);
+ 
   // Load users
   const loadUsers = async () => {
     if (!db) return;
     setIsLoading(true);
     try {
-      const usersRef = collection(db, "users");
-      const q = query(usersRef);
-      const querySnapshot = await getDocs(q);
-      const users = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setUsersList(users);
-      
-      // Check if any users need migration
-      const needsMigration = users.some(u => !u.roleId || !u.permissions || Object.keys(u.permissions || {}).length === 0);
-      if (needsMigration && !isMigrating) {
-        // Auto-migrate old users
-        setTimeout(() => migrateOldUsers(), 1000);
-      }
-    } catch (error) {
-      console.error("Error loading users:", error);
+      const snap = await getDocs(query(collection(db, "users")));
+      setUsersList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch {
       toast({ variant: "destructive", title: "Foydalanuvchilarni yuklashda xatolik" });
     } finally {
       setIsLoading(false);
     }
   };
-
+ 
   useEffect(() => {
-    if (db && (isSuperAdmin || currentUserRole === "admin")) {
-      loadUsers();
-    }
-  }, [db, isSuperAdmin, currentUserRole]);
-
-  const handleRoleChange = (newRoleId: string) => {
-    const newPermissions = getDefaultPermissions(newRoleId);
-    setFormData(prev => ({
-      ...prev,
-      roleId: newRoleId,
-      permissions: newPermissions,
-    }));
-  };
-
-  const togglePermission = (sectionId: string) => {
-    setFormData(prev => {
-      const newPermissions = {
-        ...prev.permissions,
-        [sectionId]: !prev.permissions[sectionId],
-      };
-      
-      // Check if matches any role
-      const matchedRole = ROLES.find(role => {
-        const defaultPerms = getDefaultPermissions(role.id);
-        return Object.keys(newPermissions).every(
-          key => newPermissions[key] === defaultPerms[key]
-        );
-      });
-      
-      if (matchedRole && matchedRole.id !== prev.roleId) {
-        return {
-          ...prev,
-          roleId: matchedRole.id,
-          permissions: newPermissions,
-        };
-      }
-      
-      return {
-        ...prev,
-        permissions: newPermissions,
-      };
-    });
-  };
-
-  const toggleAll = (value: boolean) => {
-    const perms: Record<string, boolean> = {};
-    SECTIONS.forEach(s => { perms[s.id] = value; });
-    setFormData(prev => ({ ...prev, permissions: perms }));
-  };
-
-  const handleEditUser = (user: any) => {
-    setEditingUserId(user.id);
-    setFormData({
-      displayName: user.displayName || "",
-      email: user.email || "",
-      password: "",
-      roleId: user.roleId || "warehouse_manager",
-      permissions: user.permissions || getDefaultPermissions(user.roleId || "warehouse_manager"),
-    });
-    setIsEditMode(true);
+    if (db && isAdminOrSuper) loadUsers();
+  }, [db, isAdminOrSuper]);
+ 
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+ 
+  const openAdd = () => {
+    setIsEditMode(false);
+    setEditingUserId(null);
+    setFormData({ displayName: "", email: "", password: "", roleId: "warehouse_manager" });
     setIsDialogOpen(true);
   };
-
-  const handleUpdateUser = async () => {
-    if (!db || !editingUserId) {
-      toast({ variant: "destructive", title: "Xatolik yuz berdi" });
-      return;
-    }
-    
-    if (!formData.displayName.trim()) {
-      toast({ variant: "destructive", title: "Ism kiritilishi shart" });
-      return;
-    }
-    
+ 
+  const openEdit = (user: any) => {
+    setIsEditMode(true);
+    setEditingUserId(user.id);
+    setFormData({
+      displayName: user.displayName ?? "",
+      email: user.email ?? "",
+      password: "",
+      roleId: user.roleId ?? "warehouse_manager",
+    });
+    setIsDialogOpen(true);
+  };
+ 
+  const closeDialog = () => {
+    if (isSaving) return;
+    setIsDialogOpen(false);
+    setIsEditMode(false);
+    setEditingUserId(null);
+  };
+ 
+  const handleAdd = async () => {
+    if (!db) return;
+    if (!formData.displayName.trim()) return toast({ variant: "destructive", title: "Ism kiritilishi shart" });
+    if (!formData.email.trim())       return toast({ variant: "destructive", title: "Email kiritilishi shart" });
+    if (formData.password.length < 6) return toast({ variant: "destructive", title: "Parol kamida 6 belgi bo'lishi kerak" });
+ 
     setIsSaving(true);
-    
+    let secondaryApp: ReturnType<typeof initializeApp> | null = null;
     try {
-      const userRef = doc(db, "users", editingUserId);
-      const updateData: any = {
+      secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+      const auth = getAuth(secondaryApp);
+      const cred = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+ 
+      await setDoc(doc(db, "users", cred.user.uid), {
+        id: cred.user.uid,
+        displayName: formData.displayName.trim(),
+        email: formData.email.trim(),
+        roleId: formData.roleId,
+        permissions: getPermissions(formData.roleId),
+        createdAt: new Date().toISOString(),
+        createdBy: currentUserId,
+      });
+ 
+      await signOut(auth);
+      toast({ title: "Foydalanuvchi yaratildi ✓" });
+      closeDialog();
+      await loadUsers();
+    } catch (e: any) {
+      const msg =
+        e?.code === "auth/email-already-in-use" ? "Bu email allaqachon ro'yxatdan o'tgan" :
+        e?.code === "auth/weak-password"         ? "Parol juda oddiy" :
+        e?.code === "auth/invalid-email"         ? "Email formati noto'g'ri" :
+                                                   "Xatolik yuz berdi";
+      toast({ variant: "destructive", title: msg });
+    } finally {
+      if (secondaryApp) { try { await deleteApp(secondaryApp); } catch {} }
+      setIsSaving(false);
+    }
+  };
+ 
+  const handleUpdate = async () => {
+    if (!db || !editingUserId) return;
+    if (!formData.displayName.trim()) return toast({ variant: "destructive", title: "Ism kiritilishi shart" });
+ 
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, "users", editingUserId), {
         displayName: formData.displayName.trim(),
         roleId: formData.roleId,
-        permissions: formData.permissions,
+        permissions: getPermissions(formData.roleId),
         updatedAt: new Date().toISOString(),
-      };
-      
-      if (formData.email.trim()) {
-        updateData.email = formData.email.trim();
-      }
-      
-      await updateDoc(userRef, updateData);
-      
-      toast({ title: "Foydalanuvchi yangilandi ✓" });
-      setIsDialogOpen(false);
-      setIsEditMode(false);
-      setEditingUserId(null);
-      setFormData({
-        displayName: "",
-        email: "",
-        password: "",
-        roleId: "warehouse_manager",
-        permissions: getDefaultPermissions("warehouse_manager"),
       });
+      toast({ title: "Foydalanuvchi yangilandi ✓" });
+      closeDialog();
       await loadUsers();
-      
-    } catch (error) {
-      console.error("Update error:", error);
+    } catch {
       toast({ variant: "destructive", title: "Yangilashda xatolik" });
     } finally {
       setIsSaving(false);
     }
   };
-
-  const handleAddUser = async () => {
-    if (!db) {
-      toast({ variant: "destructive", title: "DB ulanmagan" });
-      return;
-    }
-    
-    if (!formData.displayName.trim()) {
-      toast({ variant: "destructive", title: "Ism kiritilishi shart" });
-      return;
-    }
-    
-    if (!formData.email.trim()) {
-      toast({ variant: "destructive", title: "Email kiritilishi shart" });
-      return;
-    }
-    
-    if (formData.password.length < 6) {
-      toast({ variant: "destructive", title: "Parol kamida 6 ta belgi bo'lishi kerak" });
-      return;
-    }
-    
-    const enabledCount = Object.values(formData.permissions).filter(Boolean).length;
-    if (enabledCount === 0) {
-      toast({ variant: "destructive", title: "Kamida 1 ta bo'lim tanlang" });
-      return;
-    }
-    
-    setIsSaving(true);
-    let secondaryApp: ReturnType<typeof initializeApp> | null = null;
-    
-    try {
-      secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
-      const auth = getAuth(secondaryApp);
-      
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        formData.email.trim(),
-        formData.password
-      );
-      
-      await setDoc(doc(db, "users", cred.user.uid), {
-        displayName: formData.displayName.trim(),
-        email: formData.email.trim(),
-        roleId: formData.roleId,
-        permissions: formData.permissions,
-        id: cred.user.uid,
-        createdAt: new Date().toISOString(),
-        createdBy: currentUserId,
-      });
-      
-      await signOut(auth);
-      
-      toast({ title: "Foydalanuvchi yaratildi ✓" });
-      setIsDialogOpen(false);
-      setFormData({
-        displayName: "",
-        email: "",
-        password: "",
-        roleId: "warehouse_manager",
-        permissions: getDefaultPermissions("warehouse_manager"),
-      });
-      await loadUsers();
-      
-    } catch (e: any) {
-      console.error("Add user error:", e);
-      const msg = e?.code === "auth/email-already-in-use" 
-        ? "Bu email allaqachon ro'yxatdan o'tgan"
-        : e?.code === "auth/weak-password"
-        ? "Parol juda oddiy"
-        : e?.code === "auth/invalid-email"
-        ? "Email formati noto'g'ri"
-        : "Xatolik yuz berdi";
-      toast({ variant: "destructive", title: msg });
-    } finally {
-      if (secondaryApp) {
-        try { await deleteApp(secondaryApp); } catch { }
-      }
-      setIsSaving(false);
-    }
-  };
-  
+ 
   const handleDeleteConfirm = async () => {
     if (!confirmDeleteId || !db) return;
     setDeletingId(confirmDeleteId);
@@ -431,230 +372,224 @@ export default function UsersPage() {
       await deleteDoc(doc(db, "users", confirmDeleteId));
       toast({ title: "Foydalanuvchi o'chirildi" });
       await loadUsers();
-    } catch (error) {
-      console.error("Delete error:", error);
+    } catch {
       toast({ variant: "destructive", title: "O'chirishda xatolik" });
     } finally {
       setDeletingId(null);
     }
   };
-  
-  const filtered = useMemo(() =>
-    usersList.filter(u => {
-      const q = searchQuery.toLowerCase();
-      const role = ROLES.find(r => r.id === u.roleId);
-      const roleLabel = role?.label.toLowerCase() || "";
+ 
+  // ── FILTER ────────────────────────────────────────────────────────────────
+ 
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return usersList.filter(u => {
+      const role = getRoleById(u.roleId);
       return (
         u?.email?.toLowerCase().includes(q) ||
         u?.displayName?.toLowerCase().includes(q) ||
-        roleLabel.includes(q)
+        role.label.toLowerCase().includes(q)
       );
-    }),
-    [usersList, searchQuery]
-  );
-  
-  const getRoleInfo = (roleId: string) => {
-    return ROLES.find(r => r.id === roleId) || ROLES[0];
-  };
-  
+    });
+  }, [usersList, searchQuery]);
+ 
+  // ─────────────────────────────────────────────────────────────────────────
+ 
   if (isUserLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-gray-50">
         <Loader2 className="animate-spin w-8 h-8 text-gray-400" />
       </div>
     );
   }
-  
-  if (!isSuperAdmin && currentUserRole !== "admin") return null;
-  
-  const selectedRoleInfo = ROLES.find(r => r.id === formData.roleId);
-  const enabledCount = Object.values(formData.permissions).filter(Boolean).length;
-  const allEnabled = SECTIONS.every(s => formData.permissions[s.id]);
-  const noneEnabled = SECTIONS.every(s => !formData.permissions[s.id]);
-  
+  if (!isAdminOrSuper) return null;
+ 
+  const selectedRole = getRoleById(formData.roleId);
+  const RoleIcon = selectedRole.icon;
+ 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <OmniSidebar />
-      
+ 
       <main className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">
-          
+ 
+          {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-2xl font-bold">Foydalanuvchilar</h1>
-              <p className="text-sm text-gray-500 mt-0.5">
-                Jami: {usersList.length} ta foydalanuvchi
-              </p>
+              <h1 className="text-2xl font-bold text-gray-900">Foydalanuvchilar</h1>
+              <p className="text-sm text-gray-500 mt-0.5">Jami: {usersList.length} ta</p>
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="outline"
-                onClick={migrateOldUsers}
-                disabled={isMigrating}
-              >
-                {isMigrating ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                )}
+              <Button variant="outline" size="sm" onClick={loadUsers} disabled={isLoading}>
+                <RefreshCw className={`w-4 h-4 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
                 Yangilash
               </Button>
-              <Button 
-                onClick={() => { 
-                  setIsEditMode(false); 
-                  setEditingUserId(null);
-                  setFormData({
-                    displayName: "",
-                    email: "",
-                    password: "",
-                    roleId: "warehouse_manager",
-                    permissions: getDefaultPermissions("warehouse_manager"),
-                  }); 
-                  setIsDialogOpen(true); 
-                }}
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
+              <Button size="sm" onClick={openAdd}>
+                <UserPlus className="w-4 h-4 mr-1.5" />
                 Qo'shish
               </Button>
             </div>
           </div>
-          
-          <Input
-            placeholder="Ism, email yoki rol bo'yicha qidirish..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="mb-4"
-          />
-          
+ 
+          {/* Rol statistikasi */}
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-5">
+            {ROLES.map(role => {
+              const count = usersList.filter(u => u.roleId === role.id).length;
+              const Icon = role.icon;
+              return (
+                <div key={role.id} className={`border rounded-xl px-3 py-2.5 flex flex-col gap-1 ${count > 0 ? role.color : "bg-white border-gray-100 text-gray-300"}`}>
+                  <div className="flex items-center gap-1.5">
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="text-xs font-medium truncate">{role.label}</span>
+                  </div>
+                  <div className="text-xl font-bold">{count}</div>
+                </div>
+              );
+            })}
+          </div>
+ 
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Ism, email yoki rol bo'yicha qidirish..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+ 
+          {/* Users list */}
           {isLoading ? (
-            <div className="flex justify-center mt-16">
+            <div className="flex justify-center mt-20">
               <Loader2 className="animate-spin w-6 h-6 text-gray-400" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center mt-16">
-              Foydalanuvchilar topilmadi
-            </p>
+            <div className="text-center mt-20 text-gray-400">
+              <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Foydalanuvchilar topilmadi</p>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {filtered.map((u: any) => {
                 const isOpen = expandedUserId === u.id;
-                const roleInfo = getRoleInfo(u.roleId || "warehouse_manager");
-                const RoleIcon = roleInfo.icon;
-                const permCount = Object.values(u.permissions ?? {}).filter(Boolean).length;
+                const roleInfo = getRoleById(u.roleId ?? "warehouse_manager");
+                const RIcon = roleInfo.icon;
                 const isCurrentUser = u.id === currentUserId;
-                
+                const permCount = Object.values(roleInfo.permissions).filter(Boolean).length;
+ 
                 return (
-                  <React.Fragment key={u.id}>
-                    <div className="p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm">
-                            {(u.displayName || u.email || "?")[0].toUpperCase()}
-                          </div>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <div className="font-semibold text-lg">{u.displayName || "—"}</div>
-                              {isCurrentUser && (
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                  Siz
-                                </span>
-                              )}
-                              {u.migrated && (
-                                <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
-                                  Yangilangan
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-sm text-gray-500 mt-0.5">{u.email}</div>
-                            
-                            <div className="flex items-center gap-2 mt-2">
-                              <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${roleInfo.color}`}>
-                                <RoleIcon className="w-3 h-3" />
-                                {roleInfo.label}
-                              </div>
-                              <span className="text-xs text-gray-400">
-                                • {permCount} ta bo'lim
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex gap-1">
-                          <Button
-                            size="icon" variant="ghost"
-                            onClick={() => setExpandedUserId(isOpen ? null : u.id)}
-                          >
-                            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </Button>
-                          
-                          <Button
-                            size="icon" variant="ghost"
-                            onClick={() => handleEditUser(u)}
-                            disabled={isCurrentUser && !isSuperAdmin}
-                          >
-                            <Edit2 className="w-4 h-4 text-blue-500" />
-                          </Button>
-                          
-                          {!isCurrentUser && (
-                            <Button
-                              size="icon" variant="ghost"
-                              disabled={deletingId === u.id}
-                              onClick={() => setConfirmDeleteId(u.id)}
-                            >
-                              {deletingId === u.id
-                                ? <Loader2 className="animate-spin w-4 h-4" />
-                                : <Trash2 className="w-4 h-4 text-red-400" />}
-                            </Button>
+                  <div key={u.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3">
+ 
+                      {/* Avatar */}
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                        {(u.displayName || u.email || "?")[0].toUpperCase()}
+                      </div>
+ 
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900 text-sm">{u.displayName || "—"}</span>
+                          {isCurrentUser && (
+                            <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Siz</span>
                           )}
                         </div>
-                      </div>
-                      
-                      {isOpen && (
-                        <div className="mt-4 pt-4 border-t">
-                          <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">
-                            Ruxsatlar ({permCount}/{SECTIONS.length})
-                          </p>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            {SECTIONS.map(s => {
-                              const has = u.permissions?.[s.id];
-                              const Icon = s.icon;
-                              return (
-                                <div
-                                  key={s.id}
-                                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
-                                    has
-                                      ? "bg-green-50 text-green-700 border border-green-200"
-                                      : "bg-gray-50 text-gray-400 border border-gray-100"
-                                  }`}
-                                >
-                                  <Icon className="w-4 h-4 flex-shrink-0" />
-                                  <span className="flex-1">{s.label}</span>
-                                  {has && <Check className="w-4 h-4 text-green-600" />}
-                                </div>
-                              );
-                            })}
-                          </div>
+                        <div className="text-xs text-gray-400 truncate">{u.email}</div>
+                        <div className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border mt-1 ${roleInfo.color}`}>
+                          <RIcon className="w-3 h-3" />
+                          {roleInfo.label}
+                          <span className="opacity-60">• {permCount} bo'lim</span>
                         </div>
-                      )}
+                      </div>
+ 
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => setExpandedUserId(isOpen ? null : u.id)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+                        >
+                          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={() => openEdit(u)}
+                          disabled={isCurrentUser && !isSuperAdmin}
+                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-400 disabled:opacity-30"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        {!isCurrentUser && (
+                          <button
+                            disabled={deletingId === u.id}
+                            onClick={() => setConfirmDeleteId(u.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 disabled:opacity-30"
+                          >
+                            {deletingId === u.id
+                              ? <Loader2 className="animate-spin w-4 h-4" />
+                              : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </React.Fragment>
+ 
+                    {/* Expanded: permissions */}
+                    {isOpen && (
+                      <div className="px-4 pb-4 pt-2 border-t bg-gray-50">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                          Ruxsatlar — {roleInfo.label}
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                          {SECTIONS.map(s => {
+                            const has = roleInfo.permissions[s.id];
+                            const Icon = s.icon;
+                            return (
+                              <div
+                                key={s.id}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ${
+                                  has
+                                    ? "bg-green-50 text-green-700 border-green-200"
+                                    : "bg-white text-gray-300 border-gray-100"
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span className="flex-1">{s.label}</span>
+                                {has && <Check className="w-3.5 h-3.5 text-green-500" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
       </main>
-      
-      <Dialog open={isDialogOpen} onOpenChange={open => { if (!isSaving) setIsDialogOpen(open); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+ 
+      {/* ── Add / Edit Dialog ─────────────────────────────────────────────── */}
+      <Dialog open={isDialogOpen} onOpenChange={open => { if (!open) closeDialog(); }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{isEditMode ? "Foydalanuvchini tahrirlash" : "Yangi foydalanuvchi"}</DialogTitle>
+            <DialogTitle>
+              {isEditMode ? "Foydalanuvchini tahrirlash" : "Yangi foydalanuvchi qo'shish"}
+            </DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">Asosiy ma'lumotlar</h3>
+ 
+          <div className="space-y-5 py-2">
+ 
+            {/* Basic info */}
+            <div className="space-y-2.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Asosiy ma'lumotlar
+              </label>
               <Input
                 placeholder="Ism Familiya *"
                 value={formData.displayName}
@@ -664,6 +599,7 @@ export default function UsersPage() {
                 placeholder="Email *"
                 type="email"
                 value={formData.email}
+                disabled={isEditMode}
                 onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
               />
               {!isEditMode && (
@@ -674,147 +610,85 @@ export default function UsersPage() {
                   onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
                 />
               )}
-              {isEditMode && (
-                <Input
-                  placeholder="Yangi parol (ixtiyoriy)"
-                  type="password"
-                  value={formData.password}
-                  onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
-                />
-              )}
             </div>
-            
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Rol tanlash</h3>
+ 
+            {/* Role selector */}
+            <div className="space-y-2.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Rol tanlash
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 {ROLES.map(role => {
-                  const RoleIcon = role.icon;
+                  const Icon = role.icon;
                   const isSelected = formData.roleId === role.id;
+                  const permCount = Object.values(role.permissions).filter(Boolean).length;
                   return (
                     <button
                       key={role.id}
                       type="button"
-                      onClick={() => handleRoleChange(role.id)}
+                      onClick={() => setFormData(p => ({ ...p, roleId: role.id }))}
                       className={`p-3 rounded-xl border-2 text-left transition-all ${
                         isSelected
                           ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-blue-300"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <RoleIcon className={`w-4 h-4 ${isSelected ? "text-blue-600" : "text-gray-500"}`} />
-                        <span className={`font-medium ${isSelected ? "text-blue-700" : "text-gray-700"}`}>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isSelected ? "bg-blue-100" : "bg-gray-100"}`}>
+                          <Icon className={`w-4 h-4 ${isSelected ? "text-blue-600" : "text-gray-500"}`} />
+                        </div>
+                        <span className={`font-semibold text-sm ${isSelected ? "text-blue-700" : "text-gray-700"}`}>
                           {role.label}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500">{role.description}</p>
+                      <p className="text-xs text-gray-400 leading-snug">{role.description}</p>
+                      <p className="text-xs font-medium mt-1.5 text-gray-500">{permCount} ta bo'lim</p>
                     </button>
                   );
                 })}
               </div>
             </div>
-            
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-700">Maxsus ruxsatlar</h3>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleAll(true)}
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    Hammasini belgilash
-                  </button>
-                  <span className="text-gray-300">|</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleAll(false)}
-                    className="text-xs text-red-500 hover:underline"
-                  >
-                    Hammasini tozalash
-                  </button>
-                </div>
-              </div>
-              
-              <div className="bg-gray-50 rounded-xl p-4">
-                <div className="grid grid-cols-1 gap-2">
-                  {SECTIONS.map(s => {
-                    const has = formData.permissions[s.id];
-                    const Icon = s.icon;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => togglePermission(s.id)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
-                          has
-                            ? "bg-green-50 border-green-300 shadow-sm"
-                            : "bg-white border-gray-200 hover:border-green-200"
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          has ? "bg-green-100" : "bg-gray-100"
-                        }`}>
-                          <Icon className={`w-5 h-5 ${has ? "text-green-700" : "text-gray-500"}`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{s.label}</div>
-                          <div className="text-xs text-gray-500">{s.description}</div>
-                        </div>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          has
-                            ? "bg-green-500 border-green-500"
-                            : "border-gray-300 bg-white"
-                        }`}>
-                          {has && <Check className="w-4 h-4 text-white" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-3">
-                <p className="text-sm text-gray-600">
-                  Tanlangan: <span className="font-semibold text-blue-600">{enabledCount}</span> / {SECTIONS.length} bo'lim
-                </p>
-                {selectedRoleInfo && enabledCount !== getDefaultPermissions(formData.roleId)[SECTIONS[0]?.id] && (
-                  <p className="text-xs text-orange-600 flex items-center gap-1">
-                    <Shield className="w-3 h-3" />
-                    Maxsus konfiguratsiya
-                  </p>
-                )}
+ 
+            {/* Preview: what this role can access */}
+            <div className="bg-gray-50 rounded-xl p-3 border">
+              <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5">
+                <RoleIcon className="w-3.5 h-3.5" />
+                {selectedRole.label} — ruxsatlar ko'rinishi
+              </p>
+              <div className="grid grid-cols-3 gap-1">
+                {SECTIONS.map(s => {
+                  const has = selectedRole.permissions[s.id];
+                  const Icon = s.icon;
+                  return (
+                    <div
+                      key={s.id}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs ${
+                        has ? "bg-green-100 text-green-700" : "bg-white text-gray-300 border border-gray-100"
+                      }`}
+                    >
+                      <Icon className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{s.label}</span>
+                      {has && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-green-500" />}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
-          
-          <DialogFooter className="mt-6 pt-4 border-t">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setIsDialogOpen(false);
-                setIsEditMode(false);
-                setEditingUserId(null);
-                setFormData({
-                  displayName: "",
-                  email: "",
-                  password: "",
-                  roleId: "warehouse_manager",
-                  permissions: getDefaultPermissions("warehouse_manager"),
-                });
-              }}
-              disabled={isSaving}
-            >
+ 
+          <DialogFooter>
+            <Button variant="ghost" onClick={closeDialog} disabled={isSaving}>
               Bekor qilish
             </Button>
-            <Button onClick={isEditMode ? handleUpdateUser : handleAddUser} disabled={isSaving}>
+            <Button onClick={isEditMode ? handleUpdate : handleAdd} disabled={isSaving}>
               {isSaving && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
               {isEditMode ? "Saqlash" : "Yaratish"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+ 
+      {/* ── Delete confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!confirmDeleteId} onOpenChange={open => { if (!open) setConfirmDeleteId(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -827,15 +701,12 @@ export default function UsersPage() {
             Foydalanuvchini o'chirishga ishonchingiz komilmi? Bu amalni qaytarib bo'lmaydi.
           </p>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>
-              Bekor qilish
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              O'chirish
-            </Button>
+            <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>Bekor qilish</Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>O'chirish</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+ 
