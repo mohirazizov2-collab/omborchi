@@ -18,10 +18,10 @@ import {
 } from "@/components/ui/dialog";
 import { 
   UserRound, Search, Plus, Loader2, Trash2, 
-  ShieldCheck, Save, X, ChevronRight, Edit3 
+  ShieldCheck, Save, ChevronRight, Edit3 
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export default function IikoStaffPage() {
@@ -33,15 +33,13 @@ export default function IikoStaffPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null); // Tahrirlanayotgan user ID si
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const isSuperAdmin = user?.email === "f2472839@gmail.com";
 
-  // Initial State
   const initialForm = {
-    lastName: "", firstName: "", middleName: "", tabelId: "",
-    address: "", phone: "", mobile: "", email: "",
-    position: "Menejer", isEmployee: true
+    lastName: "", firstName: "", middleName: "", email: "",
+    position: "Menejer", role: "User"
   };
 
   const initialPermissions = {
@@ -56,94 +54,74 @@ export default function IikoStaffPage() {
   const [formData, setFormData] = useState(initialForm);
   const [permissions, setPermissions] = useState(initialPermissions);
 
-  // Eski userni tahrirlash uchun yuklash funksiyasi
-  const handleEdit = (emp: any) => {
-    setEditingId(emp.id);
-    setFormData({
-      lastName: emp.lastName || "",
-      firstName: emp.firstName || "",
-      middleName: emp.middleName || "",
-      tabelId: emp.tabelId || "",
-      address: emp.address || "",
-      phone: emp.phone || "",
-      mobile: emp.mobile || "",
-      email: emp.email || "",
-      position: emp.position || "Menejer",
-      isEmployee: emp.isEmployee ?? true
-    });
-    // Agar eski userda permissions bo'lsa o'shani yuklaydi, bo'lmasa bo'shini
-    setPermissions(emp.permissions || initialPermissions);
-    setIsDialogOpen(true);
-  };
-
-  const handleAddNew = () => {
-    setEditingId(null);
-    setFormData(initialForm);
-    setPermissions(initialPermissions);
-    setIsDialogOpen(true);
-  };
-
-  const employeesQuery = useMemoFirebase(() => {
+  // MUHIM: Kolleksiya nomini "users" ga o'zgartirdik (Rasmdagi kabi)
+  const usersQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
-    return collection(db, "employees");
+    return collection(db, "users"); 
   }, [db, user]);
 
-  const { data: employees, isLoading } = useCollection(employeesQuery);
+  const { data: allUsers, isLoading } = useCollection(usersQuery);
 
-  const filteredEmployees = useMemo(() => {
-    return employees?.filter(e => 
-      e.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      e.tabelId?.includes(searchQuery)
-    ) || [];
-  }, [employees, searchQuery]);
+  const filteredUsers = useMemo(() => {
+    if (!allUsers) return [];
+    return allUsers.filter(u => {
+      const searchTarget = `${u.lastName || ''} ${u.firstName || ''} ${u.email || ''}`.toLowerCase();
+      return searchTarget.includes(searchQuery.toLowerCase());
+    });
+  }, [allUsers, searchQuery]);
+
+  const handleEdit = (userData: any) => {
+    setEditingId(userData.id);
+    setFormData({
+      lastName: userData.lastName || "",
+      firstName: userData.firstName || "",
+      middleName: userData.middleName || "",
+      email: userData.email || "",
+      position: userData.position || "Menejer",
+      role: userData.role || "User"
+    });
+    setPermissions(userData.permissions || initialPermissions);
+    setIsDialogOpen(true);
+  };
 
   const handleSave = async () => {
-    if (!db || !user || !formData.lastName || !formData.firstName || !formData.email) {
-      toast({ variant: "destructive", title: "Xato", description: "Barcha asosiy maydonlarni to'ldiring" });
+    if (!db || !formData.email) {
+      toast({ variant: "destructive", title: "Xato", description: "Email kiritilishi shart" });
       return;
     }
     
     setIsSaving(true);
-    const id = editingId || doc(collection(db, "employees")).id;
-    const systemName = `${formData.lastName} ${formData.firstName.charAt(0)}.`;
+    // Agar tahrirlash bo'lsa eski ID, bo'lmasa yangi ID
+    const id = editingId || doc(collection(db, "users")).id;
     
     const payload = {
       ...formData,
       id,
-      fullName: `${formData.lastName} ${formData.firstName} ${formData.middleName}`.trim(),
-      systemName,
+      fullName: `${formData.lastName} ${formData.firstName}`.trim() || formData.email,
       permissions,
       updatedAt: new Date().toISOString()
     };
 
     try {
-      await setDoc(doc(db, "employees", id), payload, { merge: true });
+      await setDoc(doc(db, "users", id), payload, { merge: true });
       setIsDialogOpen(false);
-      toast({ title: "Muvaffaqiyatli", description: editingId ? "Ma'lumotlar yangilandi." : "Yangi xodim saqlandi." });
+      setEditingId(null);
+      setFormData(initialForm);
+      setPermissions(initialPermissions);
+      toast({ title: "Saqlandi", description: "Ma'lumotlar muvaffaqiyatli yangilandi." });
     } catch (e) {
-      toast({ variant: "destructive", title: "Xato", description: "Saqlashda xatolik." });
+      toast({ variant: "destructive", title: "Xato", description: "Firebase'ga yozishda xatolik yuz berdi." });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Kartochka bosilib ketishini oldini oladi
-    if (!confirm("Ushbu foydalanuvchini o'chirishni tasdiqlaysizmi?")) return;
-    try {
-      await deleteDoc(doc(db, "employees", id));
-      toast({ title: "O'chirildi", description: "Xodim ma'lumotlari o'chirildi." });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Xato", description: "O'chirishda xatolik." });
-    }
-  };
-
   const PermissionGroup = ({ title, items, stateKey }: any) => (
-    <div className="space-y-2 border-b border-slate-200 pb-3 mb-3 last:border-0">
-      <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+    <div className="space-y-2 border-b border-slate-200 pb-2 mb-2 last:border-0">
+      <h5 className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
         <ChevronRight className="w-3 h-3" /> {title}
       </h5>
-      <div className="grid grid-cols-2 gap-2 pl-2">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 pl-4">
         {Object.keys(items).map((key) => (
           <div key={key} className="flex items-center space-x-2">
             <Checkbox 
@@ -154,8 +132,8 @@ export default function IikoStaffPage() {
                 [stateKey]: { ...permissions[stateKey], [key]: !!v }
               })} 
             />
-            <Label htmlFor={`${stateKey}-${key}`} className="text-[11px] capitalize cursor-pointer">
-              {key === 'dashboard' ? 'Asosiy oyna' : key.replace(/([A-Z])/g, ' $1').trim()}
+            <Label htmlFor={`${stateKey}-${key}`} className="text-[11px] cursor-pointer">
+              {key === 'dashboard' ? 'Asosiy oyna' : key}
             </Label>
           </div>
         ))}
@@ -164,137 +142,98 @@ export default function IikoStaffPage() {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#f0f2f5] font-body">
+    <div className="flex min-h-screen bg-[#f0f2f5]">
       <OmniSidebar />
       <main className="flex-1 p-6">
         <header className="flex justify-between items-end mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Xodimlar va Ruxsatlar</h1>
-            <p className="text-xs text-slate-500 font-medium">Barcha xodimlarning bo'limlarga ruxsatini shu yerdan boshqaring</p>
+            <h1 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Foydalanuvchilar</h1>
+            <p className="text-xs text-slate-500">Baza: Cloud Firestore / users</p>
           </div>
 
-          <Button onClick={handleAddNew} className="bg-[#0078d4] hover:bg-[#005a9e] rounded-none h-10 px-6 flex gap-2 items-center text-xs font-bold uppercase">
-            <Plus className="w-4 h-4" /> Yangi foydalanuvchi
+          <Button onClick={() => { setEditingId(null); setFormData(initialForm); setIsDialogOpen(true); }} className="bg-[#0078d4] hover:bg-[#005a9e] rounded-none text-xs font-bold uppercase">
+            <Plus className="w-4 h-4 mr-2" /> Yangi foydalanuvchi
           </Button>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogContent className="max-w-[950px] p-0 border-none rounded-lg overflow-hidden bg-[#f3f3f3]">
+            <DialogContent className="max-w-[900px] p-0 bg-[#f3f3f3] overflow-hidden">
               <DialogHeader className="bg-white p-4 border-b">
-                <DialogTitle className="text-sm font-normal text-slate-600 text-center flex items-center justify-center gap-2">
+                <DialogTitle className="text-sm font-medium text-center flex justify-center items-center gap-2">
                    <ShieldCheck className="w-4 h-4 text-blue-600" /> 
-                   {editingId ? "Tahrirlash: " + formData.lastName : "Yangi xodim qo'shish"}
+                   {editingId ? "Ruxsatlarni tahrirlash" : "Yangi foydalanuvchi yaratish"}
                 </DialogTitle>
               </DialogHeader>
 
-              <div className="p-6 grid grid-cols-5 gap-6 max-h-[70vh] overflow-y-auto">
-                {/* Asosiy Ma'lumotlar */}
-                <div className="col-span-2 space-y-4 bg-white p-4 border rounded-md shadow-sm h-fit">
-                   <h4 className="text-xs font-bold border-b pb-2 mb-4">Shaxsiy ma'lumotlar</h4>
-                   <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Familiya va Ism</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input placeholder="Familiya" className="h-8 text-xs rounded-none" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
-                        <Input placeholder="Ism" className="h-8 text-xs rounded-none" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
-                      </div>
+              <div className="p-6 grid grid-cols-5 gap-6">
+                <div className="col-span-2 space-y-4 bg-white p-4 border rounded shadow-sm">
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-[11px]">Familiya</Label>
+                      <Input className="h-8 text-xs" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
                     </div>
-                    <div className="space-y-1">
+                    <div>
+                      <Label className="text-[11px]">Ism</Label>
+                      <Input className="h-8 text-xs" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                    </div>
+                    <div>
                       <Label className="text-[11px]">Email (Login)</Label>
-                      <Input placeholder="email@gmail.com" className="h-8 text-xs rounded-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                      <Input className="h-8 text-xs" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-[11px]">Lavozimi</Label>
-                      <select className="w-full h-8 text-xs border border-slate-300 bg-white px-2 outline-none" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}>
-                        <option>Admin</option>
-                        <option>Menejer</option>
-                        <option>Omborchi</option>
-                        <option>Buxgalter</option>
-                        <option>Ishchi</option>
-                      </select>
-                    </div>
-                   </div>
+                  </div>
                 </div>
 
-                {/* Bo'limlarga ruxsat berish (Rasmdagi bo'limlar) */}
-                <div className="col-span-3 bg-white p-4 border rounded-md shadow-sm">
-                   <h4 className="text-xs font-bold border-b pb-2 mb-4 text-blue-600">Bo'limlarga ruxsat berish</h4>
-                   <div className="grid grid-cols-1 gap-1">
-                      <PermissionGroup title="Analitika" stateKey="analitika" items={permissions.analitika} />
-                      <PermissionGroup title="Nakladnolar" stateKey="nakladnolar" items={permissions.nakladnolar} />
-                      <PermissionGroup title="Inventar boshqaruvi" stateKey="inventar" items={permissions.inventar} />
-                      <PermissionGroup title="Ishlab chiqarish" stateKey="ishlabChiqarish" items={permissions.ishlabChiqarish} />
-                      <PermissionGroup title="Moliya" stateKey="moliya" items={permissions.moliya} />
-                      <PermissionGroup title="Tizim ma'muriyati" stateKey="tizim" items={permissions.tizim} />
-                   </div>
+                <div className="col-span-3 bg-white p-4 border rounded shadow-sm max-h-[50vh] overflow-y-auto">
+                   <h4 className="text-xs font-bold mb-4 text-blue-600 border-b pb-2">Bo'limlarga ruxsatlar</h4>
+                   <PermissionGroup title="Analitika" stateKey="analitika" items={permissions.analitika} />
+                   <PermissionGroup title="Nakladnolar" stateKey="nakladnolar" items={permissions.nakladnolar} />
+                   <PermissionGroup title="Inventar" stateKey="inventar" items={permissions.inventar} />
+                   <PermissionGroup title="Ishlab chiqarish" stateKey="ishlabChiqarish" items={permissions.ishlabChiqarish} />
+                   <PermissionGroup title="Moliya" stateKey="moliya" items={permissions.moliya} />
+                   <PermissionGroup title="Tizim" stateKey="tizim" items={permissions.tizim} />
                 </div>
               </div>
 
-              <DialogFooter className="bg-[#e1e1e1] p-3 gap-2 border-t">
-                <Button className="h-9 rounded-none px-8 bg-[#0078d4] text-white text-xs hover:bg-[#005a9e] font-bold" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />} {editingId ? "YANGILASH" : "SAQLASH"}
+              <DialogFooter className="bg-[#e1e1e1] p-3 gap-2">
+                <Button className="h-9 bg-[#0078d4] text-white text-xs font-bold" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="animate-spin" /> : <Save className="w-4 h-4 mr-2" />} SAQLASH
                 </Button>
-                <Button className="h-9 rounded-none px-8 bg-white text-black border border-slate-400 text-xs" onClick={() => setIsDialogOpen(false)}>
-                   BEKOR QILISH
-                </Button>
+                <Button variant="outline" className="h-9 text-xs" onClick={() => setIsDialogOpen(false)}>BEKOR QILISH</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </header>
 
-        {/* Qidiruv */}
-        <div className="bg-white p-3 mb-6 border border-slate-200 shadow-sm flex items-center gap-4">
-           <div className="relative flex-1 max-w-md">
+        <div className="bg-white p-3 mb-6 border shadow-sm">
+           <div className="relative max-w-md">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-             <Input placeholder="Foydalanuvchilarni qidirish..." className="pl-10 h-10 text-xs rounded-none border-slate-200" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+             <Input placeholder="Ism yoki email bo'yicha qidirish..." className="pl-10 h-10 text-xs rounded-none" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
            </div>
         </div>
 
-        {/* Xodimlar Kartochkalari */}
         {isLoading ? (
           <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-blue-600" /></div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-             {filteredEmployees.map((emp: any) => (
-               <Card 
-                 key={emp.id} 
-                 className="rounded-none border-slate-200 shadow-sm bg-white overflow-hidden group cursor-pointer hover:border-blue-300 transition-all"
-                 onClick={() => handleEdit(emp)} // KARTA BOSILSA TAHRIRLASH OCHILADI
-               >
-                 <div className="h-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                 <CardContent className="p-5">
-                   <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 bg-blue-50 text-blue-600 flex items-center justify-center rounded-lg">
-                         <UserRound className="w-7 h-7" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {filteredUsers.length === 0 ? (
+               <p className="text-slate-400 text-xs italic">Foydalanuvchilar topilmadi.</p>
+             ) : (
+               filteredUsers.map((u: any) => (
+                <Card key={u.id} className="hover:border-blue-400 cursor-pointer transition-colors" onClick={() => handleEdit(u)}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center">
+                        <UserRound className="text-slate-400 w-6 h-6" />
                       </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={(e) => { e.stopPropagation(); handleEdit(emp); }}>
-                          <Edit3 className="w-4 h-4" />
-                        </Button>
-                        {isSuperAdmin && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" onClick={(e) => handleDelete(emp.id, e)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
+                      <div>
+                        <h3 className="font-bold text-sm">{u.lastName} {u.firstName}</h3>
+                        <p className="text-[10px] text-slate-500">{u.email}</p>
                       </div>
-                   </div>
-                   <h3 className="font-bold text-base text-slate-800">{emp.fullName}</h3>
-                   <p className="text-[11px] text-slate-500 mb-4">{emp.email}</p>
-                   
-                   <div className="space-y-3 border-t pt-4 mt-2">
-                      <div className="flex justify-between items-center text-[10px]">
-                        <span className="text-slate-400 font-bold uppercase">Roli:</span>
-                        <Badge className="bg-slate-100 text-slate-700 rounded-none border-none text-[9px] uppercase">{emp.position}</Badge>
-                      </div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Aktiv ruxsatlar:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {emp.permissions?.analitika?.dashboard && <Badge className="bg-emerald-50 text-emerald-600 text-[8px]">Analitika</Badge>}
-                        {emp.permissions?.inventar?.mahsulotlar && <Badge className="bg-blue-50 text-blue-600 text-[8px]">Inventar</Badge>}
-                        {emp.permissions?.moliya?.xarajatlar && <Badge className="bg-amber-50 text-amber-600 text-[8px]">Moliya</Badge>}
-                      </div>
-                   </div>
-                 </CardContent>
-               </Card>
-             ))}
+                    </div>
+                    <Edit3 className="w-4 h-4 text-slate-300" />
+                  </CardContent>
+                </Card>
+               ))
+             )}
           </div>
         )}
       </main>
