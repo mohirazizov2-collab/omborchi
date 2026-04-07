@@ -12,11 +12,11 @@ import {
   UserPlus, Trash2, Loader2, ChevronDown, ChevronUp,
   AlertTriangle, Package, Truck, TrendingUp, Building2,
   History, FileText, DollarSign, Users, Settings, Check, Shield,
-  Crown, Edit2, Save, X
+  Crown, Edit2, Save, X, RefreshCw
 } from "lucide-react";
 
 import { useFirestore, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, getDocs, query, updateDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, getDocs, query, updateDoc, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
@@ -35,30 +35,30 @@ const SECTIONS = [
   { id: "settings",   label: "Настройки",    icon: Settings, description: "Tizim sozlamalari" },
 ];
 
-// ===================== ROLES (iiko-like) =====================
+// ===================== ROLES =====================
 const ROLES = [
   { 
     id: "super_admin", 
     label: "Super Admin", 
     color: "bg-purple-100 text-purple-700",
     icon: Crown,
-    description: "To'liq boshqaruv, hamma bo'limlarga ruxsat",
-    defaultPermissions: SECTIONS.map(s => s.id) // All sections
+    description: "To'liq boshqaruv",
+    defaultPermissions: SECTIONS.map(s => s.id)
   },
   { 
     id: "admin", 
-    label: "Administrator", 
+    label: "Admin", 
     color: "bg-blue-100 text-blue-700",
     icon: Shield,
-    description: "Deyarli hamma narsa, lekin ayrim cheklovlar",
+    description: "Deyarli hamma narsa",
     defaultPermissions: SECTIONS.filter(s => !["settings"].includes(s.id)).map(s => s.id)
   },
   { 
     id: "warehouse_manager", 
-    label: "Kladovshik", 
+    label: "Omborchi", 
     color: "bg-green-100 text-green-700",
     icon: Package,
-    description: "Sklad va mahsulotlar bilan ishlash",
+    description: "Sklad va mahsulotlar",
     defaultPermissions: ["products", "stockIn", "stockOut", "movements", "warehouses", "reports"]
   },
   { 
@@ -66,7 +66,7 @@ const ROLES = [
     label: "Sotuvchi", 
     color: "bg-yellow-100 text-yellow-700",
     icon: TrendingUp,
-    description: "Sotish va mijozlar bilan ishlash",
+    description: "Sotish operatsiyalari",
     defaultPermissions: ["products", "stockOut", "movements", "reports"]
   },
   { 
@@ -82,12 +82,25 @@ const ROLES = [
     label: "Kuzatuvchi", 
     color: "bg-gray-100 text-gray-600",
     icon: FileText,
-    description: "Faqat ko'rish huquqi",
+    description: "Faqat ko'rish",
     defaultPermissions: ["products", "movements", "reports"]
   },
 ];
 
-// ===================== HELPERS =====================
+// Role name mapping for old data
+const ROLE_NAME_MAPPING: Record<string, string> = {
+  "Super Admin": "super_admin",
+  "Администратор": "admin",
+  "Кладовщик": "warehouse_manager",
+  "Omborchi": "warehouse_manager",
+  "Продавец": "seller",
+  "Sotuvchi": "seller",
+  "Бухгалтер": "accountant",
+  "Buxgalter": "accountant",
+  "Наблюдатель": "observer",
+  "Kuzatuvchi": "observer",
+};
+
 function getDefaultPermissions(roleId: string): Record<string, boolean> {
   const role = ROLES.find(r => r.id === roleId);
   if (!role) return {};
@@ -98,14 +111,6 @@ function getDefaultPermissions(roleId: string): Record<string, boolean> {
   });
   return perms;
 }
-
-const EMPTY_FORM = {
-  displayName: "",
-  email: "",
-  password: "",
-  roleId: "warehouse_manager",
-  permissions: getDefaultPermissions("warehouse_manager"),
-};
 
 // ===================== PAGE =====================
 export default function UsersPage() {
@@ -118,11 +123,18 @@ export default function UsersPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formData, setFormData] = useState({
+    displayName: "",
+    email: "",
+    password: "",
+    roleId: "warehouse_manager",
+    permissions: getDefaultPermissions("warehouse_manager"),
+  });
   const [usersList, setUsersList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -135,6 +147,59 @@ export default function UsersPage() {
       router.replace("/");
     }
   }, [isSuperAdmin, currentUserRole, isUserLoading, router]);
+
+  // Migrate old users
+  const migrateOldUsers = async () => {
+    if (!db) return;
+    setIsMigrating(true);
+    
+    try {
+      const usersRef = collection(db, "users");
+      const querySnapshot = await getDocs(usersRef);
+      const batch = writeBatch(db);
+      let updatedCount = 0;
+      
+      for (const docSnapshot of querySnapshot.docs) {
+        const userData = docSnapshot.data();
+        const needsUpdate = !userData.roleId || !userData.permissions || Object.keys(userData.permissions || {}).length === 0;
+        
+        if (needsUpdate) {
+          // Convert old role to new roleId
+          let newRoleId = userData.roleId;
+          if (!newRoleId && userData.role) {
+            newRoleId = ROLE_NAME_MAPPING[userData.role] || "warehouse_manager";
+          }
+          if (!newRoleId) newRoleId = "warehouse_manager";
+          
+          // Get default permissions for the role
+          const defaultPerms = getDefaultPermissions(newRoleId);
+          
+          // Update user document
+          const userRef = doc(db, "users", docSnapshot.id);
+          batch.update(userRef, {
+            roleId: newRoleId,
+            permissions: defaultPerms,
+            migrated: true,
+            migratedAt: new Date().toISOString()
+          });
+          updatedCount++;
+        }
+      }
+      
+      if (updatedCount > 0) {
+        await batch.commit();
+        toast({ title: `${updatedCount} ta foydalanuvchi yangilandi ✓` });
+        await loadUsers();
+      } else {
+        toast({ title: "Barcha foydalanuvchilar yangi versiyaga mos" });
+      }
+    } catch (error) {
+      console.error("Migration error:", error);
+      toast({ variant: "destructive", title: "Migratsiyada xatolik" });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   // Load users
   const loadUsers = async () => {
@@ -149,6 +214,13 @@ export default function UsersPage() {
         ...doc.data()
       }));
       setUsersList(users);
+      
+      // Check if any users need migration
+      const needsMigration = users.some(u => !u.roleId || !u.permissions || Object.keys(u.permissions || {}).length === 0);
+      if (needsMigration && !isMigrating) {
+        // Auto-migrate old users
+        setTimeout(() => migrateOldUsers(), 1000);
+      }
     } catch (error) {
       console.error("Error loading users:", error);
       toast({ variant: "destructive", title: "Foydalanuvchilarni yuklashda xatolik" });
@@ -163,7 +235,6 @@ export default function UsersPage() {
     }
   }, [db, isSuperAdmin, currentUserRole]);
 
-  // Handle role change - update permissions based on selected role
   const handleRoleChange = (newRoleId: string) => {
     const newPermissions = getDefaultPermissions(newRoleId);
     setFormData(prev => ({
@@ -173,7 +244,6 @@ export default function UsersPage() {
     }));
   };
 
-  // Individual permission toggle (iiko-like custom permissions)
   const togglePermission = (sectionId: string) => {
     setFormData(prev => {
       const newPermissions = {
@@ -181,7 +251,7 @@ export default function UsersPage() {
         [sectionId]: !prev.permissions[sectionId],
       };
       
-      // Check if current permissions match any role's default permissions
+      // Check if matches any role
       const matchedRole = ROLES.find(role => {
         const defaultPerms = getDefaultPermissions(role.id);
         return Object.keys(newPermissions).every(
@@ -189,7 +259,6 @@ export default function UsersPage() {
         );
       });
       
-      // If matches a role, update roleId, otherwise keep custom
       if (matchedRole && matchedRole.id !== prev.roleId) {
         return {
           ...prev,
@@ -205,20 +274,18 @@ export default function UsersPage() {
     });
   };
 
-  // Toggle all permissions
   const toggleAll = (value: boolean) => {
     const perms: Record<string, boolean> = {};
     SECTIONS.forEach(s => { perms[s.id] = value; });
     setFormData(prev => ({ ...prev, permissions: perms }));
   };
 
-  // Open edit dialog
   const handleEditUser = (user: any) => {
     setEditingUserId(user.id);
     setFormData({
       displayName: user.displayName || "",
       email: user.email || "",
-      password: "", // Don't show password, user will need to enter new one if want to change
+      password: "",
       roleId: user.roleId || "warehouse_manager",
       permissions: user.permissions || getDefaultPermissions(user.roleId || "warehouse_manager"),
     });
@@ -226,7 +293,6 @@ export default function UsersPage() {
     setIsDialogOpen(true);
   };
 
-  // Update user
   const handleUpdateUser = async () => {
     if (!db || !editingUserId) {
       toast({ variant: "destructive", title: "Xatolik yuz berdi" });
@@ -249,17 +315,8 @@ export default function UsersPage() {
         updatedAt: new Date().toISOString(),
       };
       
-      // Only update email if changed
-      const currentUser = usersList.find(u => u.id === editingUserId);
-      if (currentUser?.email !== formData.email.trim()) {
+      if (formData.email.trim()) {
         updateData.email = formData.email.trim();
-      }
-      
-      // Update password if provided
-      if (formData.password && formData.password.length >= 6) {
-        // Note: Password update would require Firebase Auth update
-        // For simplicity, we'll just update Firestore
-        updateData.passwordUpdated = true;
       }
       
       await updateDoc(userRef, updateData);
@@ -268,7 +325,13 @@ export default function UsersPage() {
       setIsDialogOpen(false);
       setIsEditMode(false);
       setEditingUserId(null);
-      setFormData(EMPTY_FORM);
+      setFormData({
+        displayName: "",
+        email: "",
+        password: "",
+        roleId: "warehouse_manager",
+        permissions: getDefaultPermissions("warehouse_manager"),
+      });
       await loadUsers();
       
     } catch (error) {
@@ -279,7 +342,6 @@ export default function UsersPage() {
     }
   };
 
-  // Create user
   const handleAddUser = async () => {
     if (!db) {
       toast({ variant: "destructive", title: "DB ulanmagan" });
@@ -334,7 +396,13 @@ export default function UsersPage() {
       
       toast({ title: "Foydalanuvchi yaratildi ✓" });
       setIsDialogOpen(false);
-      setFormData(EMPTY_FORM);
+      setFormData({
+        displayName: "",
+        email: "",
+        password: "",
+        roleId: "warehouse_manager",
+        permissions: getDefaultPermissions("warehouse_manager"),
+      });
       await loadUsers();
       
     } catch (e: any) {
@@ -355,7 +423,6 @@ export default function UsersPage() {
     }
   };
   
-  // Delete user
   const handleDeleteConfirm = async () => {
     if (!confirmDeleteId || !db) return;
     setDeletingId(confirmDeleteId);
@@ -372,26 +439,24 @@ export default function UsersPage() {
     }
   };
   
-  // Filter users
   const filtered = useMemo(() =>
     usersList.filter(u => {
       const q = searchQuery.toLowerCase();
       const role = ROLES.find(r => r.id === u.roleId);
+      const roleLabel = role?.label.toLowerCase() || "";
       return (
         u?.email?.toLowerCase().includes(q) ||
         u?.displayName?.toLowerCase().includes(q) ||
-        role?.label?.toLowerCase().includes(q)
+        roleLabel.includes(q)
       );
     }),
     [usersList, searchQuery]
   );
   
-  // Get role info
   const getRoleInfo = (roleId: string) => {
     return ROLES.find(r => r.id === roleId) || ROLES[0];
   };
   
-  // Guards
   if (isUserLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -414,7 +479,6 @@ export default function UsersPage() {
       <main className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">
           
-          {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-2xl font-bold">Foydalanuvchilar</h1>
@@ -422,20 +486,39 @@ export default function UsersPage() {
                 Jami: {usersList.length} ta foydalanuvchi
               </p>
             </div>
-            <Button 
-              onClick={() => { 
-                setIsEditMode(false); 
-                setEditingUserId(null);
-                setFormData(EMPTY_FORM); 
-                setIsDialogOpen(true); 
-              }}
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Qo'shish
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={migrateOldUsers}
+                disabled={isMigrating}
+              >
+                {isMigrating ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Yangilash
+              </Button>
+              <Button 
+                onClick={() => { 
+                  setIsEditMode(false); 
+                  setEditingUserId(null);
+                  setFormData({
+                    displayName: "",
+                    email: "",
+                    password: "",
+                    roleId: "warehouse_manager",
+                    permissions: getDefaultPermissions("warehouse_manager"),
+                  }); 
+                  setIsDialogOpen(true); 
+                }}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Qo'shish
+              </Button>
+            </div>
           </div>
           
-          {/* Search */}
           <Input
             placeholder="Ism, email yoki rol bo'yicha qidirish..."
             value={searchQuery}
@@ -443,7 +526,6 @@ export default function UsersPage() {
             className="mb-4"
           />
           
-          {/* Users List */}
           {isLoading ? (
             <div className="flex justify-center mt-16">
               <Loader2 className="animate-spin w-6 h-6 text-gray-400" />
@@ -456,7 +538,7 @@ export default function UsersPage() {
             <div className="space-y-3">
               {filtered.map((u: any) => {
                 const isOpen = expandedUserId === u.id;
-                const roleInfo = getRoleInfo(u.roleId);
+                const roleInfo = getRoleInfo(u.roleId || "warehouse_manager");
                 const RoleIcon = roleInfo.icon;
                 const permCount = Object.values(u.permissions ?? {}).filter(Boolean).length;
                 const isCurrentUser = u.id === currentUserId;
@@ -466,7 +548,6 @@ export default function UsersPage() {
                     <div className="p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-start">
                         <div className="flex items-start gap-3 flex-1">
-                          {/* Avatar */}
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm">
                             {(u.displayName || u.email || "?")[0].toUpperCase()}
                           </div>
@@ -477,6 +558,11 @@ export default function UsersPage() {
                               {isCurrentUser && (
                                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                                   Siz
+                                </span>
+                              )}
+                              {u.migrated && (
+                                <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
+                                  Yangilangan
                                 </span>
                               )}
                             </div>
@@ -491,10 +577,6 @@ export default function UsersPage() {
                                 • {permCount} ta bo'lim
                               </span>
                             </div>
-                            
-                            {roleInfo.description && (
-                              <p className="text-xs text-gray-400 mt-1.5">{roleInfo.description}</p>
-                            )}
                           </div>
                         </div>
                         
@@ -528,7 +610,6 @@ export default function UsersPage() {
                         </div>
                       </div>
                       
-                      {/* Expanded permissions */}
                       {isOpen && (
                         <div className="mt-4 pt-4 border-t">
                           <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">
@@ -565,7 +646,6 @@ export default function UsersPage() {
         </div>
       </main>
       
-      {/* Add/Edit User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={open => { if (!isSaving) setIsDialogOpen(open); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -573,7 +653,6 @@ export default function UsersPage() {
           </DialogHeader>
           
           <div className="space-y-6">
-            {/* Basic Info */}
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-gray-700">Asosiy ma'lumotlar</h3>
               <Input
@@ -597,7 +676,7 @@ export default function UsersPage() {
               )}
               {isEditMode && (
                 <Input
-                  placeholder="Yangi parol (agar o'zgartirmoqchi bo'lsangiz)"
+                  placeholder="Yangi parol (ixtiyoriy)"
                   type="password"
                   value={formData.password}
                   onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
@@ -605,7 +684,6 @@ export default function UsersPage() {
               )}
             </div>
             
-            {/* Role Selection */}
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Rol tanlash</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -636,7 +714,6 @@ export default function UsersPage() {
               </div>
             </div>
             
-            {/* Custom Permissions */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-gray-700">Maxsus ruxsatlar</h3>
@@ -718,7 +795,13 @@ export default function UsersPage() {
                 setIsDialogOpen(false);
                 setIsEditMode(false);
                 setEditingUserId(null);
-                setFormData(EMPTY_FORM);
+                setFormData({
+                  displayName: "",
+                  email: "",
+                  password: "",
+                  roleId: "warehouse_manager",
+                  permissions: getDefaultPermissions("warehouse_manager"),
+                });
               }}
               disabled={isSaving}
             >
@@ -732,7 +815,6 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <Dialog open={!!confirmDeleteId} onOpenChange={open => { if (!open) setConfirmDeleteId(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
