@@ -1,377 +1,305 @@
 "use client";
-
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger, 
+  DialogFooter 
 } from "@/components/ui/dialog";
-import {
-  UserPlus, Trash2, Loader2,
-  Package, Truck, TrendingUp,
-  Building2, History, FileText, DollarSign, Users,
-  Settings, ChevronDown, ChevronUp
+import { 
+  UserRound, Search, Plus, Loader2, Trash2, 
+  Phone, Mail, MapPin, Hash, Calendar, 
+  UserCheck, Truck, UserPlus, Save, X 
 } from "lucide-react";
-
-import { useCollection, useFirestore, useUser } from "@/firebase";
+import { useLanguage } from "@/lib/i18n/context";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-import { firebaseConfig } from "@/firebase/config";
 
-// ===================== DATA =====================
-
-const AVAILABLE_SECTIONS = [
-  { id: "products", label: "Товары", icon: Package },
-  { id: "stockIn", label: "Поступление", icon: Truck },
-  { id: "stockOut", label: "Списание", icon: TrendingUp },
-  { id: "warehouses", label: "Склады", icon: Building2 },
-  { id: "movements", label: "Движения", icon: History },
-  { id: "reports", label: "Отчеты", icon: FileText },
-  { id: "expenses", label: "Расходы", icon: DollarSign },
-  { id: "users", label: "Пользователи", icon: Users },
-  { id: "settings", label: "Настройки", icon: Settings },
-];
-
-const ROLE_PRESETS: Record<string, { permissions: string[] }> = {
-  "Администратор": { permissions: AVAILABLE_SECTIONS.map(s => s.id) },
-  "Кладовщик": { permissions: ["products","stockIn","stockOut","movements","reports","expenses","warehouses"] },
-  "Продавец": { permissions: ["products","stockOut","movements","reports"] },
-  "Бухгалтер": { permissions: ["expenses","reports","movements"] },
-  "Наблюдатель": { permissions: ["products","movements","reports"] }
-};
-
-const DEFAULT_ROLE = "Кладовщик";
-
-function buildPermissions(role: string): Record<string, boolean> {
-  const preset = ROLE_PRESETS[role];
-  const perms: Record<string, boolean> = {};
-  AVAILABLE_SECTIONS.forEach(s => {
-    perms[s.id] = preset ? preset.permissions.includes(s.id) : false;
-  });
-  return perms;
-}
-
-const EMPTY_FORM = {
-  displayName: "",
-  email: "",
-  password: "",
-  role: DEFAULT_ROLE,
-  assignedWarehouseId: "all",
-  permissions: buildPermissions(DEFAULT_ROLE),
-};
-
-// ===================== PAGE =====================
-
-export default function UsersPage() {
+export default function IikoStaffPage() {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role, isUserLoading } = useUser();
   const router = useRouter();
+  const { user, role, isUserLoading } = useUser();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const isAdmin = role === "Super Admin" || role === "Admin";
 
-  const isSuperAdmin = role === "Super Admin";
+  // Iiko "Personalnaya kartochka" strukturasiga mos state
+  const [formData, setFormData] = useState({
+    lastName: "",       // Familiya
+    firstName: "",      // Ism
+    middleName: "",     // Otchestvo
+    tabelId: "",        // Tabelniy nomer
+    address: "",        // Adres
+    phone: "",          // Telefon
+    mobile: "",         // Mob. telefon
+    email: "",          // E-mail
+    position: "Menejer", // Doljnost
+    birthDate: "",      // Data rojdeniya
+    isEmployee: true,   // Sotrudnik
+    isSupplier: false,  // Postavshik
+    isGuest: false,     // Gost
+    priceCategory: "Vse tsenovie kategorii"
+  });
 
-  // ===================== AUTH CHECK =====================
-  useEffect(() => {
-    if (isUserLoading) return;
-    if (!isSuperAdmin) {
-      router.replace("/");
-    }
-  }, [isSuperAdmin, isUserLoading, router]);
+  // Ma'lumotlarni yuklash
+  const employeesQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return collection(db, "employees");
+  }, [db, user]);
 
-  // ===================== PERMISSIONS AUTO =====================
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: buildPermissions(prev.role),
-    }));
-  }, [formData.role]);
+  const { data: employees, isLoading } = useCollection(employeesQuery);
 
-  // ===================== FIREBASE QUERY =====================
-  const usersQuery = useMemo(() => {
-    if (!db) return null;
-    return collection(db, "users");
-  }, [db]);
+  // Qidiruv mantiqi
+  const filteredEmployees = useMemo(() => {
+    return employees?.filter(e => 
+      e.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      e.tabelId.includes(searchQuery)
+    ) || [];
+  }, [employees, searchQuery]);
 
-  const { data: usersList = [], isLoading } = useCollection(usersQuery);
-
-  // ===================== ADD USER =====================
-  const handleAddUser = async () => {
-    if (!formData.email.trim() || !formData.password.trim()) {
-      toast({ variant: "destructive", title: "Email va parol kiritilishi shart" });
+  // Saqlash funksiyasi
+  const handleSave = async () => {
+    if (!db || !user || !formData.lastName || !formData.firstName) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Ism va familiyani to'ldiring" });
       return;
     }
-
+    
     setIsSaving(true);
-    let secondaryApp: ReturnType<typeof initializeApp> | null = null;
+    const id = doc(collection(db, "employees")).id;
+    
+    // Iiko formatidagi qisqa ism (Petrov K.S.)
+    const systemName = `${formData.lastName} ${formData.firstName.charAt(0)}.${formData.middleName ? formData.middleName.charAt(0) + '.' : ''}`;
+    
+    const payload = {
+      ...formData,
+      id,
+      fullName: `${formData.lastName} ${formData.firstName} ${formData.middleName}`.trim(),
+      systemName,
+      updatedAt: new Date().toISOString()
+    };
 
     try {
-      secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
-      const auth = getAuth(secondaryApp);
-
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        formData.email.trim(),
-        formData.password
-      );
-
-      await setDoc(doc(db, "users", cred.user.uid), {
-        ...formData,
-        email: formData.email.trim(),
-        id: cred.user.uid,
-        createdAt: new Date().toISOString(),
-      });
-
-      await signOut(auth);
-
-      toast({ title: "Foydalanuvchi yaratildi ✓" });
+      await setDoc(doc(db, "employees", id), payload);
       setIsDialogOpen(false);
-      setFormData(EMPTY_FORM);
-
-    } catch (e: any) {
-      const msg =
-        e?.code === "auth/email-already-in-use"
-          ? "Bu email allaqachon ro'yxatdan o'tgan"
-          : e?.code === "auth/weak-password"
-          ? "Parol kamida 6 ta belgidan iborat bo'lishi kerak"
-          : "Xatolik yuz berdi";
-      toast({ variant: "destructive", title: msg });
+      resetForm();
+      toast({ title: "Muvaffaqiyatli", description: "Xodim kartochkasi saqlandi." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Xato", description: "Saqlashda xatolik yuz berdi." });
     } finally {
-      if (secondaryApp) {
-        try { await deleteApp(secondaryApp); } catch {}
-      }
       setIsSaving(false);
     }
   };
 
-  // ===================== DELETE =====================
+  const resetForm = () => {
+    setFormData({
+      lastName: "", firstName: "", middleName: "", tabelId: "",
+      address: "", phone: "", mobile: "", email: "",
+      position: "Menejer", birthDate: "",
+      isEmployee: true, isSupplier: false, isGuest: false,
+      priceCategory: "Vse tsenovie kategorii"
+    });
+  };
+
   const handleDelete = async (id: string) => {
-    if (!confirm("Foydalanuvchini o'chirishni tasdiqlaysizmi?")) return;
-    setDeletingId(id);
+    if (!db || !confirm("Ushbu kartochkani o'chirishni tasdiqlaysizmi?")) return;
     try {
-      await deleteDoc(doc(db, "users", id));
-      toast({ title: "O'chirildi" });
-    } catch {
-      toast({ variant: "destructive", title: "O'chirishda xatolik" });
-    } finally {
-      setDeletingId(null);
+      await deleteDoc(doc(db, "employees", id));
+      toast({ title: "O'chirildi", description: "Xodim ma'lumotlari o'chirildi." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Xato", description: "O'chirishda xatolik." });
     }
   };
 
-  // ===================== FILTER =====================
-  const filtered = useMemo(() =>
-    (usersList as any[]).filter(u =>
-      u?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u?.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-    [usersList, searchQuery]
-  );
+  if (isUserLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
-  // ===================== LOADING / GUARD =====================
-  if (isUserLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="animate-spin w-8 h-8" />
-      </div>
-    );
-  }
-
-  if (!isSuperAdmin) return null;
-
-  // ===================== UI =====================
   return (
-    <div className="flex">
+    <div className="flex min-h-screen bg-[#f0f2f5] font-body">
       <OmniSidebar />
-
-      <main className="flex-1 p-6 max-w-3xl">
-
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-bold">Foydalanuvchilar</h1>
-          <Button onClick={() => { setFormData(EMPTY_FORM); setIsDialogOpen(true); }}>
-            <UserPlus className="w-4 h-4 mr-2" />
-            Qo'shish
-          </Button>
-        </div>
-
-        {/* SEARCH */}
-        <Input
-          placeholder="Qidirish (email yoki ism)..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="mb-4"
-        />
-
-        {/* LIST */}
-        {isLoading ? (
-          <div className="flex justify-center mt-10">
-            <Loader2 className="animate-spin w-6 h-6" />
+      <main className="flex-1 p-6">
+        <header className="flex justify-between items-end mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Personal kartochkasi</h1>
+            <p className="text-xs text-slate-500 font-medium">Sklad va ishlab chiqarish xodimlari reyestri</p>
           </div>
-        ) : filtered.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center mt-10">
-            Foydalanuvchilar topilmadi
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {filtered.map((u: any) => {
-              const isOpen = expandedUserId === u.id;
-              const permCount = Object.values(u.permissions || {}).filter(Boolean).length;
 
-              return (
-                <React.Fragment key={u.id}>
-                  <div className="p-3 border rounded-lg flex justify-between items-center bg-white">
-                    <div>
-                      <div className="font-medium">{u.displayName || "—"}</div>
-                      <div className="text-xs text-gray-500">{u.email}</div>
-                      <div className="text-xs text-blue-500 mt-0.5">{u.role}</div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-[#0078d4] hover:bg-[#005a9e] text-white rounded-none h-10 px-6 flex gap-2 items-center text-xs font-bold uppercase tracking-wider">
+                <Plus className="w-4 h-4" /> Qo'shish
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[850px] p-0 border-none rounded-lg overflow-hidden bg-[#f3f3f3]">
+              <DialogHeader className="bg-white p-4 border-b">
+                <DialogTitle className="text-sm font-normal text-slate-600 flex items-center justify-center">
+                   Personalnaya kartochka
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="p-6 space-y-6">
+                {/* Tabs Style (iiko design) */}
+                <div className="flex border-b border-slate-300 gap-1 overflow-x-auto">
+                   <div className="bg-white px-4 py-2 text-xs border border-b-0 border-slate-300 rounded-t-md">Osnovnie svedeniya</div>
+                   <div className="px-4 py-2 text-xs opacity-50">Dopolnitelnie</div>
+                   <div className="px-4 py-2 text-xs opacity-50">Pasport/Litsenziya</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-10">
+                  {/* Chap ustun */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Familiya:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
                     </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setExpandedUserId(isOpen ? null : u.id)}
-                      >
-                        {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </Button>
-
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={deletingId === u.id}
-                        onClick={() => handleDelete(u.id)}
-                      >
-                        {deletingId === u.id
-                          ? <Loader2 className="animate-spin w-4 h-4" />
-                          : <Trash2 className="w-4 h-4 text-red-500" />
-                        }
-                      </Button>
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Ism:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Otasining ismi:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Tabel № / Kod:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.tabelId} onChange={e => setFormData({...formData, tabelId: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Tug'ilgan sana:</Label>
+                      <Input type="date" className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.birthDate} onChange={e => setFormData({...formData, birthDate: e.target.value})} />
                     </div>
                   </div>
 
-                  {isOpen && (
-                    <div className="px-4 py-3 bg-gray-50 border border-t-0 rounded-b-lg text-xs space-y-1">
-                      <div className="font-medium text-gray-700 mb-1">
-                        Ruxsatlar ({permCount}/{AVAILABLE_SECTIONS.length}):
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {AVAILABLE_SECTIONS.map(s => {
-                          const hasAccess = u.permissions?.[s.id];
-                          return (
-                            <span
-                              key={s.id}
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                hasAccess
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-gray-100 text-gray-400 line-through"
-                              }`}
-                            >
-                              {s.label}
-                            </span>
-                          );
-                        })}
-                      </div>
+                  {/* O'ng ustun */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Adres:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
                     </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Telefon:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Mob. telefon:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">E-mail:</Label>
+                      <Input className="col-span-2 h-7 text-xs rounded-none border-slate-300" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <Label className="text-[11px] text-right">Lavozimi:</Label>
+                      <select 
+                        className="col-span-2 h-7 text-xs border border-slate-300 bg-white px-1 outline-none"
+                        value={formData.position}
+                        onChange={e => setFormData({...formData, position: e.target.value})}
+                      >
+                        <option>Menejer</option>
+                        <option>Sklad mudiri</option>
+                        <option>Buxgalter</option>
+                        <option>Haydovchi</option>
+                        <option>Ishchi</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Checkbox qatori (Iiko original mantiq) */}
+                <div className="grid grid-cols-2 gap-10 pt-4 border-t border-slate-300">
+                  <div className="space-y-2">
+                     <div className="flex items-center space-x-2">
+                        <Checkbox id="emp" checked={formData.isEmployee} onCheckedChange={(v) => setFormData({...formData, isEmployee: !!v})} />
+                        <Label htmlFor="emp" className="text-[11px] font-medium">Sotrudnik (Xodim)</Label>
+                     </div>
+                     <div className="flex items-center space-x-2">
+                        <Checkbox id="sup" checked={formData.isSupplier} onCheckedChange={(v) => setFormData({...formData, isSupplier: !!v})} />
+                        <Label htmlFor="sup" className="text-[11px] font-medium">Postavshik (Yetkazib beruvchi)</Label>
+                     </div>
+                     <div className="flex items-center space-x-2">
+                        <Checkbox id="gst" checked={formData.isGuest} onCheckedChange={(v) => setFormData({...formData, isGuest: !!v})} />
+                        <Label htmlFor="gst" className="text-[11px] font-medium">Gost (Mehmon)</Label>
+                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="bg-[#e1e1e1] p-3 gap-2 border-t">
+                <Button className="h-8 rounded-none px-6 bg-white text-black border border-slate-400 text-xs hover:bg-slate-100" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Save className="w-3 h-3 mr-2" />} Saxranit
+                </Button>
+                <Button className="h-8 rounded-none px-6 bg-white text-black border border-slate-400 text-xs hover:bg-slate-100" onClick={() => setIsDialogOpen(false)}>
+                   <X className="w-3 h-3 mr-2" /> Otmena
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </header>
+
+        {/* Qidiruv paneli */}
+        <div className="bg-white p-3 mb-6 flex items-center gap-4 border border-slate-200 shadow-sm">
+           <div className="relative flex-1 max-w-md">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+             <Input 
+               placeholder="Qidirish (ism yoki tabel raqami)..." 
+               className="pl-10 h-9 text-xs rounded-none bg-slate-50 border-slate-200"
+               value={searchQuery}
+               onChange={e => setSearchQuery(e.target.value)}
+             />
+           </div>
+        </div>
+
+        {/* Xodimlar ro'yxati (Tabel ko'rinishida yoki Kartochka) */}
+        {isLoading ? (
+          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+             {filteredEmployees.map((emp: any) => (
+               <Card key={emp.id} className="rounded-none border-slate-200 shadow-sm hover:shadow-md transition-shadow bg-white">
+                 <CardContent className="p-4">
+                   <div className="flex justify-between items-start mb-3">
+                      <div className="w-10 h-10 bg-slate-100 flex items-center justify-center text-slate-500">
+                         <UserRound className="w-6 h-6" />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-500 hover:bg-rose-50" onClick={() => handleDelete(emp.id)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                   </div>
+                   <h3 className="font-bold text-sm text-slate-800 truncate">{emp.systemName}</h3>
+                   <p className="text-[10px] text-slate-500 mb-4">{emp.position}</p>
+                   
+                   <div className="space-y-1.5 border-t pt-3">
+                      <div className="flex justify-between text-[10px]">
+                         <span className="text-slate-400">Tabel №:</span>
+                         <span className="font-bold">{emp.tabelId}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {emp.isEmployee && <Badge className="text-[8px] bg-emerald-50 text-emerald-600 border-emerald-100 rounded-none">XODIM</Badge>}
+                        {emp.isSupplier && <Badge className="text-[8px] bg-blue-50 text-blue-600 border-blue-100 rounded-none">YETKAZIB BERUVCHI</Badge>}
+                        {emp.isGuest && <Badge className="text-[8px] bg-slate-100 text-slate-600 border-none rounded-none">MEHMON</Badge>}
+                      </div>
+                   </div>
+                 </CardContent>
+               </Card>
+             ))}
           </div>
         )}
       </main>
-
-      {/* ADD DIALOG */}
-      <Dialog open={isDialogOpen} onOpenChange={open => { if (!isSaving) setIsDialogOpen(open); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Yangi foydalanuvchi</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <Input
-              placeholder="Ism *"
-              value={formData.displayName}
-              onChange={e => setFormData(p => ({ ...p, displayName: e.target.value }))}
-            />
-            <Input
-              placeholder="Email *"
-              type="email"
-              value={formData.email}
-              onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
-            />
-            <Input
-              placeholder="Parol * (kamida 6 belgi)"
-              type="password"
-              value={formData.password}
-              onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
-            />
-
-            {/* Role selector */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">Rol</label>
-              <div className="flex flex-wrap gap-2">
-                {Object.keys(ROLE_PRESETS).map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setFormData(p => ({ ...p, role: r }))}
-                    className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                      formData.role === r
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Permissions preview */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">Ruxsatlar</label>
-              <div className="flex flex-wrap gap-1">
-                {AVAILABLE_SECTIONS.map(s => {
-                  const hasAccess = formData.permissions[s.id];
-                  return (
-                    <span
-                      key={s.id}
-                      className={`px-2 py-0.5 rounded-full text-xs ${
-                        hasAccess
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-400"
-                      }`}
-                    >
-                      {s.label}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
-              Bekor qilish
-            </Button>
-            <Button onClick={handleAddUser} disabled={isSaving}>
-              {isSaving && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
-              Saqlash
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
