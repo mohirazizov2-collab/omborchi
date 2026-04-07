@@ -48,7 +48,9 @@ import {
   MoreVertical,
   Edit2,
   Save,
-  X
+  X,
+  Search,
+  CheckCircle2  // ✅ Qo'shildi
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -470,7 +472,7 @@ export default function UsersPage() {
                           <tr className="text-[9px] font-bold text-[#666] uppercase">
                             <th className="px-3 py-2 text-left">Модуль</th>
                             <th className="px-3 py-2 text-left w-20">Доступ</th>
-                          </tr>
+                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#e0e0e0]">
                           {AVAILABLE_SECTIONS.map((section) => {
@@ -549,7 +551,7 @@ export default function UsersPage() {
                     <th className="px-6 py-3 text-left">Склад</th>
                     <th className="px-6 py-3 text-left">Права</th>
                     <th className="px-6 py-3 text-right">Действия</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e0e0e0]">
                   {filteredUsers && filteredUsers.map((u: any) => {
@@ -558,8 +560,8 @@ export default function UsersPage() {
                     const isExpanded = expandedUserId === u.id;
                     
                     return (
-                      <>
-                        <tr key={u.id} className="hover:bg-[#fafafa] transition-colors">
+                      <React.Fragment key={u.id}>
+                        <tr className="hover:bg-[#fafafa] transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-8 w-8 bg-[#1a5c3e]/10 rounded-md">
@@ -633,7 +635,7 @@ export default function UsersPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     );
                   })}
                   {(!filteredUsers || filteredUsers.length === 0) && (
