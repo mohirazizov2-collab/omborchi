@@ -18,10 +18,10 @@ import {
 } from "@/components/ui/dialog";
 import { 
   UserRound, Search, Plus, Loader2, Trash2, 
-  ShieldCheck, Save, X, ChevronRight 
+  ShieldCheck, Save, X, ChevronRight, Edit3 
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export default function IikoStaffPage() {
@@ -33,33 +33,55 @@ export default function IikoStaffPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null); // Tahrirlanayotgan user ID si
 
   const isSuperAdmin = user?.email === "f2472839@gmail.com";
 
-  const [formData, setFormData] = useState({
+  // Initial State
+  const initialForm = {
     lastName: "", firstName: "", middleName: "", tabelId: "",
     address: "", phone: "", mobile: "", email: "",
     position: "Menejer", isEmployee: true
-  });
+  };
 
-  // Rasmdagi barcha bo'limlar ierarxiyasi
-  const [permissions, setPermissions] = useState({
+  const initialPermissions = {
     analitika: { dashboard: false, harakatlar: false, hisobotlar: false },
     nakladnolar: { kirim: false, chiqim: false },
     inventar: { mahsulotlar: false, omborlar: false, inventarizatsiya: false },
     ishlabChiqarish: { retseptlar: false, tayyorlash: false },
     moliya: { xarajatlar: false, ishchilar: false },
     tizim: { foydalanuvchilar: false, sozlamalar: false }
-  });
+  };
 
-  useEffect(() => {
-    if (!isUserLoading && user) {
-      if (!isSuperAdmin && !user.permissions?.tizim?.foydalanuvchilar) {
-        toast({ variant: "destructive", title: "Ruxsat yo'q", description: "Sizda 'Foydalanuvchilar' bo'limiga ruxsat mavjud emas." });
-        router.push("/dashboard");
-      }
-    }
-  }, [user, isUserLoading, isSuperAdmin]);
+  const [formData, setFormData] = useState(initialForm);
+  const [permissions, setPermissions] = useState(initialPermissions);
+
+  // Eski userni tahrirlash uchun yuklash funksiyasi
+  const handleEdit = (emp: any) => {
+    setEditingId(emp.id);
+    setFormData({
+      lastName: emp.lastName || "",
+      firstName: emp.firstName || "",
+      middleName: emp.middleName || "",
+      tabelId: emp.tabelId || "",
+      address: emp.address || "",
+      phone: emp.phone || "",
+      mobile: emp.mobile || "",
+      email: emp.email || "",
+      position: emp.position || "Menejer",
+      isEmployee: emp.isEmployee ?? true
+    });
+    // Agar eski userda permissions bo'lsa o'shani yuklaydi, bo'lmasa bo'shini
+    setPermissions(emp.permissions || initialPermissions);
+    setIsDialogOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setEditingId(null);
+    setFormData(initialForm);
+    setPermissions(initialPermissions);
+    setIsDialogOpen(true);
+  };
 
   const employeesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -82,7 +104,7 @@ export default function IikoStaffPage() {
     }
     
     setIsSaving(true);
-    const id = doc(collection(db, "employees")).id;
+    const id = editingId || doc(collection(db, "employees")).id;
     const systemName = `${formData.lastName} ${formData.firstName.charAt(0)}.`;
     
     const payload = {
@@ -90,15 +112,14 @@ export default function IikoStaffPage() {
       id,
       fullName: `${formData.lastName} ${formData.firstName} ${formData.middleName}`.trim(),
       systemName,
-      permissions, // Rasmda ko'rsatilgan barcha ruxsatlar
+      permissions,
       updatedAt: new Date().toISOString()
     };
 
     try {
-      await setDoc(doc(db, "employees", id), payload);
+      await setDoc(doc(db, "employees", id), payload, { merge: true });
       setIsDialogOpen(false);
-      resetForm();
-      toast({ title: "Muvaffaqiyatli", description: "Xodim va ruxsatnomalar saqlandi." });
+      toast({ title: "Muvaffaqiyatli", description: editingId ? "Ma'lumotlar yangilandi." : "Yangi xodim saqlandi." });
     } catch (e) {
       toast({ variant: "destructive", title: "Xato", description: "Saqlashda xatolik." });
     } finally {
@@ -106,16 +127,15 @@ export default function IikoStaffPage() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({ lastName: "", firstName: "", middleName: "", tabelId: "", address: "", phone: "", mobile: "", email: "", position: "Menejer", isEmployee: true });
-    setPermissions({
-      analitika: { dashboard: false, harakatlar: false, hisobotlar: false },
-      nakladnolar: { kirim: false, chiqim: false },
-      inventar: { mahsulotlar: false, omborlar: false, inventarizatsiya: false },
-      ishlabChiqarish: { retseptlar: false, tayyorlash: false },
-      moliya: { xarajatlar: false, ishchilar: false },
-      tizim: { foydalanuvchilar: false, sozlamalar: false }
-    });
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Kartochka bosilib ketishini oldini oladi
+    if (!confirm("Ushbu foydalanuvchini o'chirishni tasdiqlaysizmi?")) return;
+    try {
+      await deleteDoc(doc(db, "employees", id));
+      toast({ title: "O'chirildi", description: "Xodim ma'lumotlari o'chirildi." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Xato", description: "O'chirishda xatolik." });
+    }
   };
 
   const PermissionGroup = ({ title, items, stateKey }: any) => (
@@ -135,15 +155,13 @@ export default function IikoStaffPage() {
               })} 
             />
             <Label htmlFor={`${stateKey}-${key}`} className="text-[11px] capitalize cursor-pointer">
-              {key.replace(/([A-Z])/g, ' $1').trim()}
+              {key === 'dashboard' ? 'Asosiy oyna' : key.replace(/([A-Z])/g, ' $1').trim()}
             </Label>
           </div>
         ))}
       </div>
     </div>
   );
-
-  if (isUserLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="flex min-h-screen bg-[#f0f2f5] font-body">
@@ -152,24 +170,24 @@ export default function IikoStaffPage() {
         <header className="flex justify-between items-end mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Xodimlar va Ruxsatlar</h1>
-            <p className="text-xs text-slate-500 font-medium">Tizim ma'muriyati bo'limi</p>
+            <p className="text-xs text-slate-500 font-medium">Barcha xodimlarning bo'limlarga ruxsatini shu yerdan boshqaring</p>
           </div>
 
+          <Button onClick={handleAddNew} className="bg-[#0078d4] hover:bg-[#005a9e] rounded-none h-10 px-6 flex gap-2 items-center text-xs font-bold uppercase">
+            <Plus className="w-4 h-4" /> Yangi foydalanuvchi
+          </Button>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#0078d4] hover:bg-[#005a9e] rounded-none h-10 px-6 flex gap-2 items-center text-xs font-bold uppercase">
-                <Plus className="w-4 h-4" /> Foydalanuvchi qo'shish
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-w-[950px] p-0 border-none rounded-lg overflow-hidden bg-[#f3f3f3]">
               <DialogHeader className="bg-white p-4 border-b">
                 <DialogTitle className="text-sm font-normal text-slate-600 text-center flex items-center justify-center gap-2">
-                   <ShieldCheck className="w-4 h-4 text-blue-600" /> Tizimga kirish huquqlarini sozlash
+                   <ShieldCheck className="w-4 h-4 text-blue-600" /> 
+                   {editingId ? "Tahrirlash: " + formData.lastName : "Yangi xodim qo'shish"}
                 </DialogTitle>
               </DialogHeader>
 
               <div className="p-6 grid grid-cols-5 gap-6 max-h-[70vh] overflow-y-auto">
-                {/* Chap ustun: Asosiy Ma'lumotlar */}
+                {/* Asosiy Ma'lumotlar */}
                 <div className="col-span-2 space-y-4 bg-white p-4 border rounded-md shadow-sm h-fit">
                    <h4 className="text-xs font-bold border-b pb-2 mb-4">Shaxsiy ma'lumotlar</h4>
                    <div className="space-y-3">
@@ -181,7 +199,7 @@ export default function IikoStaffPage() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[11px]">Email (Tizimga kirish uchun login)</Label>
+                      <Label className="text-[11px]">Email (Login)</Label>
                       <Input placeholder="email@gmail.com" className="h-8 text-xs rounded-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                     </div>
                     <div className="space-y-1">
@@ -197,7 +215,7 @@ export default function IikoStaffPage() {
                    </div>
                 </div>
 
-                {/* O'ng ustun: Ruxsatnomalar ierarxiyasi (Rasmdagi bo'limlar) */}
+                {/* Bo'limlarga ruxsat berish (Rasmdagi bo'limlar) */}
                 <div className="col-span-3 bg-white p-4 border rounded-md shadow-sm">
                    <h4 className="text-xs font-bold border-b pb-2 mb-4 text-blue-600">Bo'limlarga ruxsat berish</h4>
                    <div className="grid grid-cols-1 gap-1">
@@ -213,7 +231,7 @@ export default function IikoStaffPage() {
 
               <DialogFooter className="bg-[#e1e1e1] p-3 gap-2 border-t">
                 <Button className="h-9 rounded-none px-8 bg-[#0078d4] text-white text-xs hover:bg-[#005a9e] font-bold" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />} SAQLASH
+                  {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />} {editingId ? "YANGILASH" : "SAQLASH"}
                 </Button>
                 <Button className="h-9 rounded-none px-8 bg-white text-black border border-slate-400 text-xs" onClick={() => setIsDialogOpen(false)}>
                    BEKOR QILISH
@@ -223,7 +241,7 @@ export default function IikoStaffPage() {
           </Dialog>
         </header>
 
-        {/* Qidiruv Paneli */}
+        {/* Qidiruv */}
         <div className="bg-white p-3 mb-6 border border-slate-200 shadow-sm flex items-center gap-4">
            <div className="relative flex-1 max-w-md">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -237,18 +255,27 @@ export default function IikoStaffPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
              {filteredEmployees.map((emp: any) => (
-               <Card key={emp.id} className="rounded-none border-slate-200 shadow-sm bg-white overflow-hidden group">
+               <Card 
+                 key={emp.id} 
+                 className="rounded-none border-slate-200 shadow-sm bg-white overflow-hidden group cursor-pointer hover:border-blue-300 transition-all"
+                 onClick={() => handleEdit(emp)} // KARTA BOSILSA TAHRIRLASH OCHILADI
+               >
                  <div className="h-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                  <CardContent className="p-5">
                    <div className="flex justify-between items-start mb-4">
                       <div className="w-12 h-12 bg-blue-50 text-blue-600 flex items-center justify-center rounded-lg">
                          <UserRound className="w-7 h-7" />
                       </div>
-                      {isSuperAdmin && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" onClick={() => handleDelete(emp.id)}>
-                          <Trash2 className="w-4 h-4" />
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={(e) => { e.stopPropagation(); handleEdit(emp); }}>
+                          <Edit3 className="w-4 h-4" />
                         </Button>
-                      )}
+                        {isSuperAdmin && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" onClick={(e) => handleDelete(emp.id, e)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                    </div>
                    <h3 className="font-bold text-base text-slate-800">{emp.fullName}</h3>
                    <p className="text-[11px] text-slate-500 mb-4">{emp.email}</p>
@@ -258,14 +285,11 @@ export default function IikoStaffPage() {
                         <span className="text-slate-400 font-bold uppercase">Roli:</span>
                         <Badge className="bg-slate-100 text-slate-700 rounded-none border-none text-[9px] uppercase">{emp.position}</Badge>
                       </div>
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Ruxsatlar:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {emp.permissions?.analitika?.dashboard && <Badge className="bg-emerald-50 text-emerald-600 text-[8px] border-none">Analitika</Badge>}
-                          {emp.permissions?.inventar?.mahsulotlar && <Badge className="bg-blue-50 text-blue-600 text-[8px] border-none">Inventar</Badge>}
-                          {emp.permissions?.ishlabChiqarish?.retseptlar && <Badge className="bg-purple-50 text-purple-600 text-[8px] border-none">Ishlab chiqarish</Badge>}
-                          {emp.permissions?.moliya?.xarajatlar && <Badge className="bg-amber-50 text-amber-600 text-[8px] border-none">Moliya</Badge>}
-                        </div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Aktiv ruxsatlar:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {emp.permissions?.analitika?.dashboard && <Badge className="bg-emerald-50 text-emerald-600 text-[8px]">Analitika</Badge>}
+                        {emp.permissions?.inventar?.mahsulotlar && <Badge className="bg-blue-50 text-blue-600 text-[8px]">Inventar</Badge>}
+                        {emp.permissions?.moliya?.xarajatlar && <Badge className="bg-amber-50 text-amber-600 text-[8px]">Moliya</Badge>}
                       </div>
                    </div>
                  </CardContent>
