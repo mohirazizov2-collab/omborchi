@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
 import {
-  UserPlus, Trash2, Loader2,
-  Package, Truck, TrendingUp,
-  Building2, History, FileText, DollarSign, Users,
-  Settings, ChevronDown, ChevronUp, AlertTriangle
+  UserPlus, Trash2, Loader2, ChevronDown, ChevronUp,
+  AlertTriangle, Package, Truck, TrendingUp, Building2,
+  History, FileText, DollarSign, Users, Settings, Check, Shield
 } from "lucide-react";
 
 import { useCollection, useFirestore, useUser } from "@/firebase";
@@ -22,36 +21,65 @@ import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { firebaseConfig } from "@/firebase/config";
 
-// ===================== DATA =====================
+// ===================== SECTIONS =====================
 
-const AVAILABLE_SECTIONS = [
-  { id: "products",   label: "Товары",        icon: Package },
-  { id: "stockIn",    label: "Поступление",   icon: Truck },
-  { id: "stockOut",   label: "Списание",      icon: TrendingUp },
-  { id: "warehouses", label: "Склады",        icon: Building2 },
-  { id: "movements",  label: "Движения",      icon: History },
-  { id: "reports",    label: "Отчеты",        icon: FileText },
-  { id: "expenses",   label: "Расходы",       icon: DollarSign },
-  { id: "users",      label: "Пользователи",  icon: Users },
-  { id: "settings",   label: "Настройки",     icon: Settings },
+const SECTIONS = [
+  { id: "products",   label: "Товары",       icon: Package },
+  { id: "stockIn",    label: "Поступление",  icon: Truck },
+  { id: "stockOut",   label: "Списание",     icon: TrendingUp },
+  { id: "warehouses", label: "Склады",       icon: Building2 },
+  { id: "movements",  label: "Движения",     icon: History },
+  { id: "reports",    label: "Отчеты",       icon: FileText },
+  { id: "expenses",   label: "Расходы",      icon: DollarSign },
+  { id: "users",      label: "Пользователи", icon: Users },
+  { id: "settings",   label: "Настройки",    icon: Settings },
 ];
 
-const ROLE_PRESETS: Record<string, string[]> = {
-  "Администратор": AVAILABLE_SECTIONS.map(s => s.id),
-  "Кладовщик":     ["products","stockIn","stockOut","movements","reports","expenses","warehouses"],
-  "Продавец":      ["products","stockOut","movements","reports"],
-  "Бухгалтер":     ["expenses","reports","movements"],
-  "Наблюдатель":   ["products","movements","reports"],
+// ===================== ROLES =====================
+
+const ROLES: Record<string, { label: string; color: string; permissions: string[] }> = {
+  "Super Admin": {
+    label: "Super Admin",
+    color: "bg-purple-100 text-purple-700",
+    permissions: SECTIONS.map(s => s.id),
+  },
+  "Администратор": {
+    label: "Администратор",
+    color: "bg-blue-100 text-blue-700",
+    permissions: SECTIONS.map(s => s.id),
+  },
+  "Кладовщик": {
+    label: "Кладовщик",
+    color: "bg-green-100 text-green-700",
+    permissions: ["products","stockIn","stockOut","movements","reports","expenses","warehouses"],
+  },
+  "Продавец": {
+    label: "Продавец",
+    color: "bg-yellow-100 text-yellow-700",
+    permissions: ["products","stockOut","movements","reports"],
+  },
+  "Бухгалтер": {
+    label: "Бухгалтер",
+    color: "bg-orange-100 text-orange-700",
+    permissions: ["expenses","reports","movements"],
+  },
+  "Наблюдатель": {
+    label: "Наблюдатель",
+    color: "bg-gray-100 text-gray-600",
+    permissions: ["products","movements","reports"],
+  },
 };
 
-const DEFAULT_ROLE = "Кладовщик";
+// ===================== HELPERS =====================
 
 function buildPermissions(role: string): Record<string, boolean> {
-  const allowed = ROLE_PRESETS[role] ?? [];
+  const allowed = ROLES[role]?.permissions ?? [];
   const perms: Record<string, boolean> = {};
-  AVAILABLE_SECTIONS.forEach(s => { perms[s.id] = allowed.includes(s.id); });
+  SECTIONS.forEach(s => { perms[s.id] = allowed.includes(s.id); });
   return perms;
 }
+
+const DEFAULT_ROLE = "Кладовщик";
 
 const EMPTY_FORM = {
   displayName: "",
@@ -76,8 +104,7 @@ export default function UsersPage() {
   const [expandedUserId,  setExpandedUserId]  = useState<string | null>(null);
   const [deletingId,      setDeletingId]      = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formData, setFormData]               = useState(EMPTY_FORM);
 
   const isSuperAdmin = role === "Super Admin";
 
@@ -87,17 +114,16 @@ export default function UsersPage() {
     if (!isSuperAdmin) router.replace("/");
   }, [isSuperAdmin, isUserLoading, router]);
 
-  // ===================== FIREBASE QUERY =====================
+  // ===================== FIREBASE =====================
   const usersQuery = useMemo(() => {
-    if (!db) return null;
+    if (!db) return undefined;
     return collection(db, "users");
   }, [db]);
 
-  const { data: usersList = [], isLoading } = useCollection(usersQuery ?? undefined);
+  const { data: usersList = [], isLoading } = useCollection(usersQuery);
 
-  // ===================== HANDLERS =====================
+  // ===================== FORM HANDLERS =====================
 
-  // Rol o'zgarganda permissions ham birga o'zgaradi — useEffect YO'Q
   const handleRoleChange = (newRole: string) => {
     setFormData(prev => ({
       ...prev,
@@ -106,9 +132,26 @@ export default function UsersPage() {
     }));
   };
 
-  const handleField = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  // Alohida permission toggle — rol presetdan mustaqil
+  const togglePermission = (sectionId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        [sectionId]: !prev.permissions[sectionId],
+      },
+    }));
   };
+
+  // Hammasini yoqish/o'chirish
+  const toggleAll = (value: boolean) => {
+    const perms: Record<string, boolean> = {};
+    SECTIONS.forEach(s => { perms[s.id] = value; });
+    setFormData(prev => ({ ...prev, permissions: perms }));
+  };
+
+  const allEnabled  = SECTIONS.every(s => formData.permissions[s.id]);
+  const noneEnabled = SECTIONS.every(s => !formData.permissions[s.id]);
 
   // ===================== ADD USER =====================
   const handleAddUser = async () => {
@@ -129,12 +172,18 @@ export default function UsersPage() {
       return;
     }
 
+    const enabledCount = Object.values(formData.permissions).filter(Boolean).length;
+    if (enabledCount === 0) {
+      toast({ variant: "destructive", title: "Kamida 1 ta bo'lim tanlang" });
+      return;
+    }
+
     setIsSaving(true);
     let secondaryApp: ReturnType<typeof initializeApp> | null = null;
 
     try {
       secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
-      const auth = getAuth(secondaryApp);
+      const auth   = getAuth(secondaryApp);
 
       const cred = await createUserWithEmailAndPassword(
         auth,
@@ -143,13 +192,13 @@ export default function UsersPage() {
       );
 
       await setDoc(doc(db, "users", cred.user.uid), {
-        displayName:        formData.displayName.trim(),
-        email:              formData.email.trim(),
-        role:               formData.role,
+        displayName:         formData.displayName.trim(),
+        email:               formData.email.trim(),
+        role:                formData.role,
         assignedWarehouseId: formData.assignedWarehouseId,
-        permissions:        formData.permissions,
-        id:                 cred.user.uid,
-        createdAt:          new Date().toISOString(),
+        permissions:         formData.permissions,
+        id:                  cred.user.uid,
+        createdAt:           new Date().toISOString(),
       });
 
       await signOut(auth);
@@ -194,13 +243,14 @@ export default function UsersPage() {
       const q = searchQuery.toLowerCase();
       return (
         u?.email?.toLowerCase().includes(q) ||
-        u?.displayName?.toLowerCase().includes(q)
+        u?.displayName?.toLowerCase().includes(q) ||
+        u?.role?.toLowerCase().includes(q)
       );
     }),
     [usersList, searchQuery]
   );
 
-  // ===================== LOADING / GUARD =====================
+  // ===================== GUARDS =====================
   if (isUserLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -220,7 +270,12 @@ export default function UsersPage() {
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Foydalanuvchilar</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Foydalanuvchilar</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {usersList.length} ta foydalanuvchi
+            </p>
+          </div>
           <Button onClick={() => { setFormData(EMPTY_FORM); setIsDialogOpen(true); }}>
             <UserPlus className="w-4 h-4 mr-2" />
             Qo'shish
@@ -229,7 +284,7 @@ export default function UsersPage() {
 
         {/* SEARCH */}
         <Input
-          placeholder="Ism yoki email bo'yicha qidirish..."
+          placeholder="Ism, email yoki rol bo'yicha qidirish..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           className="mb-4"
@@ -249,29 +304,40 @@ export default function UsersPage() {
             {filtered.map((u: any) => {
               const isOpen    = expandedUserId === u.id;
               const permCount = Object.values(u.permissions ?? {}).filter(Boolean).length;
+              const roleColor = ROLES[u.role]?.color ?? "bg-gray-100 text-gray-600";
 
               return (
                 <React.Fragment key={u.id}>
-
                   <div className="p-4 border rounded-xl flex justify-between items-center bg-white shadow-sm">
-                    <div>
-                      <div className="font-semibold">{u.displayName || "—"}</div>
-                      <div className="text-xs text-gray-500">{u.email}</div>
-                      <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">
-                        {u.role}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">
+                        {(u.displayName || u.email || "?")[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-semibold">{u.displayName || "—"}</div>
+                        <div className="text-xs text-gray-500">{u.email}</div>
+                        <div className="flex items-center gap-1 mt-1">
+                          {u.role === "Super Admin" && (
+                            <Shield className="w-3 h-3 text-purple-600" />
+                          )}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor}`}>
+                            {u.role}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            · {permCount} bo'lim
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Button
                         size="icon" variant="ghost"
                         onClick={() => setExpandedUserId(isOpen ? null : u.id)}
                       >
-                        {isOpen
-                          ? <ChevronUp className="w-4 h-4" />
-                          : <ChevronDown className="w-4 h-4" />}
+                        {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </Button>
-
                       <Button
                         size="icon" variant="ghost"
                         disabled={deletingId === u.id}
@@ -279,33 +345,39 @@ export default function UsersPage() {
                       >
                         {deletingId === u.id
                           ? <Loader2 className="animate-spin w-4 h-4" />
-                          : <Trash2 className="w-4 h-4 text-red-500" />}
+                          : <Trash2 className="w-4 h-4 text-red-400" />}
                       </Button>
                     </div>
                   </div>
 
+                  {/* EXPANDED — permissions */}
                   {isOpen && (
-                    <div className="px-4 py-3 bg-white border border-t-0 rounded-b-xl shadow-sm">
-                      <p className="text-xs font-medium text-gray-500 mb-2">
-                        Ruxsatlar ({permCount}/{AVAILABLE_SECTIONS.length})
+                    <div className="px-4 py-3 bg-white border border-t-0 rounded-b-xl shadow-sm -mt-1">
+                      <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+                        Ruxsat berilgan bo'limlar ({permCount}/{SECTIONS.length})
                       </p>
-                      <div className="flex flex-wrap gap-1">
-                        {AVAILABLE_SECTIONS.map(s => {
-                          const has = u.permissions?.[s.id];
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {SECTIONS.map(s => {
+                          const has  = u.permissions?.[s.id];
+                          const Icon = s.icon;
                           return (
-                            <span key={s.id} className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              has
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-400 line-through"
-                            }`}>
-                              {s.label}
-                            </span>
+                            <div
+                              key={s.id}
+                              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium ${
+                                has
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-gray-50 text-gray-400"
+                              }`}
+                            >
+                              <Icon className="w-3 h-3 flex-shrink-0" />
+                              <span>{s.label}</span>
+                              {has && <Check className="w-3 h-3 ml-auto" />}
+                            </div>
                           );
                         })}
                       </div>
                     </div>
                   )}
-
                 </React.Fragment>
               );
             })}
@@ -318,72 +390,125 @@ export default function UsersPage() {
         open={isDialogOpen}
         onOpenChange={open => { if (!isSaving) setIsDialogOpen(open); }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Yangi foydalanuvchi</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <Input
-              placeholder="Ism *"
-              value={formData.displayName}
-              onChange={e => handleField("displayName", e.target.value)}
-            />
-            <Input
-              placeholder="Email *"
-              type="email"
-              value={formData.email}
-              onChange={e => handleField("email", e.target.value)}
-            />
-            <Input
-              placeholder="Parol * (kamida 6 belgi)"
-              type="password"
-              value={formData.password}
-              onChange={e => handleField("password", e.target.value)}
-            />
+          <div className="space-y-4">
 
-            {/* ROL */}
+            {/* ASOSIY MA'LUMOTLAR */}
+            <div className="space-y-2">
+              <Input
+                placeholder="Ism Familiya *"
+                value={formData.displayName}
+                onChange={e => setFormData(p => ({ ...p, displayName: e.target.value }))}
+              />
+              <Input
+                placeholder="Email *"
+                type="email"
+                value={formData.email}
+                onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
+              />
+              <Input
+                placeholder="Parol * (kamida 6 belgi)"
+                type="password"
+                value={formData.password}
+                onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
+              />
+            </div>
+
+            {/* ROL TANLASH */}
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-1">Rol</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Rol
+              </p>
               <div className="flex flex-wrap gap-2">
-                {Object.keys(ROLE_PRESETS).map(r => (
+                {Object.keys(ROLES).map(r => (
                   <button
                     key={r}
                     type="button"
                     onClick={() => handleRoleChange(r)}
-                    className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                       formData.role === r
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                        ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
                     }`}
                   >
+                    {r === "Super Admin" && <Shield className="w-3 h-3" />}
                     {r}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* PERMISSIONS PREVIEW */}
+            {/* BO'LIM RUXSATLARI */}
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-1">Ruxsatlar</p>
-              <div className="flex flex-wrap gap-1">
-                {AVAILABLE_SECTIONS.map(s => {
-                  const has = formData.permissions[s.id];
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Bo'lim ruxsatlari
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAll(true)}
+                    disabled={allEnabled}
+                    className="text-xs text-blue-600 hover:underline disabled:text-gray-300"
+                  >
+                    Hammasi
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleAll(false)}
+                    disabled={noneEnabled}
+                    className="text-xs text-red-500 hover:underline disabled:text-gray-300"
+                  >
+                    Hech biri
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1.5">
+                {SECTIONS.map(s => {
+                  const has  = formData.permissions[s.id];
+                  const Icon = s.icon;
                   return (
-                    <span key={s.id} className={`px-2 py-0.5 rounded-full text-xs ${
-                      has
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-400"
-                    }`}>
-                      {s.label}
-                    </span>
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => togglePermission(s.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all text-left ${
+                        has
+                          ? "bg-green-50 border-green-200 text-green-800"
+                          : "bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300"
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        has ? "bg-green-100" : "bg-gray-100"
+                      }`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="flex-1">{s.label}</span>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        has
+                          ? "bg-green-500 border-green-500"
+                          : "border-gray-300"
+                      }`}>
+                        {has && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                    </button>
                   );
                 })}
               </div>
+
+              <p className="text-xs text-gray-400 mt-2">
+                {Object.values(formData.permissions).filter(Boolean).length}/{SECTIONS.length} bo'lim tanlangan
+              </p>
             </div>
           </div>
 
-          <DialogFooter className="mt-2">
+          <DialogFooter className="mt-4 sticky bottom-0 bg-white pt-3 border-t">
             <Button
               variant="ghost"
               onClick={() => setIsDialogOpen(false)}
@@ -393,7 +518,7 @@ export default function UsersPage() {
             </Button>
             <Button onClick={handleAddUser} disabled={isSaving}>
               {isSaving && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
-              Saqlash
+              Foydalanuvchi yaratish
             </Button>
           </DialogFooter>
         </DialogContent>
