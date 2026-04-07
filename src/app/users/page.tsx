@@ -1,88 +1,5 @@
-
-
-"use client"; import React, { useState, useMemo, useEffect } from "react"; import { useRouter } from "next/navigation"; import { OmniSidebar } from "@/components/layout/sidebar"; import { Button } from "@/components/ui/button"; import { Input } from "@/components/ui/input"; import { Dialo
-
-pasted
-
-
-rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { // ─── HELPER FUNCTIONS ──────────────────────────────────────────────────── function isAuthenticated() { return request.auth != null; } // f2472839@gmail.com — har qanday ro
-
-pasted
-
-qara bu  user add qismi bu yerga qilinish kerak bolgan ish iiko logikasidaka bolish kerak  va  web dastur userlariga qays bolim kimga ruxsat etilishini ozim hal qilishim kerak 
-agar kerak bolsa firebase rulesniham tashlab qoydim
-
-02:04
-Tushundim! Siz iiko tizimidagi kabi rol + ruxsat asosida foydalanuvchi boshqaruvi tizimini xohlayapsiz. Qanday qilmoqchisiz aniqlashtirish uchun bir nechta savol:
-
-Q: Qaysi qismni birinchi qilaylik?
-A: Foydalanuvchi qo'shish + rol/ruxsat tizimi (to'liq qayta yozish)
-
-Q: Ruxsat tizimi qanday ishlashi kerak?
-A: Faqat rol asosida (checkbox yo'q, rol = ruxsat)
-
-Q: Firebase Rules ham yangilansinmi?
-A: Ha, permissions field asosida Rules yozilsin
-
-02:05
-Yaxshi! To'liq qayta yozaman. Avval skill faylini o'qib chiqaman.
-
-
-Reading frontend design skill
-Reading frontend design skill
-Endi to'liq tizimni yozaman — users page + Firebase Rules:
-
-
-Full users management page with role-based permissions system
-Full users management page with role-based permissions system
-
-Full users management page with role-based permissions system
-users-page.tsx
-Done
-Endi Firebase Rules:
-
-
-Created a file, ran a command, read a file
-Created a file, ran a command, read a file
-Ikkala fayl tayyor. Nima qilindi:
-
-users-page.tsx — yangi tizim:
-
-Checkbox yo'q — faqat rol tanlanadi, ruxsatlar avtomatik
-Rol tanlashda preview ko'rinadi — qaysi bo'limlarga kirish bor/yo'q real vaqtda ko'rsatiladi
-Rol statistikasi — yuqorida har bir roldan nechtasi bor (iiko panel kabi)
-Foydalanuvchi kartasini ochsangiz — o'sha rolning ruxsatlari chiroyli ko'rinadi
-usePermission("products") hook eksport qilingan — sidebar va sahifalarda ishlatish uchun
-firestore.rules — permissions asosida:
-
-hasPerm("products") — Firestore da foydalanuvchining permissions.products == true ekanligini tekshiradi
-Rol o'zgarganda permissions field ham yangilanadi — Rules shu field ni o'qiydi
-Foydalanuvchi o'z roleId va permissions ni o'zgartira olmaydi (faqat admin)
-Master email hamma narsaga kiradi
-Sidebar/sahifalarda qo'llash:
-
-tsx
-const canSeeProducts = usePermission("products");
-// yoki
-const { role } = useUser();
-const perms = getPermissions(role);
-if (!perms.stockIn) return <Redirect to="/" />;
-Users page
-Code · TSX 
-Firestore
-RULES 
-
-You are out of free messages until 7:00 AM
-Upgrade
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-Users page · TSX
-Copy
-
 "use client";
- 
+
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -97,19 +14,19 @@ import {
   History, FileText, DollarSign, Users, Settings,
   Check, Shield, Crown, Edit2, RefreshCw, Search, X,
 } from "lucide-react";
- 
+
 import { useFirestore, useUser } from "@/firebase";
 import {
   collection, doc, setDoc, deleteDoc, getDocs,
-  query, updateDoc,
+  query, updateDoc, where, writeBatch,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { firebaseConfig } from "@/firebase/config";
- 
+
 // ─── SECTIONS ───────────────────────────────────────────────────────────────
- 
+
 export const SECTIONS = [
   { id: "products",   label: "Товары",       icon: Package,    description: "Mahsulotlarni boshqarish" },
   { id: "stockIn",    label: "Поступление",  icon: Truck,      description: "Kirim qilish" },
@@ -121,10 +38,9 @@ export const SECTIONS = [
   { id: "users",      label: "Пользователи", icon: Users,      description: "Foydalanuvchilar" },
   { id: "settings",   label: "Настройки",    icon: Settings,   description: "Tizim sozlamalari" },
 ];
- 
+
 // ─── ROLES ───────────────────────────────────────────────────────────────────
-// Har bir rol = aniq ruxsatlar to'plami (iiko mantiqiga o'xshash)
- 
+
 export const ROLES = [
   {
     id: "super_admin",
@@ -133,10 +49,6 @@ export const ROLES = [
     dotColor: "bg-purple-500",
     icon: Crown,
     description: "Barcha bo'limlarga to'liq kirish",
-    permissions: {
-      products: true, stockIn: true, stockOut: true, warehouses: true,
-      movements: true, reports: true, expenses: true, users: true, settings: true,
-    },
   },
   {
     id: "admin",
@@ -145,10 +57,6 @@ export const ROLES = [
     dotColor: "bg-blue-500",
     icon: Shield,
     description: "Settings va Users bundan mustasno",
-    permissions: {
-      products: true, stockIn: true, stockOut: true, warehouses: true,
-      movements: true, reports: true, expenses: true, users: false, settings: false,
-    },
   },
   {
     id: "warehouse_manager",
@@ -157,10 +65,6 @@ export const ROLES = [
     dotColor: "bg-green-500",
     icon: Package,
     description: "Sklad, mahsulot va hisobotlar",
-    permissions: {
-      products: true, stockIn: true, stockOut: true, warehouses: true,
-      movements: true, reports: true, expenses: false, users: false, settings: false,
-    },
   },
   {
     id: "seller",
@@ -169,10 +73,6 @@ export const ROLES = [
     dotColor: "bg-yellow-500",
     icon: TrendingUp,
     description: "Faqat sotish va mahsulotlarni ko'rish",
-    permissions: {
-      products: true, stockIn: false, stockOut: true, warehouses: false,
-      movements: true, reports: false, expenses: false, users: false, settings: false,
-    },
   },
   {
     id: "accountant",
@@ -181,10 +81,6 @@ export const ROLES = [
     dotColor: "bg-orange-500",
     icon: DollarSign,
     description: "Xarajatlar va moliyaviy hisobotlar",
-    permissions: {
-      products: false, stockIn: false, stockOut: false, warehouses: false,
-      movements: true, reports: true, expenses: true, users: false, settings: false,
-    },
   },
   {
     id: "observer",
@@ -193,69 +89,100 @@ export const ROLES = [
     dotColor: "bg-gray-400",
     icon: FileText,
     description: "Faqat ko'rish huquqi",
-    permissions: {
-      products: true, stockIn: false, stockOut: false, warehouses: false,
-      movements: true, reports: true, expenses: false, users: false, settings: false,
-    },
   },
 ];
- 
+
 export type RoleId = typeof ROLES[number]["id"];
- 
+
+// Har bir rol uchun ruxsatlar (iiko logikasi)
+const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
+  super_admin: {
+    products: true, stockIn: true, stockOut: true, warehouses: true,
+    movements: true, reports: true, expenses: true, users: true, settings: true,
+  },
+  admin: {
+    products: true, stockIn: true, stockOut: true, warehouses: true,
+    movements: true, reports: true, expenses: true, users: false, settings: false,
+  },
+  warehouse_manager: {
+    products: true, stockIn: true, stockOut: true, warehouses: true,
+    movements: true, reports: true, expenses: false, users: false, settings: false,
+  },
+  seller: {
+    products: true, stockIn: false, stockOut: true, warehouses: false,
+    movements: true, reports: false, expenses: false, users: false, settings: false,
+  },
+  accountant: {
+    products: false, stockIn: false, stockOut: false, warehouses: false,
+    movements: true, reports: true, expenses: true, users: false, settings: false,
+  },
+  observer: {
+    products: true, stockIn: false, stockOut: false, warehouses: false,
+    movements: true, reports: true, expenses: false, users: false, settings: false,
+  },
+};
+
 export function getRoleById(roleId: string) {
   return ROLES.find(r => r.id === roleId) ?? ROLES[2];
 }
- 
+
 export function getPermissions(roleId: string): Record<string, boolean> {
-  const role = getRoleById(roleId);
-  return { ...role.permissions };
+  return { ...(ROLE_PERMISSIONS[roleId] ?? ROLE_PERMISSIONS.observer) };
 }
- 
+
 /**
  * usePermission – sidebar va sahifalarda ruxsatni tekshirish uchun hook
  * Misol: const canView = usePermission("products");
  */
 export function usePermission(sectionId: string): boolean {
-  const { role } = useUser();
-  const roleData = getRoleById(role ?? "observer");
-  return roleData.permissions[sectionId] ?? false;
+  const { role, permissions } = useUser();
+  
+  // Agar permissions field mavjud bo'lsa, undan foydalan (migratsiya uchun)
+  if (permissions && typeof permissions === 'object') {
+    return permissions[sectionId] ?? false;
+  }
+  
+  // Aks holda roldan olish
+  const rolePerms = ROLE_PERMISSIONS[role ?? "observer"];
+  return rolePerms?.[sectionId] ?? false;
 }
- 
+
 // ─── PAGE ────────────────────────────────────────────────────────────────────
- 
+
 export default function UsersPage() {
   const { toast } = useToast();
   const db = useFirestore();
-  const { role: currentUserRole, isUserLoading, uid: currentUserId } = useUser();
+  const { role: currentUserRole, isUserLoading, uid: currentUserId, permissions: currentUserPerms } = useUser();
   const router = useRouter();
- 
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
- 
+
   const [formData, setFormData] = useState({
     displayName: "",
     email: "",
     password: "",
     roleId: "warehouse_manager",
   });
- 
+
   const isSuperAdmin = currentUserRole === "super_admin";
-  const isAdminOrSuper = isSuperAdmin || currentUserRole === "admin";
- 
+  const canManageUsers = currentUserPerms?.users === true || isSuperAdmin;
+
   // Auth guard
   useEffect(() => {
     if (isUserLoading) return;
-    if (!isAdminOrSuper) router.replace("/");
-  }, [isAdminOrSuper, isUserLoading, router]);
- 
+    if (!canManageUsers) router.replace("/");
+  }, [canManageUsers, isUserLoading, router]);
+
   // Load users
   const loadUsers = async () => {
     if (!db) return;
@@ -263,26 +190,70 @@ export default function UsersPage() {
     try {
       const snap = await getDocs(query(collection(db, "users")));
       setUsersList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch {
+    } catch (error) {
+      console.error("Error loading users:", error);
       toast({ variant: "destructive", title: "Foydalanuvchilarni yuklashda xatolik" });
     } finally {
       setIsLoading(false);
     }
   };
- 
+
+  // Migrate old users - add permissions field based on role
+  const migrateUsers = async () => {
+    if (!db) return;
+    setIsMigrating(true);
+    try {
+      const snap = await getDocs(query(collection(db, "users")));
+      const batch = writeBatch(db);
+      let updatedCount = 0;
+
+      for (const docSnap of snap.docs) {
+        const userData = docSnap.data();
+        const needsUpdate = !userData.permissions || Object.keys(userData.permissions || {}).length === 0;
+        
+        if (needsUpdate) {
+          const roleId = userData.roleId || userData.role || "observer";
+          const permissions = getPermissions(roleId);
+          const userRef = doc(db, "users", docSnap.id);
+          batch.update(userRef, {
+            permissions,
+            roleId: roleId,
+            migrated: true,
+          });
+          updatedCount++;
+        }
+      }
+
+      if (updatedCount > 0) {
+        await batch.commit();
+        toast({ title: `${updatedCount} ta foydalanuvchi yangilandi ✓` });
+        await loadUsers();
+      } else {
+        toast({ title: "Barcha foydalanuvchilar yangilangan" });
+      }
+    } catch (error) {
+      console.error("Migration error:", error);
+      toast({ variant: "destructive", title: "Migratsiyada xatolik" });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   useEffect(() => {
-    if (db && isAdminOrSuper) loadUsers();
-  }, [db, isAdminOrSuper]);
- 
+    if (db && canManageUsers) {
+      loadUsers();
+    }
+  }, [db, canManageUsers]);
+
   // ── CRUD ──────────────────────────────────────────────────────────────────
- 
+
   const openAdd = () => {
     setIsEditMode(false);
     setEditingUserId(null);
     setFormData({ displayName: "", email: "", password: "", roleId: "warehouse_manager" });
     setIsDialogOpen(true);
   };
- 
+
   const openEdit = (user: any) => {
     setIsEditMode(true);
     setEditingUserId(user.id);
@@ -294,42 +265,45 @@ export default function UsersPage() {
     });
     setIsDialogOpen(true);
   };
- 
+
   const closeDialog = () => {
     if (isSaving) return;
     setIsDialogOpen(false);
     setIsEditMode(false);
     setEditingUserId(null);
   };
- 
+
   const handleAdd = async () => {
     if (!db) return;
     if (!formData.displayName.trim()) return toast({ variant: "destructive", title: "Ism kiritilishi shart" });
     if (!formData.email.trim())       return toast({ variant: "destructive", title: "Email kiritilishi shart" });
     if (formData.password.length < 6) return toast({ variant: "destructive", title: "Parol kamida 6 belgi bo'lishi kerak" });
- 
+
     setIsSaving(true);
     let secondaryApp: ReturnType<typeof initializeApp> | null = null;
     try {
       secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
       const auth = getAuth(secondaryApp);
       const cred = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
- 
+
+      const permissions = getPermissions(formData.roleId);
+
       await setDoc(doc(db, "users", cred.user.uid), {
         id: cred.user.uid,
         displayName: formData.displayName.trim(),
         email: formData.email.trim(),
         roleId: formData.roleId,
-        permissions: getPermissions(formData.roleId),
+        permissions: permissions,
         createdAt: new Date().toISOString(),
         createdBy: currentUserId,
       });
- 
+
       await signOut(auth);
       toast({ title: "Foydalanuvchi yaratildi ✓" });
       closeDialog();
       await loadUsers();
     } catch (e: any) {
+      console.error("Add error:", e);
       const msg =
         e?.code === "auth/email-already-in-use" ? "Bu email allaqachon ro'yxatdan o'tgan" :
         e?.code === "auth/weak-password"         ? "Parol juda oddiy" :
@@ -341,29 +315,32 @@ export default function UsersPage() {
       setIsSaving(false);
     }
   };
- 
+
   const handleUpdate = async () => {
     if (!db || !editingUserId) return;
     if (!formData.displayName.trim()) return toast({ variant: "destructive", title: "Ism kiritilishi shart" });
- 
+
     setIsSaving(true);
     try {
+      const permissions = getPermissions(formData.roleId);
+      
       await updateDoc(doc(db, "users", editingUserId), {
         displayName: formData.displayName.trim(),
         roleId: formData.roleId,
-        permissions: getPermissions(formData.roleId),
+        permissions: permissions,
         updatedAt: new Date().toISOString(),
       });
       toast({ title: "Foydalanuvchi yangilandi ✓" });
       closeDialog();
       await loadUsers();
-    } catch {
+    } catch (error) {
+      console.error("Update error:", error);
       toast({ variant: "destructive", title: "Yangilashda xatolik" });
     } finally {
       setIsSaving(false);
     }
   };
- 
+
   const handleDeleteConfirm = async () => {
     if (!confirmDeleteId || !db) return;
     setDeletingId(confirmDeleteId);
@@ -372,15 +349,16 @@ export default function UsersPage() {
       await deleteDoc(doc(db, "users", confirmDeleteId));
       toast({ title: "Foydalanuvchi o'chirildi" });
       await loadUsers();
-    } catch {
+    } catch (error) {
+      console.error("Delete error:", error);
       toast({ variant: "destructive", title: "O'chirishda xatolik" });
     } finally {
       setDeletingId(null);
     }
   };
- 
+
   // ── FILTER ────────────────────────────────────────────────────────────────
- 
+
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return usersList.filter(u => {
@@ -392,9 +370,19 @@ export default function UsersPage() {
       );
     });
   }, [usersList, searchQuery]);
- 
+
+  // Rol statistikasi
+  const roleStats = useMemo(() => {
+    const stats: Record<string, number> = {};
+    ROLES.forEach(r => { stats[r.id] = 0; });
+    usersList.forEach(u => {
+      if (stats[u.roleId] !== undefined) stats[u.roleId]++;
+    });
+    return stats;
+  }, [usersList]);
+
   // ─────────────────────────────────────────────────────────────────────────
- 
+
   if (isUserLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -402,18 +390,20 @@ export default function UsersPage() {
       </div>
     );
   }
-  if (!isAdminOrSuper) return null;
- 
+  if (!canManageUsers) return null;
+
   const selectedRole = getRoleById(formData.roleId);
   const RoleIcon = selectedRole.icon;
- 
+  const selectedPerms = getPermissions(formData.roleId);
+  const permCount = Object.values(selectedPerms).filter(Boolean).length;
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <OmniSidebar />
- 
+
       <main className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">
- 
+
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -421,8 +411,12 @@ export default function UsersPage() {
               <p className="text-sm text-gray-500 mt-0.5">Jami: {usersList.length} ta</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={loadUsers} disabled={isLoading}>
-                <RefreshCw className={`w-4 h-4 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+              <Button variant="outline" size="sm" onClick={migrateUsers} disabled={isMigrating}>
+                {isMigrating ? (
+                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-1.5" />
+                )}
                 Yangilash
               </Button>
               <Button size="sm" onClick={openAdd}>
@@ -431,11 +425,11 @@ export default function UsersPage() {
               </Button>
             </div>
           </div>
- 
+
           {/* Rol statistikasi */}
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-5">
             {ROLES.map(role => {
-              const count = usersList.filter(u => u.roleId === role.id).length;
+              const count = roleStats[role.id] || 0;
               const Icon = role.icon;
               return (
                 <div key={role.id} className={`border rounded-xl px-3 py-2.5 flex flex-col gap-1 ${count > 0 ? role.color : "bg-white border-gray-100 text-gray-300"}`}>
@@ -448,7 +442,7 @@ export default function UsersPage() {
               );
             })}
           </div>
- 
+
           {/* Search */}
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -464,7 +458,7 @@ export default function UsersPage() {
               </button>
             )}
           </div>
- 
+
           {/* Users list */}
           {isLoading ? (
             <div className="flex justify-center mt-20">
@@ -482,17 +476,18 @@ export default function UsersPage() {
                 const roleInfo = getRoleById(u.roleId ?? "warehouse_manager");
                 const RIcon = roleInfo.icon;
                 const isCurrentUser = u.id === currentUserId;
-                const permCount = Object.values(roleInfo.permissions).filter(Boolean).length;
- 
+                const userPerms = u.permissions || getPermissions(u.roleId);
+                const permCountUser = Object.values(userPerms).filter(Boolean).length;
+
                 return (
                   <div key={u.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
                     <div className="flex items-center gap-3 px-4 py-3">
- 
+
                       {/* Avatar */}
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                         {(u.displayName || u.email || "?")[0].toUpperCase()}
                       </div>
- 
+
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -500,15 +495,18 @@ export default function UsersPage() {
                           {isCurrentUser && (
                             <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Siz</span>
                           )}
+                          {u.migrated && (
+                            <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">Yangilangan</span>
+                          )}
                         </div>
                         <div className="text-xs text-gray-400 truncate">{u.email}</div>
                         <div className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border mt-1 ${roleInfo.color}`}>
                           <RIcon className="w-3 h-3" />
                           {roleInfo.label}
-                          <span className="opacity-60">• {permCount} bo'lim</span>
+                          <span className="opacity-60">• {permCountUser} bo'lim</span>
                         </div>
                       </div>
- 
+
                       {/* Actions */}
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
@@ -537,7 +535,7 @@ export default function UsersPage() {
                         )}
                       </div>
                     </div>
- 
+
                     {/* Expanded: permissions */}
                     {isOpen && (
                       <div className="px-4 pb-4 pt-2 border-t bg-gray-50">
@@ -546,7 +544,7 @@ export default function UsersPage() {
                         </p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
                           {SECTIONS.map(s => {
-                            const has = roleInfo.permissions[s.id];
+                            const has = userPerms[s.id];
                             const Icon = s.icon;
                             return (
                               <div
@@ -573,7 +571,7 @@ export default function UsersPage() {
           )}
         </div>
       </main>
- 
+
       {/* ── Add / Edit Dialog ─────────────────────────────────────────────── */}
       <Dialog open={isDialogOpen} onOpenChange={open => { if (!open) closeDialog(); }}>
         <DialogContent className="max-w-lg">
@@ -582,9 +580,9 @@ export default function UsersPage() {
               {isEditMode ? "Foydalanuvchini tahrirlash" : "Yangi foydalanuvchi qo'shish"}
             </DialogTitle>
           </DialogHeader>
- 
+
           <div className="space-y-5 py-2">
- 
+
             {/* Basic info */}
             <div className="space-y-2.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -611,7 +609,7 @@ export default function UsersPage() {
                 />
               )}
             </div>
- 
+
             {/* Role selector */}
             <div className="space-y-2.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -621,7 +619,8 @@ export default function UsersPage() {
                 {ROLES.map(role => {
                   const Icon = role.icon;
                   const isSelected = formData.roleId === role.id;
-                  const permCount = Object.values(role.permissions).filter(Boolean).length;
+                  const rolePerms = getPermissions(role.id);
+                  const rolePermCount = Object.values(rolePerms).filter(Boolean).length;
                   return (
                     <button
                       key={role.id}
@@ -642,22 +641,22 @@ export default function UsersPage() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 leading-snug">{role.description}</p>
-                      <p className="text-xs font-medium mt-1.5 text-gray-500">{permCount} ta bo'lim</p>
+                      <p className="text-xs font-medium mt-1.5 text-gray-500">{rolePermCount} ta bo'lim</p>
                     </button>
                   );
                 })}
               </div>
             </div>
- 
+
             {/* Preview: what this role can access */}
             <div className="bg-gray-50 rounded-xl p-3 border">
               <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5">
                 <RoleIcon className="w-3.5 h-3.5" />
-                {selectedRole.label} — ruxsatlar ko'rinishi
+                {selectedRole.label} — ruxsatlar ({permCount}/{SECTIONS.length})
               </p>
               <div className="grid grid-cols-3 gap-1">
                 {SECTIONS.map(s => {
-                  const has = selectedRole.permissions[s.id];
+                  const has = selectedPerms[s.id];
                   const Icon = s.icon;
                   return (
                     <div
@@ -675,7 +674,7 @@ export default function UsersPage() {
               </div>
             </div>
           </div>
- 
+
           <DialogFooter>
             <Button variant="ghost" onClick={closeDialog} disabled={isSaving}>
               Bekor qilish
@@ -687,7 +686,7 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
- 
+
       {/* ── Delete confirm ────────────────────────────────────────────────── */}
       <Dialog open={!!confirmDeleteId} onOpenChange={open => { if (!open) setConfirmDeleteId(null); }}>
         <DialogContent className="max-w-sm">
@@ -709,4 +708,3 @@ export default function UsersPage() {
     </div>
   );
 }
- 
