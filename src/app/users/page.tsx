@@ -14,8 +14,8 @@ import {
   History, FileText, DollarSign, Users, Settings, Check, Shield
 } from "lucide-react";
 
-import { useCollection, useFirestore, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { useFirestore, useUser } from "@/firebase";
+import { collection, doc, setDoc, deleteDoc, getDocs, query } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
@@ -105,6 +105,8 @@ export default function UsersPage() {
   const [deletingId,      setDeletingId]      = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [formData, setFormData]               = useState(EMPTY_FORM);
+  const [usersList, setUsersList]             = useState<any[]>([]);
+  const [isLoading, setIsLoading]             = useState(true);
 
   const isSuperAdmin = role === "Super Admin";
 
@@ -114,13 +116,32 @@ export default function UsersPage() {
     if (!isSuperAdmin) router.replace("/");
   }, [isSuperAdmin, isUserLoading, router]);
 
-  // ===================== FIREBASE =====================
-  const usersQuery = useMemo(() => {
-    if (!db) return undefined;
-    return collection(db, "users");
-  }, [db]);
+  // ===================== LOAD USERS =====================
+  const loadUsers = async () => {
+    if (!db) return;
+    setIsLoading(true);
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef);
+      const querySnapshot = await getDocs(q);
+      const users = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsersList(users);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast({ variant: "destructive", title: "Foydalanuvchilarni yuklashda xatolik" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const { data: usersList = [], isLoading } = useCollection(usersQuery);
+  useEffect(() => {
+    if (db && isSuperAdmin) {
+      loadUsers();
+    }
+  }, [db, isSuperAdmin]);
 
   // ===================== FORM HANDLERS =====================
 
@@ -132,7 +153,6 @@ export default function UsersPage() {
     }));
   };
 
-  // Alohida permission toggle — rol presetdan mustaqil
   const togglePermission = (sectionId: string) => {
     setFormData(prev => ({
       ...prev,
@@ -143,7 +163,6 @@ export default function UsersPage() {
     }));
   };
 
-  // Hammasini yoqish/o'chirish
   const toggleAll = (value: boolean) => {
     const perms: Record<string, boolean> = {};
     SECTIONS.forEach(s => { perms[s.id] = value; });
@@ -206,17 +225,19 @@ export default function UsersPage() {
       toast({ title: "Foydalanuvchi yaratildi ✓" });
       setIsDialogOpen(false);
       setFormData(EMPTY_FORM);
+      await loadUsers(); // Reload users list
 
     } catch (e: any) {
+      console.error("Add user error:", e);
       const msg =
         e?.code === "auth/email-already-in-use" ? "Bu email allaqachon ro'yxatdan o'tgan" :
         e?.code === "auth/weak-password"         ? "Parol juda oddiy" :
         e?.code === "auth/invalid-email"         ? "Email formati noto'g'ri" :
-                                                   "Xatolik yuz berdi";
+        e?.message || "Xatolik yuz berdi";
       toast({ variant: "destructive", title: msg });
     } finally {
       if (secondaryApp) {
-        try { await deleteApp(secondaryApp); } catch {}
+        try { await deleteApp(secondaryApp); } catch (err) { console.error("Error deleting app:", err); }
       }
       setIsSaving(false);
     }
@@ -230,7 +251,9 @@ export default function UsersPage() {
     try {
       await deleteDoc(doc(db, "users", confirmDeleteId));
       toast({ title: "Foydalanuvchi o'chirildi" });
-    } catch {
+      await loadUsers(); // Reload users list
+    } catch (error) {
+      console.error("Delete error:", error);
       toast({ variant: "destructive", title: "O'chirishda xatolik" });
     } finally {
       setDeletingId(null);
@@ -239,7 +262,7 @@ export default function UsersPage() {
 
   // ===================== FILTER =====================
   const filtered = useMemo(() =>
-    (usersList as any[]).filter(u => {
+    usersList.filter(u => {
       const q = searchQuery.toLowerCase();
       return (
         u?.email?.toLowerCase().includes(q) ||
@@ -310,7 +333,6 @@ export default function UsersPage() {
                 <React.Fragment key={u.id}>
                   <div className="p-4 border rounded-xl flex justify-between items-center bg-white shadow-sm">
                     <div className="flex items-center gap-3">
-                      {/* Avatar */}
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">
                         {(u.displayName || u.email || "?")[0].toUpperCase()}
                       </div>
@@ -350,7 +372,6 @@ export default function UsersPage() {
                     </div>
                   </div>
 
-                  {/* EXPANDED — permissions */}
                   {isOpen && (
                     <div className="px-4 py-3 bg-white border border-t-0 rounded-b-xl shadow-sm -mt-1">
                       <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
@@ -385,7 +406,7 @@ export default function UsersPage() {
         )}
       </main>
 
-      {/* ===== ADD USER DIALOG ===== */}
+      {/* ADD USER DIALOG */}
       <Dialog
         open={isDialogOpen}
         onOpenChange={open => { if (!isSaving) setIsDialogOpen(open); }}
@@ -396,8 +417,6 @@ export default function UsersPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-
-            {/* ASOSIY MA'LUMOTLAR */}
             <div className="space-y-2">
               <Input
                 placeholder="Ism Familiya *"
@@ -418,7 +437,6 @@ export default function UsersPage() {
               />
             </div>
 
-            {/* ROL TANLASH */}
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                 Rol
@@ -442,7 +460,6 @@ export default function UsersPage() {
               </div>
             </div>
 
-            {/* BO'LIM RUXSATLARI */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -452,7 +469,6 @@ export default function UsersPage() {
                   <button
                     type="button"
                     onClick={() => toggleAll(true)}
-                    disabled={allEnabled}
                     className="text-xs text-blue-600 hover:underline disabled:text-gray-300"
                   >
                     Hammasi
@@ -461,7 +477,6 @@ export default function UsersPage() {
                   <button
                     type="button"
                     onClick={() => toggleAll(false)}
-                    disabled={noneEnabled}
                     className="text-xs text-red-500 hover:underline disabled:text-gray-300"
                   >
                     Hech biri
@@ -524,7 +539,7 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ===== DELETE CONFIRM DIALOG ===== */}
+      {/* DELETE CONFIRM DIALOG */}
       <Dialog
         open={!!confirmDeleteId}
         onOpenChange={open => { if (!open) setConfirmDeleteId(null); }}
