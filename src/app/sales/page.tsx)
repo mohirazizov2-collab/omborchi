@@ -1,20 +1,11 @@
 "use client";
-
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  ShoppingBag, Plus, Loader2, 
-  Trash2, Calendar, User, DollarSign 
-} from "lucide-react";
-import { 
-  Dialog, DialogContent, DialogHeader, 
-  DialogTitle, DialogTrigger, DialogFooter 
-} from "@/components/ui/dialog";
-import { 
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
-} from "@/components/ui/select";
+import { ShoppingBag, Plus, Loader2, Trash2, Calendar, User } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -24,164 +15,59 @@ export default function SalesPage() {
   const db = useFirestore();
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({ customerName: "", productName: "", amount: "", staffId: "", paymentMethod: "Naqd" });
 
-  // Forma holati
-  const [formData, setFormData] = useState({
-    customerName: "",
-    productName: "",
-    amount: "",
-    staffId: "",
-    paymentMethod: "Naqd",
-  });
-
-  // 1. Ma'lumotlarni yuklash (Sotuvlar va Xodimlar)
   const salesQuery = useMemoFirebase(() => db ? collection(db, "sales") : null, [db]);
   const staffQuery = useMemoFirebase(() => db ? collection(db, "staff") : null, [db]);
-  
-  const { data: salesList, isLoading: salesLoading } = useCollection(salesQuery);
+  const { data: salesList, isLoading } = useCollection(salesQuery);
   const { data: staffList } = useCollection(staffQuery);
 
-  // 2. Sotuv qo'shish
   const handleAddSale = async () => {
-    if (!formData.productName || !formData.amount || !formData.staffId) {
-      toast({ title: "Xato", description: "Barcha maydonlarni to'ldiring!", variant: "destructive" });
-      return;
-    }
-
+    if (!formData.productName || !formData.amount || !formData.staffId) return;
     setLoading(true);
     try {
-      if (!db) return;
-      
-      const selectedStaff = staffList?.find(s => s.id === formData.staffId);
-
-      await addDoc(collection(db, "sales"), {
-        ...formData,
-        amount: Number(formData.amount),
-        staffName: `${selectedStaff?.surname} ${selectedStaff?.name}`,
-        createdAt: serverTimestamp(),
-      });
-
-      toast({ title: "Muvaffaqiyatli", description: "Sotuv qayd etildi." });
+      const staff = staffList?.find(s => s.id === formData.staffId);
+      await addDoc(collection(db!, "sales"), { ...formData, amount: Number(formData.amount), staffName: `${staff?.surname} ${staff?.name}`, createdAt: serverTimestamp() });
       setIsModalOpen(false);
       setFormData({ customerName: "", productName: "", amount: "", staffId: "", paymentMethod: "Naqd" });
-    } catch (error: any) {
-      toast({ title: "Xatolik", description: error.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Ushbu sotuvni o'chirmoqchimisiz?")) return;
-    if (db) await deleteDoc(doc(db, "sales", id));
-  };
-
-  if (salesLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
       <OmniSidebar />
-      <main className="flex-1 p-6 lg:p-10">
-        
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <ShoppingBag className="text-orange-500" /> SOTUV BO'LIMI
-          </h1>
-
+      <main className="flex-1 p-10">
+        <div className="flex justify-between mb-8">
+          <h1 className="text-2xl font-black flex items-center gap-2"><ShoppingBag className="text-orange-500" /> SOTUVLAR</h1>
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 rounded-xl">
-                <Plus className="w-4 h-4 mr-2" /> YANGI SOTUV
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button className="bg-blue-600"><Plus className="mr-2" /> YANGI SOTUV</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Sotuv ma'lumotlari</DialogTitle></DialogHeader>
-              
-              <div className="space-y-4 pt-4">
-                <Input 
-                  placeholder="Mijoz ismi" 
-                  value={formData.customerName} 
-                  onChange={e => setFormData({...formData, customerName: e.target.value})} 
-                />
-                <Input 
-                  placeholder="Mahsulot nomi" 
-                  value={formData.productName} 
-                  onChange={e => setFormData({...formData, productName: e.target.value})} 
-                />
-                <Input 
-                  type="number" 
-                  placeholder="Summa (UZS)" 
-                  value={formData.amount} 
-                  onChange={e => setFormData({...formData, amount: e.target.value})} 
-                />
-                
+              <DialogHeader><DialogTitle>Sotuv qo'shish</DialogTitle></DialogHeader>
+              <div className="space-y-4 py-4">
+                <Input placeholder="Mijoz" value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} />
+                <Input placeholder="Mahsulot" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} />
+                <Input type="number" placeholder="Summa" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
                 <Select onValueChange={v => setFormData({...formData, staffId: v})}>
-                  <SelectTrigger><SelectValue placeholder="Sotuvchi (Xodim)" /></SelectTrigger>
-                  <SelectContent>
-                    {staffList?.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.surname} {s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select onValueChange={v => setFormData({...formData, paymentMethod: v})} defaultValue="Naqd">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Naqd">Naqd</SelectItem>
-                    <SelectItem value="Karta">Plastik Karta</SelectItem>
-                    <SelectItem value="Perechisleniye">O'tkazma</SelectItem>
-                  </SelectContent>
+                  <SelectTrigger><SelectValue placeholder="Sotuvchi" /></SelectTrigger>
+                  <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.id}>{s.name} {s.surname}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-
-              <DialogFooter className="mt-6">
-                <Button variant="outline" onClick={() => setIsModalOpen(false)}>Bekor qilish</Button>
-                <Button onClick={handleAddSale} disabled={loading} className="bg-green-600 hover:bg-green-700">
-                  {loading ? <Loader2 className="animate-spin w-4 h-4" /> : "Sotuvni yakunlash"}
-                </Button>
-              </DialogFooter>
+              <DialogFooter><Button onClick={handleAddSale} disabled={loading}>{loading ? "Saqlanmoqda..." : "Saqlash"}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
-
-        {/* SOTUVLAR JADVALI */}
-        <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              <tr>
-                <th className="px-6 py-4">Sana</th>
-                <th className="px-6 py-4">Mijoz / Mahsulot</th>
-                <th className="px-6 py-4">Sotuvchi</th>
-                <th className="px-6 py-4">Summa</th>
-                <th className="px-6 py-4 text-right">Amallar</th>
-              </tr>
+        <div className="bg-white rounded-xl border">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 uppercase text-[10px] font-bold text-slate-400">
+              <tr><th className="p-4">Sana</th><th className="p-4">Mahsulot</th><th className="p-4">Sotuvchi</th><th className="p-4">Summa</th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {salesList?.map((sale) => (
-                <tr key={sale.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-slate-500 flex items-center gap-2 text-xs">
-                    <Calendar className="w-3 h-3" />
-                    {sale.createdAt?.toDate().toLocaleDateString() || "Hozir"}
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-slate-800">{sale.productName}</p>
-                    <p className="text-[10px] text-slate-400">{sale.customerName || "Anonim mijoz"}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="flex items-center gap-1 text-xs font-medium">
-                      <User className="w-3 h-3 text-blue-500" /> {sale.staffName}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-black text-green-600">
-                      {sale.amount?.toLocaleString()} UZS
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(sale.id)} className="text-rose-500 hover:bg-rose-50">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </td>
+            <tbody>
+              {salesList?.map(s => (
+                <tr key={s.id} className="border-t">
+                  <td className="p-4"><Calendar className="inline w-3 h-3 mr-1" />{s.createdAt?.toDate().toLocaleDateString()}</td>
+                  <td className="p-4 font-bold">{s.productName}</td>
+                  <td className="p-4">{s.staffName}</td>
+                  <td className="p-4 text-green-600 font-bold">{s.amount?.toLocaleString()} UZS</td>
                 </tr>
               ))}
             </tbody>
