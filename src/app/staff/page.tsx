@@ -1,103 +1,306 @@
 "use client";
-import { useState, useMemo } from "react";
-import { OmniSidebar } from "@/components/layout/sidebar";
+
+/**
+ * StaffWorkerForm.tsx
+ * Oddiy ishchi kartochkasi — login / parol talab qilinmaydi.
+ */
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldCheck, UserPlus, Edit2, Trash2, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, CheckCircle2, UserRound, Phone, Briefcase } from "lucide-react";
+import { useFirestore } from "@/firebase";
+import { collection, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
-export default function StaffPage() {
+// ─── Tip ──────────────────────────────────────────────────────────
+
+export interface WorkerFormData {
+  surname:    string;
+  name:       string;
+  patronymic: string;
+  dob:        string;
+  gender:     "Male" | "Female";
+  position:   string;
+  department: string;
+  hireDate:   string;
+  salary:     string;
+  schedule:   string;
+  phone:      string;
+  phone2:     string;
+  address:    string;
+  note:       string;
+  isEmployee: boolean;
+  isSupplier: boolean;
+  isGuest:    boolean;
+  status:     "active" | "inactive";
+  hasLogin:   false;
+  role:       "Ishchi";
+  permissions: Record<string, never>;
+}
+
+const POSITIONS = [
+  "Ishchi", "Usta", "Smenachi", "Qorovul", "Haydovchi",
+  "Tozalovchi", "Elektrik", "Slesarь", "Mexanik", "Boshqa",
+];
+
+const DEPARTMENTS = [
+  "Ishlab chiqarish", "Ombor", "Transport", "Xavfsizlik",
+  "Xizmat ko'rsatish", "Boshqa",
+];
+
+const SCHEDULES = ["5/2", "2/2", "3/3", "Smenali", "To'liq kun", "Qisman"];
+
+const initialWorker: WorkerFormData = {
+  surname: "", name: "", patronymic: "",
+  dob: "", gender: "Male",
+  position: "Ishchi", department: "Ishlab chiqarish",
+  hireDate: new Date().toISOString().slice(0, 10),
+  salary: "", schedule: "5/2",
+  phone: "", phone2: "", address: "",
+  note: "",
+  isEmployee: true, isSupplier: false, isGuest: false,
+  status: "active",
+  hasLogin: false,
+  role: "Ishchi",
+  permissions: {},
+};
+
+// ─── Komponent ────────────────────────────────────────────────────
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  editingId?: string | null;
+  initialData?: Partial<WorkerFormData>;
+}
+
+export function StaffWorkerForm({ open, onClose, editingId, initialData }: Props) {
   const db = useFirestore();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  
-  const initialForm = {
-    surname: "", name: "", patronymic: "", gender: "Male", 
-    dob: "", position: "", email: "", phone: "", address: "",
-    isEmployee: true, isSupplier: false, isGuest: false, permissions: []
-  };
-  const [formData, setFormData] = useState(initialForm);
+  const { toast } = useToast();
 
-  const staffQuery = useMemoFirebase(() => db ? collection(db, "staff") : null, [db]);
-  const { data: staffList, isLoading } = useCollection(staffQuery);
+  const [form, setForm] = useState<WorkerFormData>({
+    ...initialWorker,
+    ...initialData,
+  });
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState("personal");
 
-  const handleSubmit = async () => {
-    if (!db || !formData.email) return;
-    if (editingId) await updateDoc(doc(db, "staff", editingId), { ...formData, updatedAt: serverTimestamp() });
-    else await addDoc(collection(db, "staff"), { ...formData, createdAt: serverTimestamp() });
-    setIsModalOpen(false);
-    setFormData(initialForm);
+  const set = (key: keyof WorkerFormData, val: unknown) =>
+    setForm(p => ({ ...p, [key]: val }));
+
+  const handleSave = async () => {
+    if (!form.name || !form.surname) {
+      toast({ title: "Xatolik", description: "Ism va Familiya majburiy!", variant: "destructive" });
+      return;
+    }
+    if (!db) return;
+    setLoading(true);
+    try {
+      if (editingId) {
+        await updateDoc(doc(db, "staff", editingId), {
+          ...form, updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Yangilandi ✓" });
+      } else {
+        await addDoc(collection(db, "staff"), {
+          ...form, createdAt: serverTimestamp(),
+        });
+        toast({ title: "Qo'shildi ✓" });
+      }
+      onClose();
+    } catch {
+      toast({ title: "Xatolik", description: "Saqlashda muammo", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f1f5f9]">
-      <OmniSidebar />
-      <main className="flex-1 p-10">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-black flex items-center gap-2"><ShieldCheck className="text-blue-600"/> XODIMLAR</h1>
-          <Button onClick={() => { setEditingId(null); setFormData(initialForm); setIsModalOpen(true); }} className="bg-orange-500"><UserPlus className="mr-2 w-4 h-4" /> FOYDALANUVCHI QO'SHISH</Button>
-        </div>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl p-0 overflow-hidden max-h-[88vh] flex flex-col">
 
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader><DialogTitle className="text-center border-b pb-2">Персональная карточка</DialogTitle></DialogHeader>
-            <Tabs defaultValue="main">
-              <TabsList className="grid grid-cols-5 text-[10px]">
-                <TabsTrigger value="main">Основные сведения</TabsTrigger>
-                <TabsTrigger value="extra">Дополнительные</TabsTrigger>
-                <TabsTrigger value="passport">Паспорт/Лицензия</TabsTrigger>
-                <TabsTrigger value="photo">Фото</TabsTrigger>
-                <TabsTrigger value="med">Медкнижки</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="main" className="grid grid-cols-2 gap-6 p-4">
-                <div className="space-y-3">
-                  <Input placeholder="Фамилия" value={formData.surname} onChange={e => setFormData({...formData, surname: e.target.value})} />
-                  <Input placeholder="Имя" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                  <Input placeholder="Отчество" value={formData.patronymic} onChange={e => setFormData({...formData, patronymic: e.target.value})} />
-                  <Input type="date" placeholder="Дата рождения" value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} />
-                </div>
-                <div className="space-y-3">
-                  <Input placeholder="Адрес" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
-                  <Input placeholder="Телефон" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                  <Input placeholder="E-mail" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                  <Input placeholder="Должность" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})} />
-                </div>
-                <div className="col-span-2 flex gap-4 border-t pt-4">
-                   <label className="flex items-center gap-2"><Checkbox checked={formData.isEmployee} onCheckedChange={v => setFormData({...formData, isEmployee: !!v})} /> Сотрудник</label>
-                   <label className="flex items-center gap-2"><Checkbox checked={formData.isSupplier} onCheckedChange={v => setFormData({...formData, isSupplier: !!v})} /> Поставщик</label>
-                </div>
-              </TabsContent>
-            </Tabs>
-            <DialogFooter className="border-t pt-4">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>Отмена</Button>
-              <Button onClick={handleSubmit} className="bg-slate-200 text-black hover:bg-slate-300">Сохранить</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <DialogHeader className="bg-slate-50 px-5 py-3 border-b shrink-0">
+          <DialogTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <UserRound className="w-4 h-4 text-orange-500" />
+            {editingId ? "Ishchini tahrirlash" : "Yangi ishchi qo'shish"}
+            <span className="ml-auto text-[11px] font-normal bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full border border-orange-100">
+              Login talab qilinmaydi
+            </span>
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b text-[10px] font-bold text-slate-400 uppercase">
-              <tr><th className="p-4">Foydalanuvchi</th><th className="p-4">Roli</th><th className="p-4">Login</th><th className="p-4 text-right">Amallar</th></tr>
-            </thead>
-            <tbody>
-              {staffList?.length ? staffList.map(w => (
-                <tr key={w.id} className="border-t">
-                  <td className="p-4 font-bold">{w.surname} {w.name}</td>
-                  <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px]">{w.position}</span></td>
-                  <td className="p-4">{w.email}</td>
-                  <td className="p-4 text-right"><Button variant="ghost" size="icon" onClick={() => { setEditingId(w.id); setFormData(w); setIsModalOpen(true); }}><Edit2 className="w-4 h-4"/></Button></td>
-                </tr>
-              )) : <tr><td colSpan={4} className="p-10 text-center text-slate-400">Ma'lumot topilmadi</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </main>
+        <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="shrink-0 w-full justify-start rounded-none bg-slate-100 border-b px-2">
+            <TabsTrigger value="personal" className="text-xs gap-1">
+              <UserRound className="w-3 h-3" /> Shaxsiy
+            </TabsTrigger>
+            <TabsTrigger value="work" className="text-xs gap-1">
+              <Briefcase className="w-3 h-3" /> Ish ma&apos;lumotlari
+            </TabsTrigger>
+            <TabsTrigger value="contact" className="text-xs gap-1">
+              <Phone className="w-3 h-3" /> Aloqa
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ── Shaxsiy ma'lumotlar ── */}
+          <TabsContent value="personal" className="flex-1 overflow-y-auto p-5">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <WField label="Familiya *">
+                <Input value={form.surname} onChange={e => set("surname", e.target.value)} placeholder="Karimov" />
+              </WField>
+              <WField label="Ism *">
+                <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Jasur" />
+              </WField>
+              <WField label="Otasining ismi">
+                <Input value={form.patronymic} onChange={e => set("patronymic", e.target.value)} placeholder="Aliyevich" />
+              </WField>
+              <WField label="Tug'ilgan sana">
+                <Input type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
+              </WField>
+              <WField label="Jins">
+                <Select value={form.gender} onValueChange={v => set("gender", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Erkak</SelectItem>
+                    <SelectItem value="Female">Ayol</SelectItem>
+                  </SelectContent>
+                </Select>
+              </WField>
+              <WField label="Holat">
+                <Select value={form.status} onValueChange={v => set("status", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Faol</SelectItem>
+                    <SelectItem value="inactive">Nofaol</SelectItem>
+                  </SelectContent>
+                </Select>
+              </WField>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-slate-100 flex gap-6">
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox checked={form.isEmployee} onCheckedChange={v => set("isEmployee", !!v)} />
+                Xodim
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox checked={form.isSupplier} onCheckedChange={v => set("isSupplier", !!v)} />
+                Ta&apos;minotchi
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox checked={form.isGuest} onCheckedChange={v => set("isGuest", !!v)} />
+                Mehmon
+              </label>
+            </div>
+          </TabsContent>
+
+          {/* ── Ish ma'lumotlari ── */}
+          <TabsContent value="work" className="flex-1 overflow-y-auto p-5">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <WField label="Lavozim">
+                <Select value={form.position} onValueChange={v => set("position", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {POSITIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </WField>
+              <WField label="Bo'lim">
+                <Select value={form.department} onValueChange={v => set("department", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </WField>
+              <WField label="Ishga qabul sanasi">
+                <Input type="date" value={form.hireDate} onChange={e => set("hireDate", e.target.value)} />
+              </WField>
+              <WField label="Maosh (so'm)">
+                <Input
+                  type="number"
+                  value={form.salary}
+                  onChange={e => set("salary", e.target.value)}
+                  placeholder="2 500 000"
+                />
+              </WField>
+              <WField label="Ish grafigi">
+                <Select value={form.schedule} onValueChange={v => set("schedule", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SCHEDULES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </WField>
+            </div>
+          </TabsContent>
+
+          {/* ── Aloqa ── */}
+          <TabsContent value="contact" className="flex-1 overflow-y-auto p-5">
+            <div className="space-y-4 max-w-md">
+              <WField label="Asosiy telefon">
+                <Input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+998 90 123 45 67" />
+              </WField>
+              <WField label="Qo'shimcha telefon">
+                <Input value={form.phone2} onChange={e => set("phone2", e.target.value)} placeholder="+998 91 ..." />
+              </WField>
+              <WField label="Yashash manzili">
+                <Input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Toshkent sh., Chilonzor t., ..." />
+              </WField>
+              <WField label="Izoh">
+                <textarea
+                  value={form.note}
+                  onChange={e => set("note", e.target.value)}
+                  placeholder="Qo'shimcha ma'lumot..."
+                  rows={3}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+              </WField>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter className="bg-slate-50 px-5 py-3 border-t shrink-0 flex items-center justify-between">
+          <div className="text-[11px] text-slate-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+            Bu xodimga dasturga kirish huquqi berilmaydi
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>Bekor qilish</Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={loading}
+              className="bg-orange-500 hover:bg-orange-600 text-white gap-1"
+            >
+              {loading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <CheckCircle2 className="w-4 h-4" />}
+              Saqlash
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Yordamchi ────────────────────────────────────────────────────
+
+function WField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</Label>
+      {children}
     </div>
   );
 }
