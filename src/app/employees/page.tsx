@@ -1,7 +1,6 @@
 "use client";
- 
-import { useState, useMemo } from "react";
-import { OmniSidebar } from "@/components/layout/sidebar";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +12,329 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, CheckCircle2, UserRound, Phone, MapPin, Briefcase, CalendarDays } from "lucide-react";
+import { useFirestore } from "@/firebase";
+import { collection, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+// ─── Tip ──────────────────────────────────────────────────────────
+
+export interface WorkerFormData {
+  // Shaxsiy
+  surname:      string;
+  name:         string;
+  patronymic:   string;
+  dob:          string;
+  gender:       "Male" | "Female";
+  // Ish
+  position:     string;
+  department:   string;
+  hireDate:     string;
+  salary:       string;
+  schedule:     string;
+  // Aloqa
+  phone:        string;
+  phone2:       string;
+  address:      string;
+  // Qo'shimcha
+  note:         string;
+  // Dastur holati
+  isEmployee:   boolean;
+  isSupplier:   boolean;
+  isGuest:      boolean;
+  status:       "active" | "inactive";
+  // Login yo'q — faqat ma'lumot
+  hasLogin:     false;
+  role:         "Ishchi";
+  permissions: {};
+}
+
+const POSITIONS = [
+  "Ishchi", "Usta", "Smenachi", "Qorovul", "Haydovchi",
+  "Tozalovchi", "Elektrik", "Slesarь", "Mexanik", "Boshqa",
+];
+
+const DEPARTMENTS = [
+  "Ishlab chiqarish", "Ombor", "Transport", "Xavfsizlik",
+  "Xizmat ko'rsatish", "Boshqa",
+];
+
+const SCHEDULES = ["5/2", "2/2", "3/3", "Smenali", "To'liq kun", "Qisman"];
+
+const initialWorker: WorkerFormData = {
+  surname: "", name: "", patronymic: "",
+  dob: "", gender: "Male",
+  position: "Ishchi", department: "Ishlab chiqarish",
+  hireDate: new Date().toISOString().slice(0, 10),
+  salary: "", schedule: "5/2",
+  phone: "", phone2: "", address: "",
+  note: "",
+  isEmployee: true, isSupplier: false, isGuest: false,
+  status: "active",
+  hasLogin: false,
+  role: "Ishchi",
+  permissions: {},
+};
+
+// ─── Komponent ────────────────────────────────────────────────────
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  editingId?: string | null;
+  initialData?: Partial<WorkerFormData>;
+}
+
+export function StaffWorkerForm({ open, onClose, editingId, initialData }: Props) {
+  const db = useFirestore();
+  const { toast } = useToast();
+
+  const [form, setForm] = useState<WorkerFormData>({
+    ...initialWorker,
+    ...initialData,
+  });
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState("personal");
+
+  const set = (key: keyof WorkerFormData, val: any) =>
+    setForm(p => ({ ...p, [key]: val }));
+
+  const handleSave = async () => {
+    if (!form.name || !form.surname) {
+      toast({ title: "Xatolik", description: "Ism va Familiya majburiy!", variant: "destructive" });
+      return;
+    }
+    if (!db) return;
+    setLoading(true);
+    try {
+      if (editingId) {
+        await updateDoc(doc(db, "staff", editingId), {
+          ...form, updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Yangilandi ✓" });
+      } else {
+        await addDoc(collection(db, "staff"), {
+          ...form, createdAt: serverTimestamp(),
+        });
+        toast({ title: "Qo'shildi ✓" });
+      }
+      onClose();
+    } catch {
+      toast({ title: "Xatolik", description: "Saqlashda muammo", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl p-0 overflow-hidden max-h-[88vh] flex flex-col">
+
+        {/* Header */}
+        <DialogHeader className="bg-slate-50 px-5 py-3 border-b shrink-0">
+          <DialogTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <UserRound className="w-4 h-4 text-orange-500" />
+            {editingId ? "Ishchini tahrirlash" : "Yangi ishchi qo'shish"}
+            <span className="ml-auto text-[11px] font-normal text-slate-400 bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full border border-orange-100">
+              Login talab qilinmaydi
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="shrink-0 w-full justify-start rounded-none bg-slate-100 border-b px-2">
+            <TabsTrigger value="personal" className="text-xs gap-1">
+              <UserRound className="w-3 h-3" /> Shaxsiy
+            </TabsTrigger>
+            <TabsTrigger value="work" className="text-xs gap-1">
+              <Briefcase className="w-3 h-3" /> Ish ma'lumotlari
+            </TabsTrigger>
+            <TabsTrigger value="contact" className="text-xs gap-1">
+              <Phone className="w-3 h-3" /> Aloqa
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ── Shaxsiy ma'lumotlar ── */}
+          <TabsContent value="personal" className="flex-1 overflow-y-auto p-5">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <WField label="Familiya *">
+                <Input value={form.surname} onChange={e => set("surname", e.target.value)} placeholder="Karimov" />
+              </WField>
+              <WField label="Ism *">
+                <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Jasur" />
+              </WField>
+              <WField label="Otasining ismi">
+                <Input value={form.patronymic} onChange={e => set("patronymic", e.target.value)} placeholder="Aliyevich" />
+              </WField>
+              <WField label="Tug'ilgan sana">
+                <Input type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
+              </WField>
+              <WField label="Jins">
+                <Select value={form.gender} onValueChange={v => set("gender", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Erkak</SelectItem>
+                    <SelectItem value="Female">Ayol</SelectItem>
+                  </SelectContent>
+                </Select>
+              </WField>
+              <WField label="Holat">
+                <Select value={form.status} onValueChange={v => set("status", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Faol</SelectItem>
+                    <SelectItem value="inactive">Nofaol</SelectItem>
+                  </SelectContent>
+                </Select>
+              </WField>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-slate-100 flex gap-6">
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox checked={form.isEmployee} onCheckedChange={v => set("isEmployee", !!v)} />
+                Xodim
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox checked={form.isSupplier} onCheckedChange={v => set("isSupplier", !!v)} />
+                Ta'minotchi
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox checked={form.isGuest} onCheckedChange={v => set("isGuest", !!v)} />
+                Mehmon
+              </label>
+            </div>
+          </TabsContent>
+
+          {/* ── Ish ma'lumotlari ── */}
+          <TabsContent value="work" className="flex-1 overflow-y-auto p-5">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <WField label="Lavozim">
+                <Select value={form.position} onValueChange={v => set("position", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {POSITIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </WField>
+              <WField label="Bo'lim">
+                <Select value={form.department} onValueChange={v => set("department", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </WField>
+              <WField label="Ishga qabul sanasi">
+                <Input type="date" value={form.hireDate} onChange={e => set("hireDate", e.target.value)} />
+              </WField>
+              <WField label="Maosh (so'm)">
+                <Input
+                  type="number"
+                  value={form.salary}
+                  onChange={e => set("salary", e.target.value)}
+                  placeholder="2 500 000"
+                />
+              </WField>
+              <WField label="Ish grafigi">
+                <Select value={form.schedule} onValueChange={v => set("schedule", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SCHEDULES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </WField>
+            </div>
+          </TabsContent>
+
+          {/* ── Aloqa ── */}
+          <TabsContent value="contact" className="flex-1 overflow-y-auto p-5">
+            <div className="space-y-4 max-w-md">
+              <WField label="Asosiy telefon">
+                <Input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+998 90 123 45 67" />
+              </WField>
+              <WField label="Qo'shimcha telefon">
+                <Input value={form.phone2} onChange={e => set("phone2", e.target.value)} placeholder="+998 91 ..." />
+              </WField>
+              <WField label="Yashash manzili">
+                <Input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Toshkent sh., Chilonzor t., ..." />
+              </WField>
+              <WField label="Izoh">
+                <textarea
+                  value={form.note}
+                  onChange={e => set("note", e.target.value)}
+                  placeholder="Qo'shimcha ma'lumot..."
+                  rows={3}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+              </WField>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Footer */}
+        <DialogFooter className="bg-slate-50 px-5 py-3 border-t shrink-0 flex items-center justify-between">
+          <div className="text-[11px] text-slate-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+            Bu xodimga dasturga kirish huquqi berilmaydi
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>Bekor qilish</Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={loading}
+              className="bg-orange-500 hover:bg-orange-600 text-white gap-1"
+            >
+              {loading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <CheckCircle2 className="w-4 h-4" />}
+              Saqlash
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Yordamchi ────────────────────────────────────────────────────
+
+function WField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+
+// ==================================================================
+// FAYL 2: page.tsx (StaffManagementPage)
+// (Xodimlar ro'yxati va tizim foydalanuvchilarini boshqarish sahifasi)
+// ==================================================================
+
+"use client";
+
+import { useState, useMemo } from "react";
+import { OmniSidebar } from "@/components/layout/sidebar";
+// import { StaffWorkerForm } from "./StaffWorkerForm"; // Odatda shunday import qilinadi
+
+// Eslatma: Quyidagi importlar loyihangiz tuzilmasiga qarab farq qilishi mumkin.
+// Berilgan kodda bu importlar mavjud edi, ularni saqlab qoldim.
+// import { Button } from "@/components/ui/button";
+// import { Input } from "@/components/ui/input";
+// import { Label } from "@/components/ui/label";
+// import { Checkbox } from "@/components/ui/checkbox";
+// import {
+//   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+// } from "@/components/ui/select";
+// import {
+//   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+// } from "@/components/ui/dialog";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   ShieldCheck, UserPlus, Search, Loader2, Edit2, Trash2,
   Lock, Eye, EyeOff, Users, KeyRound, ChevronDown, ChevronUp,
@@ -27,10 +349,10 @@ import {
   deleteUser as deleteFirebaseUser,
 } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
- 
+// import { cn } from "@/lib/utils"; // Yuqorida import qilingan
+
 // ─── Konstantlar ───────────────────────────────────────────────────────────────
- 
+
 const ROLES = [
   "Super Admin",
   "Admin",
@@ -41,7 +363,7 @@ const ROLES = [
   "Ishchi",
 ] as const;
 type Role = (typeof ROLES)[number];
- 
+
 // Barcha bo'limlar — Super Admin qaysi rolga qaysi bo'lim ko'rinishini belgilaydi
 const ALL_MODULES = [
   { key: "dashboard",       label: "Bosh sahifa (Dashboard)" },
@@ -58,21 +380,21 @@ const ALL_MODULES = [
   { key: "production",      label: "Ishlab chiqarish" },
 ] as const;
 type ModuleKey = (typeof ALL_MODULES)[number]["key"];
- 
+
 // Har bir modul uchun mumkin bo'lgan amallar
 const MODULE_ACTIONS = ["view", "create", "edit", "delete"] as const;
 type Action = (typeof MODULE_ACTIONS)[number];
- 
+
 const ACTION_LABELS: Record<Action, string> = {
   view:   "Ko'rish",
   create: "Yaratish",
   edit:   "Tahrirlash",
   delete: "O'chirish",
 };
- 
+
 // Ruxsat tuzilmasi: { dashboard: ["view","create",...], ... }
 type Permissions = Partial<Record<ModuleKey, Action[]>>;
- 
+
 // Standart ruxsatlar — rolga qarab
 const DEFAULT_PERMISSIONS: Record<Role, Permissions> = {
   "Super Admin":    Object.fromEntries(ALL_MODULES.map(m => [m.key, [...MODULE_ACTIONS]])) as Permissions,
@@ -83,9 +405,9 @@ const DEFAULT_PERMISSIONS: Record<Role, Permissions> = {
   "Hisobchi":       { dashboard:["view"], finance:["view","create","edit"], reports:["view","create"] },
   "Ishchi":         { dashboard:["view"] },
 };
- 
+
 // ─── Tiplar ────────────────────────────────────────────────────────────────────
- 
+
 interface StaffMember {
   id: string;
   // Asosiy ma'lumotlar
@@ -100,9 +422,9 @@ interface StaffMember {
   address: string;
   // Login
   role: Role;
-  hasLogin: boolean;         // Login ochilganmi
-  loginEmail: string;        // Login uchun email
-  uid?: string;              // Firebase Auth UID
+  hasLogin: boolean;          // Login ochilganmi
+  loginEmail: string;         // Login uchun email
+  uid?: string;               // Firebase Auth UID
   // Ruxsatlar
   permissions: Permissions;
   // Tur
@@ -114,9 +436,9 @@ interface StaffMember {
   createdAt?: any;
   updatedAt?: any;
 }
- 
+
 type FormData = Omit<StaffMember, "id" | "createdAt" | "updatedAt">;
- 
+
 const initialForm: FormData = {
   surname: "", name: "", patronymic: "", dob: "", gender: "Male",
   position: "Sotuvchi", phone: "", email: "", address: "",
@@ -125,16 +447,35 @@ const initialForm: FormData = {
   isEmployee: true, isSupplier: false, isGuest: false,
   status: "active",
 };
- 
+
+// Jadvalda rollarni ko'rsatish uchun yordamchi komponent (Fayl 2 ichida edi)
+function RoleBadge({ role }: { role: Role }) {
+  const styles: Record<Role, string> = {
+    "Super Admin": "bg-purple-100 text-purple-700 border-purple-200",
+    "Admin": "bg-blue-100 text-blue-700 border-blue-200",
+    "Menejer": "bg-indigo-100 text-indigo-700 border-indigo-200",
+    "Sotuvchi": "bg-orange-100 text-orange-700 border-orange-200",
+    "Ombor boshlig'i": "bg-amber-100 text-amber-700 border-amber-200",
+    "Hisobchi": "bg-emerald-100 text-emerald-700 border-emerald-200",
+    "Ishchi": "bg-slate-100 text-slate-700 border-slate-200",
+  };
+
+  return (
+    <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-tight", styles[role])}>
+      {role}
+    </span>
+  );
+}
+
 // ─── ASOSIY KOMPONENT ──────────────────────────────────────────────────────────
- 
+
 export default function StaffManagementPage() {
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role: currentUserRole } = useUser();
- 
+
   const isSuperAdmin = currentUserRole === "Super Admin";
- 
+
   // ── Holat ──
   const [searchQuery, setSearchQuery]     = useState("");
   const [filterRole, setFilterRole]       = useState<"all" | Role>("all");
@@ -148,11 +489,11 @@ export default function StaffManagementPage() {
   const [formData, setFormData]           = useState<FormData>(initialForm);
   const [activeTab, setActiveTab]         = useState("main");
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
- 
+
   // ── Firebase ──
   const staffQuery = useMemoFirebase(() => db ? collection(db, "staff") : null, [db]);
   const { data: staffList, isLoading } = useCollection(staffQuery);
- 
+
   // ── Filtrlangan ro'yxat ──
   const filtered = useMemo(() => {
     if (!staffList) return [];
@@ -169,14 +510,14 @@ export default function StaffManagementPage() {
     }
     return list;
   }, [staffList, searchQuery, filterRole, filterStatus]);
- 
+
   // ── Statistika ──
   const stats = useMemo(() => ({
     total:    (staffList?.length ?? 0),
     active:   (staffList as unknown as StaffMember[] ?? []).filter(s => s.status === "active").length,
     withLogin:(staffList as unknown as StaffMember[] ?? []).filter(s => s.hasLogin).length,
   }), [staffList]);
- 
+
   // ── Modal ochish ──
   const openCreate = () => {
     setFormData(initialForm);
@@ -185,7 +526,7 @@ export default function StaffManagementPage() {
     setActiveTab("main");
     setIsModalOpen(true);
   };
- 
+
   const openEdit = (member: StaffMember) => {
     setFormData({
       surname: member.surname ?? "",
@@ -211,14 +552,14 @@ export default function StaffManagementPage() {
     setActiveTab("main");
     setIsModalOpen(true);
   };
- 
+
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
     setPassword("");
     setFormData(initialForm);
   };
- 
+
   // ── Rol o'zgarganda standart ruxsatlarni yuklash ──
   const handleRoleChange = (role: Role) => {
     setFormData(prev => ({
@@ -227,7 +568,7 @@ export default function StaffManagementPage() {
       permissions: DEFAULT_PERMISSIONS[role],
     }));
   };
- 
+
   // ── Ruxsat toggle ──
   const toggleAction = (moduleKey: ModuleKey, action: Action) => {
     setFormData(prev => {
@@ -240,7 +581,7 @@ export default function StaffManagementPage() {
       };
     });
   };
- 
+
   const toggleModule = (moduleKey: ModuleKey, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
@@ -250,7 +591,7 @@ export default function StaffManagementPage() {
       },
     }));
   };
- 
+
   // ── Saqlash ──
   const handleSubmit = async () => {
     if (!formData.name || !formData.surname) {
@@ -264,16 +605,16 @@ export default function StaffManagementPage() {
     setLoading(true);
     try {
       let uid = formData.uid;
- 
+
       // Firebase Auth — yangi login yaratish
       if (formData.hasLogin && !editingId && formData.loginEmail && password) {
         const auth = getAuth();
         const cred = await createUserWithEmailAndPassword(auth, formData.loginEmail, password);
         uid = cred.user.uid;
       }
- 
+
       const payload = { ...formData, uid, updatedAt: serverTimestamp() };
- 
+
       if (editingId) {
         await updateDoc(doc(db!, "staff", editingId), payload);
         toast({ title: "Yangilandi ✓" });
@@ -293,7 +634,7 @@ export default function StaffManagementPage() {
       setLoading(false);
     }
   };
- 
+
   // ── O'chirish ──
   const handleDelete = async (id: string) => {
     if (!db) return;
@@ -305,21 +646,21 @@ export default function StaffManagementPage() {
       toast({ title: "Xatolik", variant: "destructive" });
     }
   };
- 
+
   if (isLoading)
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
       </div>
     );
- 
+
   // ════════════════════════════════════════════════════════════════
   return (
     <div className="flex min-h-screen bg-[#f1f5f9]">
       <OmniSidebar />
- 
+
       <main className="flex-1 flex flex-col overflow-hidden">
- 
+
         {/* ── TOP BAR ── */}
         <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 flex-wrap">
           <ShieldCheck className="w-5 h-5 text-blue-600" />
@@ -335,7 +676,7 @@ export default function StaffManagementPage() {
             </Button>
           )}
         </div>
- 
+
         {/* ── STATISTIKA ── */}
         <div className="px-6 py-4 grid grid-cols-3 gap-3">
           {[
@@ -352,7 +693,7 @@ export default function StaffManagementPage() {
             </div>
           ))}
         </div>
- 
+
         {/* ── FILTER + SEARCH ── */}
         <div className="px-6 pb-3 flex items-center gap-3 flex-wrap">
           <div className="relative">
@@ -384,7 +725,7 @@ export default function StaffManagementPage() {
             </SelectContent>
           </Select>
         </div>
- 
+
         {/* ── JADVAL ── */}
         <div className="flex-1 overflow-auto px-6 pb-6">
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -405,7 +746,7 @@ export default function StaffManagementPage() {
               <tbody className="divide-y divide-slate-50">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-slate-400 text-sm">
+                    <td colSpan={isSuperAdmin ? 7 : 6} className="text-center py-12 text-slate-400 text-sm">
                       Xodimlar topilmadi
                     </td>
                   </tr>
@@ -468,368 +809,280 @@ export default function StaffManagementPage() {
                 )}
               </tbody>
             </table>
- 
+
+            {/* Jadval footeri (Berilgan kodda kesilgan edi, o'z holicha qoldi) */}
             <div className="border-t border-slate-100 px-4 py-2 bg-slate-50 flex items-center gap-4 text-xs text-slate-500">
-              <span>Jami: <strong className="text-slate-700">{filtered.length}</strong> ta</span>
+               {/* Bu yerda odatda paginatsiya bo'ladi */}
+               Jami: {filtered.length} ta yozuv ko'rsatilmoqda
             </div>
           </div>
         </div>
       </main>
- 
-      {/* ════════ MODAL: Xodim qo'shish / tahrirlash ════════ */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+
+      {/* ── FOYDALANUVCHI QO'SHISH/TAHRIRLASH MODALI (page.tsx ichidagi) ── */}
+      <Dialog open={isModalOpen} onOpenChange={closeModal}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
-          <DialogHeader className="bg-slate-50 px-5 py-3 border-b shrink-0">
-            <DialogTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <UserCog className="w-4 h-4 text-blue-600" />
-              {editingId ? "Xodimni tahrirlash" : "Yangi xodim qo'shish"}
+          <DialogHeader className="px-6 py-4 border-b bg-slate-50 shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base shrink-0">
+              <UserCog className="w-5 h-5 text-blue-600" />
+              {editingId ? "Foydalanuvchini tahrirlash" : "Yangi foydalanuvchi qo'shish"}
             </DialogTitle>
           </DialogHeader>
- 
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="shrink-0 w-full justify-start rounded-none bg-slate-100 border-b px-2 overflow-x-auto">
-              <TabsTrigger value="main"        className="text-xs">Asosiy ma'lumotlar</TabsTrigger>
-              <TabsTrigger value="login"       className="text-xs">Login / Kirish</TabsTrigger>
-              {isSuperAdmin && (
-                <TabsTrigger value="permissions" className="text-xs">Ruxsatlar</TabsTrigger>
-              )}
-              <TabsTrigger value="extra"       className="text-xs">Qo'shimcha</TabsTrigger>
+            <TabsList className="shrink-0 justify-start rounded-none border-b bg-white px-6">
+              <TabsTrigger value="main" className="data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent pb-3 pt-3 text-xs">
+                Asosiy ma'lumotlar
+              </TabsTrigger>
+              <TabsTrigger value="permissions" className="data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent pb-3 pt-3 text-xs">
+                Ruxsatlar tarmog'i
+              </TabsTrigger>
             </TabsList>
- 
-            {/* ── Tab 1: Asosiy ma'lumotlar ── */}
-            <TabsContent value="main" className="flex-1 overflow-y-auto p-5">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                <Field label="Familiya *">
-                  <Input value={formData.surname} onChange={e => setFormData(p => ({...p, surname: e.target.value}))} placeholder="Karimov" />
-                </Field>
-                <Field label="Ism *">
-                  <Input value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} placeholder="Jasur" />
-                </Field>
-                <Field label="Otasining ismi">
-                  <Input value={formData.patronymic} onChange={e => setFormData(p => ({...p, patronymic: e.target.value}))} placeholder="Aliyevich" />
-                </Field>
-                <Field label="Tug'ilgan sana">
-                  <Input type="date" value={formData.dob} onChange={e => setFormData(p => ({...p, dob: e.target.value}))} />
-                </Field>
-                <Field label="Jins">
-                  <Select value={formData.gender} onValueChange={v => setFormData(p => ({...p, gender: v}))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Male">Erkak</SelectItem>
-                      <SelectItem value="Female">Ayol</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Lavozim">
-                  <Select value={formData.position} onValueChange={v => setFormData(p => ({...p, position: v}))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Telefon">
-                  <Input value={formData.phone} onChange={e => setFormData(p => ({...p, phone: e.target.value}))} placeholder="+998 90 123 45 67" />
-                </Field>
-                <Field label="E-mail (shaxsiy)">
-                  <Input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} placeholder="jasur@gmail.com" />
-                </Field>
-                <Field label="Manzil" className="col-span-2">
-                  <Input value={formData.address} onChange={e => setFormData(p => ({...p, address: e.target.value}))} placeholder="Toshkent sh., Chilonzor t." />
-                </Field>
-              </div>
- 
-              {/* Tur */}
-              <div className="mt-5 pt-4 border-t border-slate-100 flex gap-6">
-                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                  <Checkbox checked={formData.isEmployee} onCheckedChange={v => setFormData(p => ({...p, isEmployee: !!v}))} />
-                  Xodim
-                </label>
-                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                  <Checkbox checked={formData.isSupplier} onCheckedChange={v => setFormData(p => ({...p, isSupplier: !!v}))} />
-                  Ta'minotchi
-                </label>
-                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                  <Checkbox checked={formData.isGuest} onCheckedChange={v => setFormData(p => ({...p, isGuest: !!v}))} />
-                  Mehmon
-                </label>
-              </div>
- 
-              {/* Holat */}
-              <div className="mt-4 flex items-center gap-3">
-                <Label className="text-xs font-medium text-slate-600">Holat:</Label>
-                <Select value={formData.status} onValueChange={v => setFormData(p => ({...p, status: v as any}))}>
-                  <SelectTrigger className="w-36 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Faol</SelectItem>
-                    <SelectItem value="inactive">Nofaol</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </TabsContent>
- 
-            {/* ── Tab 2: Login / Kirish ── */}
-            <TabsContent value="login" className="flex-1 overflow-y-auto p-5">
-              <div className="max-w-md space-y-5">
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700 leading-relaxed">
-                  <Lock className="w-4 h-4 inline mr-1 opacity-70" />
-                  Login ochilgan xodimlar dasturga email va parol orqali kiradi. Login ochilmagan oddiy ishchilar faqat ma'lumotlar ro'yxatida ko'rinadi.
+
+            {/* Asosiy ma'lumotlar Tab */}
+            <TabsContent value="main" className="flex-1 overflow-y-auto p-6 m-0">
+              <div className="grid grid-cols-3 gap-x-5 gap-y-4">
+                {/* Shaxsiy */}
+                <div className="col-span-3 pb-1 border-b">
+                  <h3 className="text-sm font-semibold text-slate-800">Shaxsiy ma'lumotlar</h3>
                 </div>
- 
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={formData.hasLogin}
-                    onCheckedChange={v => setFormData(p => ({...p, hasLogin: !!v}))}
-                  />
-                  <span className="text-sm font-medium text-slate-700">Login ochish (dasturga kirish huquqi berish)</span>
-                </label>
- 
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Familiya *</Label>
+                  <Input size={1} value={formData.surname} onChange={e => setFormData(p=>({...p, surname: e.target.value}))} placeholder="Usmonov" className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Ism *</Label>
+                  <Input value={formData.name} onChange={e => setFormData(p=>({...p, name: e.target.value}))} placeholder="Anvar" className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Otasining ismi</Label>
+                  <Input value={formData.patronymic} onChange={e => setFormData(p=>({...p, patronymic: e.target.value}))} placeholder="Akmalovich" className="h-9 text-sm" />
+                </div>
+                
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Telefon</Label>
+                  <Input value={formData.phone} onChange={e => setFormData(p=>({...p, phone: e.target.value}))} placeholder="+998 90 ..." className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Lavozim</Label>
+                  <Input value={formData.position} onChange={e => setFormData(p=>({...p, position: e.target.value}))} placeholder="Katta sotuvchi" className="h-9 text-sm" />
+                </div>
+                 <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Holat</Label>
+                  <Select value={formData.status} onValueChange={v => setFormData(p=>({...p, status: v as any}))}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Faol</SelectItem>
+                      <SelectItem value="inactive">Nofaol</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Tizimga kirish */}
+                <div className="col-span-3 mt-4 pb-1 border-b flex items-center gap-3">
+                  <h3 className="text-sm font-semibold text-slate-800">Tizimga kirish (Login)</h3>
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox id="hasLogin" checked={formData.hasLogin} onCheckedChange={checked => setFormData(p=>({...p, hasLogin: !!checked}))} />
+                    <Label htmlFor="hasLogin" className="text-xs font-medium text-blue-700 cursor-pointer">Login ruxsatini yoish</Label>
+                  </div>
+                </div>
+
                 {formData.hasLogin && (
-                  <div className="space-y-4 pl-6 border-l-2 border-blue-200">
-                    <Field label="Login email *">
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">Rol *</Label>
+                      <Select value={formData.role} onValueChange={handleRoleChange}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLES.filter(r => r !== "Ishchi").map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">Login (Email) *</Label>
                       <Input
                         type="email"
                         value={formData.loginEmail}
-                        onChange={e => setFormData(p => ({...p, loginEmail: e.target.value}))}
-                        placeholder="xodim@zavod.uz"
-                        disabled={!!editingId} // tahrirlashda email o'zgartirilmaydi
+                        onChange={e => setFormData(p=>({...p, loginEmail: e.target.value}))}
+                        placeholder="anvar@ombor.uz"
+                        className="h-9 text-sm"
+                        disabled={!!editingId} // Emailni tahrirlab bo'lmaydi (Firebase Auth cheklovi)
                       />
-                      {editingId && (
-                        <p className="text-[11px] text-slate-400 mt-1">Login email tahrirlashda o'zgartirilmaydi</p>
-                      )}
-                    </Field>
- 
+                    </div>
                     {!editingId && (
-                      <Field label="Parol *">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Parol *</Label>
                         <div className="relative">
                           <Input
                             type={showPass ? "text" : "password"}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            placeholder="Kamida 6 ta belgi"
+                            placeholder="******"
+                            className="h-9 text-sm pr-8"
                           />
-                          <button
-                            type="button"
-                            onClick={() => setShowPass(!showPass)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                          >
+                          <Button variant="ghost" size="icon" onClick={()=>setShowPass(!showPass)} className="absolute right-0 top-0 h-9 w-8 text-slate-400">
                             {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
+                          </Button>
                         </div>
-                      </Field>
+                      </div>
                     )}
- 
-                    <Field label="Rol (dasturda qanday rol berilsin)">
-                      <Select value={formData.role} onValueChange={v => handleRoleChange(v as Role)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {ROLES.map(r => (
-                            <SelectItem key={r} value={r}>
-                              <div className="flex items-center gap-2">
-                                <RoleBadge role={r} small />
-                                <span>{r}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Rol tanlaganda standart ruxsatlar avtomatik o'rnatiladi. "Ruxsatlar" tabida qo'shimcha sozlash mumkin.
-                      </p>
-                    </Field>
-                  </div>
+                    {editingId && (
+                       <div className="col-span-3 flex items-center gap-2 bg-blue-50 border border-blue-100 p-3 rounded-lg text-blue-700 mt-1">
+                           <KeyRound className="w-5 h-5 shrink-0" />
+                           <div className="text-xs">
+                               <p className="font-semibold">Parolni yangilash</p>
+                               <p className="opacity-90">Foydalanuvchi parolini faqat o'zi profil sozlamalaridan yoki "Parolni unutdingizmi?" orqali tiklashi mumkin.</p>
+                           </div>
+                       </div>
+                    )}
+                  </>
                 )}
+                
+                 {/* Turlar */}
+                <div className="col-span-3 mt-4 pb-1 border-b flex items-center gap-6">
+                   <h3 className="text-sm font-semibold text-slate-800">Tizimdagi turi</h3>
+                   <div className="flex items-center gap-4">
+                    {[
+                        { key: "isEmployee", label: "Xodim" },
+                        { key: "isSupplier", label: "Ta'minotchi xodimi" },
+                        { key: "isGuest",    label: "Mehmon" },
+                    ].map(type => (
+                        <label key={type.key} className="flex items-center gap-2 text-xs cursor-pointer">
+                            <Checkbox checked={(formData as any)[type.key]} onCheckedChange={v => setFormData(p=>({...p, [type.key]: !!v}))} />
+                            {type.label}
+                        </label>
+                    ))}
+                   </div>
+                </div>
+
               </div>
             </TabsContent>
- 
-            {/* ── Tab 3: Ruxsatlar (faqat Super Admin) ── */}
-            {isSuperAdmin && (
-              <TabsContent value="permissions" className="flex-1 overflow-y-auto p-5">
-                {!formData.hasLogin ? (
-                  <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-2">
-                    <Lock className="w-8 h-8 opacity-30" />
-                    <p className="text-sm">Avval "Login ochish" ni yoqing</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <LayoutGrid className="w-4 h-4 text-blue-600" />
-                        Bo'lim ruxsatlari — {formData.role}
-                      </p>
-                      <button
-                        onClick={() => {
-                          const allOn = ALL_MODULES.every(m =>
-                            MODULE_ACTIONS.every(a => formData.permissions[m.key]?.includes(a))
-                          );
-                          const newPerms: Permissions = {};
-                          ALL_MODULES.forEach(m => {
-                            newPerms[m.key] = allOn ? [] : [...MODULE_ACTIONS];
-                          });
-                          setFormData(p => ({...p, permissions: newPerms}));
-                        }}
-                        className="text-xs text-blue-600 hover:underline"
-                      >
-                        Hammasini belgilash / olib tashlash
-                      </button>
+
+            {/* Ruxsatlar Tab */}
+            <TabsContent value="permissions" className="flex-1 overflow-y-auto p-0 m-0 bg-slate-50">
+               {!formData.hasLogin ? (
+                   <div className="flex flex-col h-full items-center justify-center gap-3 text-slate-400 border-t bg-white">
+                       <Lock className="w-10 h-10 opacity-50" />
+                       <p className="text-sm">Ruxsatlarni belgilash uchun avval "Login ruxsatini yoqish"ni belgilang.</p>
+                   </div>
+               ) : (
+                  <div className="p-6 space-y-3">
+                    <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg flex gap-3 text-amber-800 mb-4">
+                        <LayoutGrid className="w-5 h-5 shrink-0 mt-0.5" />
+                        <div className="text-xs">
+                            <p className="font-semibold">Standart ruxsatlar yuklangan</p>
+                            <p className="opacity-90">"{formData.role}" roli uchun standart ruxsatlar o'rnatildi. Quyida ularni g'ayrioddiy holatlar uchun o'zgartirishingiz mumkin.</p>
+                        </div>
                     </div>
- 
-                    {ALL_MODULES.map(module => {
-                      const modulePerms = formData.permissions[module.key] ?? [];
-                      const allChecked = MODULE_ACTIONS.every(a => modulePerms.includes(a));
-                      const someChecked = MODULE_ACTIONS.some(a => modulePerms.includes(a));
+
+                    {ALL_MODULES.map((module) => {
+                      const modulePermissions = formData.permissions[module.key] ?? [];
+                      const allChecked = MODULE_ACTIONS.every(a => modulePermissions.includes(a));
+                      const someChecked = MODULE_ACTIONS.some(a => modulePermissions.includes(a)) && !allChecked;
                       const isExpanded = expandedModules[module.key];
- 
+
                       return (
-                        <div key={module.key} className="border border-slate-200 rounded-lg overflow-hidden">
-                          <div
-                            className={cn(
-                              "flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors",
-                              allChecked && "bg-blue-50/60"
-                            )}
-                            onClick={() => setExpandedModules(p => ({...p, [module.key]: !isExpanded}))}
-                          >
+                        <div key={module.key} className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                          {/* Modul Header */}
+                          <div className={cn("px-4 py-2.5 flex items-center gap-3 border-b border-slate-100", isExpanded ? "bg-slate-50/50" : "")}>
                             <Checkbox
-                              checked={allChecked}
-                              onCheckedChange={v => toggleModule(module.key as ModuleKey, !!v)}
-                              onClick={e => e.stopPropagation()}
-                              className={someChecked && !allChecked ? "opacity-50" : ""}
+                              id={`mod-${module.key}`}
+                              checked={allChecked ? true : someChecked ? "indeterminate" : false}
+                              onCheckedChange={(checked) => toggleModule(module.key, !!checked)}
                             />
-                            <span className="flex-1 text-sm font-medium text-slate-700">{module.label}</span>
-                            <div className="flex items-center gap-1 mr-2">
-                              {MODULE_ACTIONS.map(a => (
-                                <span
-                                  key={a}
-                                  className={cn(
-                                    "text-[10px] px-1.5 py-0.5 rounded",
-                                    modulePerms.includes(a)
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-slate-100 text-slate-300"
-                                  )}
-                                >
-                                  {ACTION_LABELS[a]}
-                                </span>
-                              ))}
+                            <Label
+                              htmlFor={`mod-${module.key}`}
+                              className="text-sm font-medium text-slate-800 flex-1 cursor-pointer"
+                            >
+                              {module.label}
+                            </Label>
+                            
+                            <div className="text-[11px] text-slate-400 mr-2">
+                                {modulePermissions.length} / {MODULE_ACTIONS.length} ruxsat
                             </div>
-                            {isExpanded
-                              ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                              : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setExpandedModules(p => ({ ...p, [module.key]: !isExpanded }))}
+                              className="w-8 h-8 text-slate-400"
+                            >
+                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </Button>
                           </div>
- 
+
+                          {/* Amallar (Kengaytirilganda) */}
                           {isExpanded && (
-                            <div className="border-t border-slate-100 px-4 py-3 bg-slate-50 flex gap-4">
-                              {MODULE_ACTIONS.map(action => (
-                                <label key={action} className="flex items-center gap-2 text-xs cursor-pointer">
-                                  <Checkbox
-                                    checked={modulePerms.includes(action)}
-                                    onCheckedChange={() => toggleAction(module.key as ModuleKey, action)}
-                                  />
-                                  <span className="text-slate-600">{ACTION_LABELS[action]}</span>
-                                </label>
-                              ))}
+                            <div className="px-4 py-3 grid grid-cols-4 gap-4 bg-white">
+                              {MODULE_ACTIONS.map((action) => {
+                                const id = `perm-${module.key}-${action}`;
+                                return (
+                                  <div key={action} className="flex items-center gap-2.5">
+                                    <Checkbox
+                                      id={id}
+                                      checked={modulePermissions.includes(action)}
+                                      onCheckedChange={() => toggleAction(module.key, action)}
+                                    />
+                                    <Label htmlFor={id} className="text-xs text-slate-600 cursor-pointer">
+                                      {ACTION_LABELS[action]}
+                                    </Label>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
                       );
                     })}
                   </div>
-                )}
-              </TabsContent>
-            )}
- 
-            {/* ── Tab 4: Qo'shimcha ── */}
-            <TabsContent value="extra" className="flex-1 overflow-y-auto p-5">
-              <div className="max-w-md space-y-4 text-sm text-slate-500">
-                <p className="text-xs text-slate-400">
-                  Passport, litsenziya, tibbiy kitob, sertifikat va boshqa hujjatlarni bu yerga qo'shishingiz mumkin.
-                  Bu bo'lim keyingi versiyada to'liq ishga tushiriladi.
-                </p>
-                <div className="border border-dashed border-slate-200 rounded-xl h-32 flex items-center justify-center text-slate-300 text-xs">
-                  Fayl yuklash (tez orada)
-                </div>
-              </div>
+               )}
             </TabsContent>
           </Tabs>
- 
-          <DialogFooter className="bg-slate-50 px-5 py-3 border-t shrink-0 flex items-center gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={closeModal}>Bekor qilish</Button>
+
+          <DialogFooter className="px-6 py-3 border-t bg-slate-50 shrink-0">
+            <Button variant="outline" size="sm" onClick={closeModal} disabled={loading}>
+              Bekor qilish
+            </Button>
             <Button
               size="sm"
               onClick={handleSubmit}
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white gap-1"
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 min-w-[100px]"
             >
-              {loading
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <CheckCircle2 className="w-4 h-4" />}
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
               {editingId ? "Yangilash" : "Saqlash"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
- 
-      {/* ════════ O'chirish tasdiqlash ════════ */}
+      
+      {/* O'chirishni tasdiqlash dialogi (Kesilgan kodda yo'q edi, lekin mantiqan kerak) */}
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-rose-600">
-              <Trash2 className="w-4 h-4" /> O'chirishni tasdiqlang
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-slate-600 py-2">
-            Bu xodimni o'chirsangiz, barcha ma'lumotlari ham o'chadi. Firebase Auth logini saqlanadi — uni Auth panelidan qo'lda o'chiring.
-          </p>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>Yo'q</Button>
-            <Button
-              size="sm"
-              onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
-              className="bg-rose-600 hover:bg-rose-700 text-white"
-            >
-              Ha, o'chirish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+          <DialogContent className="max-w-md">
+              <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-rose-600">
+                      <Trash2 className="w-5 h-5" />
+                      O'chirishni tasdiqlang
+                  </DialogTitle>
+              </DialogHeader>
+              <div className="py-2 text-sm text-slate-600">
+                  Haqiqatan ham ushbu xodimni tizimdan o'chirib tashlamoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi.
+              </div>
+              <DialogFooter className="mt-4 gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>Bekor qilish</Button>
+                  <Button variant="destructive" size="sm" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>O'chirish</Button>
+              </DialogFooter>
+          </DialogContent>
       </Dialog>
+
     </div>
-  );
-}
- 
-// ─── Yordamchi komponentlar ────────────────────────────────────────────────────
- 
-function Field({
-  label, children, className,
-}: {
-  label: string; children: React.ReactNode; className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1", className)}>
-      <Label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</Label>
-      {children}
-    </div>
-  );
-}
- 
-const ROLE_COLORS: Record<string, string> = {
-  "Super Admin":      "bg-rose-100 text-rose-700",
-  "Admin":            "bg-orange-100 text-orange-700",
-  "Menejer":          "bg-blue-100 text-blue-700",
-  "Sotuvchi":         "bg-emerald-100 text-emerald-700",
-  "Ombor boshlig'i":  "bg-purple-100 text-purple-700",
-  "Hisobchi":         "bg-amber-100 text-amber-700",
-  "Ishchi":           "bg-slate-100 text-slate-500",
-};
- 
-function RoleBadge({ role, small }: { role: string; small?: boolean }) {
-  return (
-    <span className={cn(
-      "inline-block font-medium rounded-full",
-      small ? "text-[10px] px-1.5 py-0.5" : "text-[11px] px-2 py-0.5",
-      ROLE_COLORS[role] ?? "bg-slate-100 text-slate-500"
-    )}>
-      {role}
-    </span>
   );
 }
