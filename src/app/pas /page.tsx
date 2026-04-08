@@ -304,5 +304,3 @@ export default function POSPage() {
     </div>
   );
 }
-
-// Badge o'rniga oddiy span ishlatildi, shadcn o'rnatilgan bo'lsa import qilsa bo'ladi.
