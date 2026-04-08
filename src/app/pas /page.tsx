@@ -10,7 +10,7 @@ import {
   Barcode, Wallet, Trash2, PackageSearch
 } from "lucide-react";
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
-import { collection, doc, runTransaction, serverTimestamp, getDoc } from "firebase/firestore";
+import { collection, doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useScanner } from "@/hooks/use-scanner";
 import { cn } from "@/lib/utils";
@@ -24,23 +24,23 @@ export default function POSPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Ma'lumotlarni yuklash (Real-time)
+  // 1. Ma'lumotlarni yuklash
   const productsQuery = useMemoFirebase(() => db ? collection(db, "products") : null, [db]);
   const { data: products } = useCollection(productsQuery);
 
   const inventoryQuery = useMemoFirebase(() => db ? collection(db, "inventory") : null, [db]);
   const { data: inventory } = useCollection(inventoryQuery);
 
-  // 2. Savatga qo'shish mantiqi (Callback orqali optimallashtirilgan)
+  // 2. Savatga qo'shish mantiqi
   const addToCart = useCallback((product: any) => {
     if (!assignedWarehouseId) {
       toast({ variant: "destructive", title: "Xatolik", description: "Sizga ombor biriktirilmagan!" });
       return;
     }
 
-    const stockItem = inventory?.find(inv => 
-      inv.productId === product.id && inv.warehouseId === assignedWarehouseId
-    );
+    // Ombordagi joriy qoldiqni topish
+    const stockKey = `${assignedWarehouseId}_${product.id}`;
+    const stockItem = inventory?.find(inv => inv.id === stockKey);
     const currentStock = stockItem?.stock || 0;
 
     setCart(prev => {
@@ -51,7 +51,7 @@ export default function POSPage() {
         toast({ 
           variant: "destructive", 
           title: "Zaxira yetarli emas", 
-          description: `Omborda jami ${currentStock} ta bor. Savatda: ${currentQty}` 
+          description: `Omborda jami ${currentStock} ta bor.` 
         });
         return prev;
       }
@@ -70,8 +70,6 @@ export default function POSPage() {
       addToCart(product);
       setSearchQuery("");
       toast({ title: "Qo'shildi", description: product.name });
-    } else {
-      toast({ variant: "destructive", title: "Topilmadi", description: `"${barcode}" kodi bazada yo'q.` });
     }
   });
 
@@ -81,11 +79,12 @@ export default function POSPage() {
     const q = searchQuery.toLowerCase();
     return products?.filter(p => 
       p.name?.toLowerCase().includes(q) || 
-      p.sku?.toLowerCase().includes(q)
+      p.sku?.toLowerCase().includes(q) ||
+      p.barcode?.includes(q)
     ).slice(0, 8);
   }, [products, searchQuery]);
 
-  // 5. Sotuvni yakunlash (Tranzaksiya bilan)
+  // 5. Sotuvni yakunlash
   const handleCheckout = async () => {
     if (!db || !user || !assignedWarehouseId || cart.length === 0) return;
 
@@ -95,30 +94,20 @@ export default function POSPage() {
         let totalCalculated = 0;
 
         for (const item of cart) {
-          // Xavfsizlik uchun narxni va zaxirani bazadan qayta tekshiramiz
           const invRef = doc(db, "inventory", `${assignedWarehouseId}_${item.id}`);
-          const prodRef = doc(db, "products", item.id);
-          
-          const [invSnap, prodSnap] = await Promise.all([
-            transaction.get(invRef),
-            transaction.get(prodRef)
-          ]);
+          const invSnap = await transaction.get(invRef);
 
           if (!invSnap.exists()) throw new Error(`${item.name} omborda topilmadi!`);
           
           const actualStock = invSnap.data().stock;
-          const actualPrice = prodSnap.data().price || 0;
-
           if (actualStock < item.quantity) {
             throw new Error(`${item.name} uchun qoldiq yetarli emas!`);
           }
 
-          // Zaxirani ayirish
           transaction.update(invRef, { stock: actualStock - item.quantity });
-          totalCalculated += (actualPrice * item.quantity);
+          totalCalculated += (item.price * item.quantity);
         }
 
-        // Sotuv hisobotini yaratish
         const saleRef = doc(collection(db, "sales"));
         transaction.set(saleRef, {
           items: cart,
@@ -132,7 +121,7 @@ export default function POSPage() {
       });
 
       setCart([]);
-      toast({ title: "Muvaffaqiyatli!", description: "Sotuv amalga oshirildi va kassa yangilandi." });
+      toast({ title: "Muvaffaqiyatli!", description: "Sotuv amalga oshirildi." });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Xatolik", description: err.message });
     } finally {
@@ -143,40 +132,46 @@ export default function POSPage() {
   const totalSum = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   return (
-    <div className="flex min-h-screen bg-[#f1f5f9] font-sans">
+    <div className="flex min-h-screen bg-[#f8fafc]">
       <OmniSidebar />
-      <main className="flex-1 p-4 lg:p-6 flex flex-col lg:flex-row gap-6">
+      <main className="flex-1 p-4 lg:p-8 flex flex-col lg:flex-row gap-8">
         
-        {/* CHAP TOMON: QIDIRUV */}
-        <div className="flex-1 space-y-4">
-          <Card className="rounded-[2rem] border-none shadow-sm overflow-hidden bg-white">
-            <CardContent className="p-4">
+        {/* CHAP: QIDIRUV VA MAHSULOTLAR */}
+        <div className="flex-1 space-y-6">
+          <header>
+            <h1 className="text-3xl font-black text-slate-900 mb-2">Savdo Kassasi</h1>
+            <p className="text-slate-500 font-medium">Mahsulotlarni tanlang yoki skanerlang</p>
+          </header>
+
+          <Card className="rounded-[2rem] border-none shadow-xl shadow-blue-500/5 bg-white overflow-hidden">
+            <CardContent className="p-6">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                 <Input 
-                  placeholder="Mahsulot nomi yoki kodi..." 
-                  className="pl-12 h-14 bg-slate-50 border-none rounded-2xl text-lg font-medium focus-visible:ring-2 focus-visible:ring-blue-500 transition-all"
+                  placeholder="Nomi, SKU yoki Barcode..." 
+                  className="pl-12 h-16 bg-slate-50 border-none rounded-2xl text-lg font-bold focus-visible:ring-2 focus-visible:ring-blue-500 transition-all"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  autoFocus
                 />
               </div>
 
               {searchQuery.length >= 2 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 animate-in fade-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                   {filteredProducts?.map(p => (
                     <button 
                       key={p.id}
                       onClick={() => { addToCart(p); setSearchQuery(""); }}
-                      className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-500 hover:shadow-md transition-all text-left"
+                      className="flex items-center justify-between p-4 bg-white border-2 border-slate-50 rounded-2xl hover:border-blue-500 hover:bg-blue-50/30 transition-all group text-left"
                     >
-                      <div className="overflow-hidden">
+                      <div className="min-w-0">
                         <p className="font-bold text-slate-800 truncate">{p.name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">{p.sku || 'Noma’lum'}</p>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.barcode || p.sku}</p>
                       </div>
-                      <p className="font-black text-blue-600 whitespace-nowrap ml-2">
-                        {p.price?.toLocaleString()} <span className="text-[10px]">so'm</span>
-                      </p>
+                      <div className="text-right ml-4">
+                        <p className="font-black text-blue-600">
+                          {p.price?.toLocaleString()} <span className="text-[10px]">UZS</span>
+                        </p>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -184,97 +179,107 @@ export default function POSPage() {
             </CardContent>
           </Card>
 
+          {/* STATUS BAR */}
           <div className="grid grid-cols-2 gap-4">
             <div className={cn(
-              "p-4 rounded-2xl border flex items-center gap-3 transition-colors",
+              "p-4 rounded-3xl border-2 flex items-center gap-4 transition-all",
               assignedWarehouseId ? "bg-emerald-50 border-emerald-100 text-emerald-700" : "bg-rose-50 border-rose-100 text-rose-700"
             )}>
-              <Barcode className="w-5 h-5" />
+              <div className={cn("p-2 rounded-xl", assignedWarehouseId ? "bg-emerald-500/10" : "bg-rose-500/10")}>
+                <Barcode className="w-6 h-6" />
+              </div>
               <div>
-                <p className="text-[10px] font-black uppercase opacity-60">Skayner</p>
-                <p className="text-xs font-bold">{assignedWarehouseId ? "Aktiv" : "Faol emas"}</p>
+                <p className="text-[10px] font-black uppercase opacity-60">Skayner Holati</p>
+                <p className="text-sm font-bold">{assignedWarehouseId ? "Aktiv & Tayyor" : "Faol emas"}</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 text-blue-700 flex items-center gap-3">
-              <PackageSearch className="w-5 h-5" />
+            <div className="p-4 rounded-3xl bg-blue-50 border-2 border-blue-100 text-blue-700 flex items-center gap-4">
+              <div className="p-2 rounded-xl bg-blue-500/10">
+                <PackageSearch className="w-6 h-6" />
+              </div>
               <div>
-                <p className="text-[10px] font-black uppercase opacity-60">Ombor</p>
-                <p className="text-xs font-bold truncate max-w-[120px]">{assignedWarehouseId || "Biriktirilmagan"}</p>
+                <p className="text-[10px] font-black uppercase opacity-60">Joriy Ombor</p>
+                <p className="text-sm font-bold truncate max-w-[150px]">{assignedWarehouseId || "Biriktirilmagan"}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* O'NG TOMON: SAVATCHA */}
-        <Card className="w-full lg:w-[420px] rounded-[2.5rem] border-none shadow-2xl flex flex-col h-[calc(100vh-3rem)] sticky top-6">
-          <CardContent className="p-6 flex-1 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                <ShoppingCart className="text-blue-600 w-6 h-6" /> SAVAT
+        {/* O'NG: SAVATCHA */}
+        <Card className="w-full lg:w-[450px] rounded-[3rem] border-none shadow-2xl flex flex-col h-[calc(100vh-4rem)] sticky top-8 bg-white overflow-hidden">
+          <CardContent className="p-8 flex-1 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-2xl text-white">
+                  <ShoppingCart className="w-6 h-6" />
+                </div>
+                SAVAT
               </h2>
-              <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">
-                {cart.length} ta mahsulot
+              <span className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-full text-xs font-black">
+                {cart.length} TA
               </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2 -mr-2 custom-scrollbar">
               {cart.map(item => (
-                <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-transparent hover:border-slate-200 transition-all group">
-                  <div className="flex-1 min-w-0 mr-2">
+                <div key={item.id} className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                  <div className="flex-1 min-w-0 mr-4">
                     <p className="font-bold text-slate-800 text-sm truncate">{item.name}</p>
-                    <p className="text-[11px] font-bold text-blue-600">
-                      {(item.price * item.quantity).toLocaleString()} so'm
+                    <p className="text-xs font-black text-blue-600">
+                      {(item.price * item.quantity).toLocaleString()} UZS
                     </p>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-white rounded-xl border border-slate-100 p-1 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
                       <button 
                         onClick={() => {
                           if(item.quantity > 1) setCart(cart.map(i => i.id === item.id ? {...i, quantity: i.quantity - 1} : i));
                           else setCart(cart.filter(i => i.id !== item.id));
                         }}
-                        className="p-1 hover:bg-slate-100 rounded-lg"
+                        className="p-1.5 hover:bg-slate-50 rounded-lg transition-colors"
                       >
-                        <Minus className="w-3 h-3" />
+                        <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="w-7 text-center text-xs font-black">{item.quantity}</span>
+                      <span className="w-8 text-center text-sm font-black">{item.quantity}</span>
                       <button 
                         onClick={() => addToCart(item)}
-                        className="p-1 hover:bg-slate-100 rounded-lg"
+                        className="p-1.5 hover:bg-slate-50 rounded-lg transition-colors"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <button 
                       onClick={() => setCart(cart.filter(i => i.id !== item.id))}
                       className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
               ))}
 
               {cart.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
-                  <ShoppingCart className="w-20 h-20 mb-4" />
-                  <p className="font-black text-xs uppercase">Savat bo'sh</p>
+                <div className="h-full flex flex-col items-center justify-center text-slate-300 py-20">
+                  <div className="p-6 bg-slate-50 rounded-full mb-4">
+                    <ShoppingCart className="w-12 h-12" />
+                  </div>
+                  <p className="font-black text-xs uppercase tracking-widest">Savat bo'sh</p>
                 </div>
               )}
             </div>
 
-            <div className="mt-6 pt-6 border-t border-slate-100">
-              <div className="flex justify-between items-center mb-6">
+            <div className="mt-8 pt-8 border-t border-slate-100 space-y-6">
+              <div className="flex justify-between items-end">
                 <div>
-                  <p className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Jami summa</p>
-                  <p className="text-3xl font-black text-slate-800">
-                    {totalSum.toLocaleString()} <span className="text-sm font-medium">so'm</span>
+                  <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] mb-1">Umumiy summa</p>
+                  <p className="text-4xl font-black text-slate-900 leading-none">
+                    {totalSum.toLocaleString()} <span className="text-lg font-bold text-slate-400">UZS</span>
                   </p>
                 </div>
-                <div className="bg-blue-600/10 p-4 rounded-2xl text-blue-600">
-                  <Wallet className="w-7 h-7" />
+                <div className="bg-blue-600/10 p-4 rounded-3xl text-blue-600">
+                  <Wallet className="w-8 h-8" />
                 </div>
               </div>
 
@@ -282,15 +287,15 @@ export default function POSPage() {
                 onClick={handleCheckout}
                 disabled={cart.length === 0 || isSubmitting || !assignedWarehouseId}
                 className={cn(
-                  "w-full h-16 rounded-[1.5rem] text-lg font-black transition-all",
+                  "w-full h-20 rounded-[2rem] text-xl font-black transition-all shadow-2xl",
                   assignedWarehouseId 
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 active:scale-[0.98]" 
+                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 active:scale-[0.98]" 
                     : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 )}
               >
                 {isSubmitting ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-6 h-6 animate-spin" />
                     <span>YUBORILMOQDA...</span>
                   </div>
                 ) : (
