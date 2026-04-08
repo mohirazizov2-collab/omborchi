@@ -1,5 +1,5 @@
 "use client";
-
+ 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -45,20 +45,21 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-
+ 
 export function OmniSidebar() {
   const pathname = usePathname();
   const { t, language, setLanguage } = useLanguage();
   const { user, role } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
-
+ 
   const isSuperAdmin = role === "Super Admin";
   const isAdmin = role === "Admin" || isSuperAdmin;
   const isOmborchi = role === "Omborchi";
   const isSotuvchi = role === "Sotuvchi";
-
+ 
   // Sotuvchi uchun maxsus navigatsiya
   const sotuvchiNavigation = useMemo(() => [
+    { name: "Sotuvlar", href: "/sales", icon: ShoppingCart },
     { name: "Inventarizatsiya", href: "/inventory-audit", icon: ClipboardList },
     { name: "Chiqim", href: "/stock-out", icon: FileOutput },
     { name: "Nakladnoy", href: "/nakladnoy", icon: FileText },
@@ -68,43 +69,48 @@ export function OmniSidebar() {
     { name: "Moliya hisobotlari", href: "/expenses", icon: WalletCards },
     { name: "Foydalanuvchilar", href: "/users", icon: Users },
   ], []);
-
+ 
   const analyticsNavigation = useMemo(() => [
     { name: t.nav.dashboard, href: "/", icon: LayoutDashboard },
     { name: t.nav.history, href: "/history", icon: History },
     { name: t.nav.reports, href: "/reports", icon: BarChart3, hide: isOmborchi },
   ], [t, isOmborchi]);
-
+ 
   const invoiceNavigation = useMemo(() => [
     { name: t.nav.stockIn, href: "/stock-in", icon: FileInput },
     { name: t.nav.stockOut, href: "/stock-out", icon: FileOutput },
   ], [t]);
-
+ 
   const inventoryNavigation = useMemo(() => [
     { name: t.nav.products, href: "/products", icon: Package },
     { name: t.nav.warehouses, href: "/warehouses", icon: Warehouse },
     { name: t.nav.inventoryAudit, href: "/inventory-audit", icon: ClipboardCheck, hide: !isAdmin },
   ], [t, isAdmin]);
-
+ 
   const productionNavigation = useMemo(() => [
     { name: t.nav.recipes, href: "/recipes", icon: FlaskConical },
     { name: t.nav.productionAct, href: "/production", icon: Wrench },
   ], [t]);
-
+ 
   const financeNavigation = useMemo(() => [
     { name: t.nav.expenses, href: "/expenses", icon: WalletCards, hide: isOmborchi },
     { name: t.nav.employees, href: "/employees", icon: UserRound, hide: !isAdmin },
   ], [t, isAdmin, isOmborchi]);
-
+ 
+  // ✅ Sotuvlar navigatsiyasi — Admin va Super Admin uchun
+  const salesNavigation = useMemo(() => [
+    { name: "Sotuvlar", href: "/sales", icon: ShoppingCart },
+  ], []);
+ 
   const adminNavigation = useMemo(() => [
     { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isSuperAdmin },
     { name: t.nav.settings, href: "/settings", icon: Settings, hide: !isAdmin },
   ], [t, isAdmin, isSuperAdmin]);
-
+ 
   const userInitials = useMemo(() => user?.displayName
     ? user.displayName.split(' ').map((n: string) => n[0]).join('')
     : (user?.email ? user.email[0].toUpperCase() : 'U'), [user]);
-
+ 
   const activeGroup = useMemo(() => {
     if (analyticsNavigation.some(i => pathname === i.href)) return "analytics";
     if (invoiceNavigation.some(i => pathname === i.href)) return "invoices";
@@ -112,17 +118,18 @@ export function OmniSidebar() {
     if (productionNavigation.some(i => pathname === i.href)) return "production";
     if (financeNavigation.some(i => pathname === i.href)) return "finance";
     if (adminNavigation.some(i => pathname === i.href)) return "admin";
+    if (salesNavigation.some(i => pathname === i.href)) return "sales";
     if (sotuvchiNavigation.some(i => pathname === i.href)) return "sotuvchi";
     return "";
-  }, [pathname, analyticsNavigation, invoiceNavigation, inventoryNavigation, productionNavigation, financeNavigation, adminNavigation, sotuvchiNavigation]);
-
+  }, [pathname, analyticsNavigation, invoiceNavigation, inventoryNavigation, productionNavigation, financeNavigation, adminNavigation, salesNavigation, sotuvchiNavigation]);
+ 
   const renderAccordionItem = (value: string, label: string, icon: any, items: any[]) => {
     const visibleItems = items.filter(i => !i.hide);
     if (visibleItems.length === 0) return null;
-
+ 
     const Icon = icon;
     const isGroupActive = activeGroup === value;
-
+ 
     return (
       <AccordionItem key={value} value={value} className="border-none">
         <AccordionTrigger className={cn(
@@ -158,12 +165,12 @@ export function OmniSidebar() {
       </AccordionItem>
     );
   };
-
+ 
   // ✅ SOTUVCHI UCHUN ALOHIDA SIDEBAR
   const SotuvchiSidebarContent = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center px-6 h-20 border-b shrink-0">
-        <Link href="/inventory-audit" className="flex items-center gap-3 group" onClick={() => setMobileOpen(false)}>
+        <Link href="/sales" className="flex items-center gap-3 group" onClick={() => setMobileOpen(false)}>
           <div className="w-11 h-11 rounded-[0.9rem] bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 10L12 4L21 10V20H3V10Z" />
@@ -175,7 +182,7 @@ export function OmniSidebar() {
           <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
         </Link>
       </div>
-
+ 
       <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-hide">
         <div className="flex gap-2 px-2 mb-6">
           <DropdownMenu>
@@ -192,7 +199,7 @@ export function OmniSidebar() {
           </DropdownMenu>
           <ThemeToggle />
         </div>
-
+ 
         {/* Sotuvchi menu items */}
         <div className="space-y-1 px-1">
           {sotuvchiNavigation.map((item) => {
@@ -216,7 +223,7 @@ export function OmniSidebar() {
           })}
         </div>
       </div>
-
+ 
       <div className="p-4 border-t shrink-0">
         <Link href="/profile" onClick={() => setMobileOpen(false)}>
           <div className="flex items-center gap-3 p-3 rounded-2xl hover:bg-muted transition-all cursor-pointer group bg-muted/20">
@@ -232,7 +239,7 @@ export function OmniSidebar() {
       </div>
     </div>
   );
-
+ 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center px-6 h-20 border-b shrink-0">
@@ -248,7 +255,7 @@ export function OmniSidebar() {
           <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
         </Link>
       </div>
-
+ 
       <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-hide">
         <div className="flex gap-2 px-2 mb-6">
           <DropdownMenu>
@@ -265,9 +272,11 @@ export function OmniSidebar() {
           </DropdownMenu>
           <ThemeToggle />
         </div>
-
+ 
         <Accordion type="multiple" defaultValue={[activeGroup]} className="space-y-2">
           {renderAccordionItem("analytics", t.nav.analyticsGroup, BarChart3, analyticsNavigation)}
+          {/* ✅ Sotuvlar bo'limi — Admin va Super Admin uchun ko'rinadi */}
+          {renderAccordionItem("sales", "Sotuvlar", ShoppingCart, salesNavigation)}
           {renderAccordionItem("invoices", t.nav.invoices, FileText, invoiceNavigation)}
           {renderAccordionItem("inventory", t.nav.inventoryGroup, Package, inventoryNavigation)}
           {renderAccordionItem("production", t.nav.productionGroup, FlaskConical, productionNavigation)}
@@ -275,7 +284,7 @@ export function OmniSidebar() {
           {renderAccordionItem("admin", t.nav.systemGroup, Settings, adminNavigation)}
         </Accordion>
       </div>
-
+ 
       <div className="p-4 border-t shrink-0">
         <Link href="/profile" onClick={() => setMobileOpen(false)}>
           <div className="flex items-center gap-3 p-3 rounded-2xl hover:bg-muted transition-all cursor-pointer group bg-muted/20">
@@ -291,15 +300,15 @@ export function OmniSidebar() {
       </div>
     </div>
   );
-
+ 
   // ✅ Sotuvchi bo'lsa alohida sidebar ko'rsatiladi
   const ActiveSidebar = isSotuvchi ? SotuvchiSidebarContent : SidebarContent;
-
+ 
   return (
     <>
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-16 bg-card border-b">
-        <Link href={isSotuvchi ? "/inventory-audit" : "/"} className="flex items-center gap-2">
+        <Link href={isSotuvchi ? "/sales" : "/"} className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 10L12 4L21 10V20H3V10Z" />
@@ -316,7 +325,7 @@ export function OmniSidebar() {
           {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
-
+ 
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div
@@ -324,7 +333,7 @@ export function OmniSidebar() {
           onClick={() => setMobileOpen(false)}
         />
       )}
-
+ 
       {/* Mobile Sidebar */}
       <div className={cn(
         "md:hidden fixed top-16 left-0 bottom-0 z-50 w-72 bg-card border-r transition-transform duration-300",
@@ -332,11 +341,10 @@ export function OmniSidebar() {
       )}>
         <ActiveSidebar />
       </div>
-
+ 
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col w-64 bg-card border-r h-screen sticky top-0 z-50 transition-all duration-200">
         <ActiveSidebar />
       </div>
     </>
   );
-}
