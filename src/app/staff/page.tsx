@@ -1,190 +1,188 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { 
-  ShoppingCart, Search, Loader2, Plus, Minus, 
-  Barcode, Wallet, Trash2, PackageSearch, 
-  Printer, CreditCard, Banknote, User as UserIcon,
-  X, ChevronRight, LayoutGrid
+  Eye, EyeOff, Save, Loader2, Mail, Lock, Camera, 
+  Settings, ShieldCheck, UserPlus 
 } from "lucide-react";
-import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore";
-import { Button } from "@/components/ui/button";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { useFirestore } from "@/firebase";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-export default function POSPage() {
+export default function IikoStaffPage() {
   const { toast } = useToast();
   const db = useFirestore();
-  const userContext = useUser(); // Xatolikni oldini olish uchun obyekt sifatida olamiz
-  const { data: products, loading } = useCollection("products");
-  
-  const [cart, setCart] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // iiko style: Tanlangan kategoriya (ixtiyoriy)
-  const [activeCategory, setActiveCategory] = useState("Hammasi");
+  const [formData, setFormData] = useState({
+    lastName: "",
+    firstName: "",
+    middleName: "",
+    email: "",
+    password: "",
+    position: "Sotuvchi",
+    role: "User",
+  });
 
-  // Client-side exception'ni oldini olish uchun tekshiruv
-  if (!userContext) return <div className="h-screen flex items-center justify-center bg-[#f0f2f5]"><Loader2 className="animate-spin text-blue-600" /></div>;
+  useEffect(() => { setMounted(true); }, []);
 
-  const filteredProducts = products?.filter((p: any) => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.sku?.includes(searchQuery)
-  ) || [];
+  const handleSave = async () => {
+    if (!db || !formData.email || !formData.password) {
+      toast({ variant: "destructive", title: "Xato", description: "Email va parol majburiy!" });
+      return;
+    }
 
-  const addToCart = (product: any) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => item.id === product.id 
-          ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
-  };
+    setIsSaving(true);
+    const auth = getAuth();
+    
+    // Hozirgi admin sessiyasini saqlab qolish uchun emailni olamiz
+    const adminEmail = auth.currentUser?.email;
 
-  const removeFromCart = (id: string, fullDelete = false) => {
-    setCart(prev => prev.reduce((acc: any[], item) => {
-      if (item.id === id) {
-        if (fullDelete || item.quantity === 1) return acc;
-        acc.push({ ...item, quantity: item.quantity - 1 });
-      } else {
-        acc.push(item);
-      }
-      return acc;
-    }, []));
-  };
-
-  const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-  const handleCheckout = async (method: 'naqd' | 'karta') => {
-    if (cart.length === 0 || !db) return;
-    setIsProcessing(true);
     try {
-      await addDoc(collection(db, "sales"), {
-        items: cart,
-        total: totalAmount,
-        paymentMethod: method,
-        sellerId: userContext.user?.uid || "unknown",
+      // 1. Yangi foydalanuvchi yaratish
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const uid = userCredential.user.uid;
+
+      // 2. Ruxsatlarni sizning Firestore Rules'ingizga 100% moslash
+      const permissions = formData.role === "Admin" ? {
+        tizim: { foydalanuvchilar: true },
+        inventar: { mahsulotlar: true },
+        moliya: { xarajatlar: true },
+        nakladnolar: { kirim: true },
+        analitika: { dashboard: true, hisobotlar: true }
+      } : {
+        tizim: { foydalanuvchilar: false },
+        inventar: { mahsulotlar: true },
+        moliya: { xarajatlar: false },
+        nakladnolar: { kirim: false },
+        analitika: { dashboard: true, hisobotlar: false }
+      };
+
+      // 3. Firestore-ga yozish
+      await setDoc(doc(db, "users", uid), {
+        lastName: formData.lastName,
+        firstName: formData.firstName,
+        middleName: formData.middleName,
+        email: formData.email,
+        position: formData.position,
+        role: formData.role,
+        fullName: `${formData.lastName} ${formData.firstName} ${formData.middleName}`.trim(),
+        permissions: permissions,
         createdAt: serverTimestamp(),
       });
+
+      toast({ title: "Muvaffaqiyatli!", description: "Xodim va ruxsatlar yaratildi." });
       
-      toast({ title: "Sotuv bajarildi", description: "Chek chiqarishga tayyor." });
-      setCart([]);
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Xato", description: error.message });
+      // Formani tozalash
+      setFormData({ lastName: "", firstName: "", middleName: "", email: "", password: "", position: "Sotuvchi", role: "User" });
+
+    } catch (e: any) {
+      let msg = e.message;
+      if (msg.includes("email-already-in-use")) msg = "Bu email bazada bor!";
+      toast({ variant: "destructive", title: "Xatolik!", description: msg });
     } finally {
-      setIsProcessing(false);
+      setIsSaving(false);
     }
   };
 
+  if (!mounted) return null;
+
   return (
-    <div className="flex h-screen bg-[#1e222d] text-slate-200 overflow-hidden font-sans">
-      
-      {/* CHAP PANELA: MAHSULOTLAR (Dark Iiko Theme) */}
-      <div className="flex-1 flex flex-col p-4 overflow-hidden border-r border-slate-700">
-        <div className="flex items-center gap-4 mb-6 bg-[#2a2f3b] p-3 rounded-xl border border-slate-700">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-            <Input 
-              placeholder="Qidirish..." 
-              className="pl-10 h-10 bg-[#1e222d] border-slate-600 focus:border-blue-500 text-sm"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+    <div className="min-h-screen bg-[#f0f2f5] p-4 lg:p-8 font-sans">
+      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-300">
+        
+        {/* HEADER */}
+        <div className="bg-[#e0e3e9] p-3 border-b border-slate-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-black text-xs shadow-lg">i</div>
+            <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Xodim qo'shish (iiko style)</span>
           </div>
-          <Button variant="ghost" className="text-slate-400 hover:text-white"><Barcode /></Button>
+          <Settings className="w-4 h-4 text-slate-400" />
         </div>
 
-        {/* KATEGORIYALAR (iiko style) */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-          {["Hammasi", "Ichimliklar", "Ovqatlar", "Desertlar"].map(cat => (
-            <button 
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider border transition-all ${activeCategory === cat ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-[#2a2f3b] border-slate-700 text-slate-400'}`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pr-2">
-          {loading ? (
-            <div className="col-span-full flex items-center justify-center h-40"><Loader2 className="animate-spin" /></div>
-          ) : filteredProducts.map((p: any) => (
-            <button 
-              key={p.id}
-              onClick={() => addToCart(p)}
-              className="bg-[#2a2f3b] p-3 rounded-xl border border-slate-700 hover:border-blue-500 transition-all flex flex-col text-left group relative active:scale-95"
-            >
-              <div className="w-full aspect-square bg-[#1e222d] rounded-lg mb-3 flex items-center justify-center text-slate-600 group-hover:text-blue-500 transition-colors">
-                <LayoutGrid className="w-8 h-8" />
-              </div>
-              <span className="text-[11px] font-bold text-slate-300 uppercase truncate w-full">{p.name}</span>
-              <span className="text-blue-400 font-black text-sm mt-1">{p.price.toLocaleString()}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* O'NG PANELA: CHECK (White/Grey Contrast) */}
-      <div className="w-[380px] bg-[#f8f9fb] flex flex-col shadow-2xl text-slate-800">
-        <div className="p-5 border-b border-slate-200 bg-white flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-600">
-            <UserIcon className="w-4 h-4" />
-            <span className="text-[11px] font-black uppercase tracking-tighter">{userContext.user?.email?.split('@')[0] || "KASSIR"}</span>
+        <Tabs defaultValue="main" className="w-full">
+          <div className="bg-[#f8f9fb] border-b border-slate-200">
+            <TabsList className="h-12 bg-transparent gap-0 p-0">
+              <TabsTrigger value="main" className="rounded-none border-r h-full px-8 text-[10px] font-black uppercase data-[state=active]:bg-white">Ma'lumotlar</TabsTrigger>
+              <TabsTrigger value="perms" className="rounded-none border-r h-full px-8 text-[10px] font-black uppercase data-[state=active]:bg-white">Ruxsatlar</TabsTrigger>
+            </TabsList>
           </div>
-          <div className="text-[11px] font-black bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">KASSA №1</div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {cart.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm animate-in fade-in zoom-in duration-200">
-              <div className="flex-1">
-                <div className="text-[11px] font-black text-slate-700 uppercase leading-tight mb-1">{item.name}</div>
-                <div className="text-[10px] text-slate-400 font-bold">{item.price.toLocaleString()} UZS</div>
+          <TabsContent value="main" className="p-10 m-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label className="text-[10px] font-black text-slate-400 text-right uppercase">Familiya</Label>
+                  <Input className="col-span-2 h-10 text-xs bg-slate-50 border-slate-200" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label className="text-[10px] font-black text-slate-400 text-right uppercase">Ism</Label>
+                  <Input className="col-span-2 h-10 text-xs bg-slate-50 border-slate-200" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label className="text-[10px] font-black text-slate-400 text-right uppercase">Lavozim</Label>
+                  <Select value={formData.position} onValueChange={(v) => setFormData({...formData, position: v})}>
+                    <SelectTrigger className="col-span-2 h-10 text-xs bg-slate-50 border-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Menejer">Menejer</SelectItem>
+                      <SelectItem value="Sotuvchi">Sotuvchi</SelectItem>
+                      <SelectItem value="Kassir">Kassir</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
-                <button onClick={() => removeFromCart(item.id)} className="p-2 hover:bg-slate-200 transition-colors"><Minus className="w-3 h-3" /></button>
-                <span className="w-8 text-center text-xs font-black">{item.quantity}</span>
-                <button onClick={() => addToCart(item)} className="p-2 hover:bg-slate-200 transition-colors"><Plus className="w-3 h-3" /></button>
+
+              <div className="bg-[#f8faff] p-6 rounded-2xl border border-blue-50 space-y-4">
+                <h4 className="text-[10px] font-black text-blue-500 uppercase flex items-center gap-2 mb-2">
+                  <ShieldCheck className="w-4 h-4" /> Kirish ma'lumotlari
+                </h4>
+                <div className="space-y-4">
+                  <Input className="h-10 text-xs bg-white border-slate-200" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                  <div className="relative">
+                    <Input type={showPassword ? "text" : "password"} className="h-10 text-xs bg-white border-slate-200 pr-10" placeholder="Parol" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                    <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-300">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <Select value={formData.role} onValueChange={(v) => setFormData({...formData, role: v})}>
+                    <SelectTrigger className="h-10 text-xs bg-white border-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Admin">Super Admin</SelectItem>
+                      <SelectItem value="User">Sotuvchi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
+          </TabsContent>
+        </Tabs>
 
-        {/* TO'LOV QISMI */}
-        <div className="p-6 bg-white border-t-2 border-dashed border-slate-200 space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Jami:</span>
-            <span className="text-2xl font-black text-blue-600 tracking-tighter">{totalAmount.toLocaleString()} <span className="text-xs">UZS</span></span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button 
-              onClick={() => handleCheckout('naqd')}
-              disabled={cart.length === 0 || isProcessing}
-              className="h-16 bg-[#2a2f3b] hover:bg-[#1e222d] text-white flex flex-col gap-1 rounded-2xl shadow-xl transition-all active:translate-y-1"
-            >
-              <Banknote className="w-5 h-5" />
-              <span className="text-[9px] font-black uppercase">Naqd Pul</span>
-            </Button>
-            <Button 
-              onClick={() => handleCheckout('karta')}
-              disabled={cart.length === 0 || isProcessing}
-              className="h-16 bg-blue-600 hover:bg-blue-700 text-white flex flex-col gap-1 rounded-2xl shadow-xl transition-all active:translate-y-1"
-            >
-              <CreditCard className="w-5 h-5" />
-              <span className="text-[9px] font-black uppercase">Plastik</span>
-            </Button>
-          </div>
-
-          <Button variant="ghost" className="w-full text-slate-400 text-[10px] font-bold uppercase tracking-widest hover:text-red-500">
-            <Trash2 className="w-3 h-3 mr-2" /> Savatni tozalash
+        <div className="bg-[#f0f2f5] p-6 border-t border-slate-300 flex justify-end gap-4 px-10">
+          <Button variant="outline" className="h-10 px-8 text-[10px] font-black border-slate-300 uppercase tracking-widest">Bekor qilish</Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            className="h-10 px-12 text-[10px] font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xl uppercase tracking-widest transition-all"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <span className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Saqlash</span>}
           </Button>
         </div>
       </div>
