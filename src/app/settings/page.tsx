@@ -33,6 +33,7 @@ import {
   getDocs,
   deleteDoc,
   writeBatch,
+  serverTimestamp,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -76,7 +77,6 @@ export default function SettingsPage() {
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         
-        // Header: 1 orqali barcha qatorlarni massiv sifatida olamiz
         const data = XLSX.utils.sheet_to_json(sheet);
         setExcelData(data);
         
@@ -98,7 +98,7 @@ export default function SettingsPage() {
       const batch = writeBatch(db);
       
       excelData.forEach((item: any) => {
-        // Ruscha va o'zbekcha ustun nomlarini tekshirish mantiqi
+        // Ustun nomlarini qidirish (Kichik harflarga o'girib solishtiradi)
         const findVal = (keys: string[]) => {
           const foundKey = Object.keys(item).find(k => 
             keys.includes(k.trim().toLowerCase())
@@ -106,14 +106,15 @@ export default function SettingsPage() {
           return foundKey ? item[foundKey] : null;
         };
 
-        const productId = findVal(["sku", "артикул", "kod"]) || Math.random().toString(36).substr(2, 9);
-        const docRef = doc(db, "products", String(productId));
+        // ID har doim String bo'lishi shart
+        const skuVal = findVal(["sku", "артикул", "kod"]);
+        const productId = skuVal ? String(skuVal) : Math.random().toString(36).substr(2, 9);
+        const docRef = doc(db, "products", productId);
 
         batch.set(docRef, {
-          id: String(productId),
-          // Ruscha "наименование" yoki "название" bo'lsa ham o'qiydi
+          id: productId,
           name: findVal(["nomi", "name", "наименование", "название", "товар"]) || "Nomsiz mahsulot",
-          sku: String(productId),
+          sku: productId,
           unit: findVal(["birligi", "unit", "ед.изм", "ед.изм."]) || "dona",
           stock: Number(findVal(["qoldiq", "stock", "количество", "остаток"])) || 0,
           salePrice: Number(findVal(["narxi", "price", "цена", "стоимость"])) || 0,
@@ -128,7 +129,11 @@ export default function SettingsPage() {
       setExcelData([]);
     } catch (err: any) {
       console.error(err);
-      toast({ variant: "destructive", title: "Xatolik", description: "Bazaga yozib bo'lmadi: " + err.message });
+      toast({ 
+        variant: "destructive", 
+        title: "Xatolik", 
+        description: "Bazaga yozib bo'lmadi. Ruxsatlarni yoki faylni tekshiring." 
+      });
     } finally {
       setImporting(false);
     }
@@ -249,7 +254,7 @@ export default function SettingsPage() {
                     <input type="file" accept=".xlsx" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                     <Upload className="w-10 h-10 text-slate-400 mb-2" />
                     <span className="text-sm font-medium text-slate-600">
-                      {excelData.length > 0 ? `${excelData.length} ta tavar tanlandi` : "Faylni tanlang"}
+                      {excelData.length > 0 ? `${excelData.length} ta tovar tanlandi` : "Faylni tanlang"}
                     </span>
                   </div>
                   <Button onClick={handleBulkImport} disabled={importing || excelData.length === 0} className="w-full h-12 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold">
@@ -263,7 +268,7 @@ export default function SettingsPage() {
                 <CardHeader className="p-8">
                   <CardTitle className="text-xl font-bold text-rose-600 flex items-center gap-2">
                     <Trash2 className="w-5 h-5" />
-                    Bazanani tozalash
+                    Bazani tozalash
                   </CardTitle>
                   <CardDescription>Barcha ma'lumotlarni o'chirib yuborish</CardDescription>
                 </CardHeader>
