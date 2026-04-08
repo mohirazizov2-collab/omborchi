@@ -20,7 +20,6 @@ import {
   Upload,
   FileSpreadsheet,
   Download,
-  KeyRound,
   ShieldCheck,
   Eye,
   EyeOff,
@@ -57,9 +56,11 @@ export default function SettingsPage() {
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState(""); // QO'SHILDI: Tasdiqlash uchun
   const [showCurrentPwd, setShowCurrentPwd] = useState(false);
   const [pwdLoading, setPwdLoading] = useState(false);
 
+  // ─── EXCEL HANDLERS ──────────────────────────────────────────────────────────
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -68,6 +69,7 @@ export default function SettingsPage() {
     reader.onload = (event) => {
       try {
         const bstr = event.target?.result;
+        // codepage: 1251 Kirill shriftlari uchun juda muhim
         const workbook = XLSX.read(bstr, { type: "binary", codepage: 1251 });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
@@ -95,6 +97,7 @@ export default function SettingsPage() {
         };
 
         const skuVal = findVal(["sku", "артикул", "kod"]);
+        // ID ni stringga o'girish (Firestore talabi)
         const productId = skuVal ? String(skuVal) : Math.random().toString(36).substr(2, 9);
         const docRef = doc(db, "products", productId);
 
@@ -106,7 +109,7 @@ export default function SettingsPage() {
           stock: Number(findVal(["qoldiq", "stock", "количество", "остаток"])) || 0,
           salePrice: Number(findVal(["narxi", "price", "цена", "стоимость"])) || 0,
           isDeleted: false,
-          createdAt: serverTimestamp(),
+          createdAt: serverTimestamp(), // To'g'ri Firestore vaqti
           updatedAt: serverTimestamp(),
         }, { merge: true });
       });
@@ -114,15 +117,30 @@ export default function SettingsPage() {
       await batch.commit();
       toast({ title: "Muvaffaqiyatli ✅", description: "Ma'lumotlar yuklandi." });
       setExcelData([]);
-    } catch (err) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Bazaga yozishda xato. Ruxsatlarni tekshiring." });
+    } catch (err: any) {
+      console.error(err);
+      toast({ 
+        variant: "destructive", 
+        title: "Xatolik", 
+        description: err.message.includes("permission") 
+          ? "Ruxsat yo'q! Firebase Rules-ni tekshiring." 
+          : "Bazaga yozishda xato yuz berdi." 
+      });
     } finally {
       setImporting(false);
     }
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword) return;
+    if (!currentPassword || !newPassword) {
+      toast({ variant: "destructive", title: "Xato", description: "Barcha maydonlarni to'ldiring." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ variant: "destructive", title: "Xato", description: "Yangi parollar bir-biriga mos kelmadi." });
+      return;
+    }
+
     const user = auth.currentUser;
     if (!user?.email) return;
     setPwdLoading(true);
@@ -130,9 +148,9 @@ export default function SettingsPage() {
       const cred = EmailAuthProvider.credential(user.email, currentPassword);
       await reauthenticateWithCredential(user, cred);
       await updatePassword(user, newPassword);
-      toast({ title: "Yangilandi", description: "Parol o'zgartirildi." });
-      setCurrentPassword(""); setNewPassword("");
-    } catch (err) {
+      toast({ title: "Yangilandi", description: "Parol muvaffaqiyatli o'zgartirildi." });
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+    } catch (err: any) {
       toast({ variant: "destructive", title: "Xato", description: "Eski parol noto'g'ri." });
     } finally {
       setPwdLoading(false);
@@ -140,11 +158,15 @@ export default function SettingsPage() {
   };
 
   const handleClearAllData = async () => {
-    if (!db || !confirm("Barcha mahsulotlarni o'chirishni tasdiqlaysizmi?")) return;
+    if (!db || !confirm("DIQQAT! Barcha mahsulotlarni o'chirib yubormoqchisiz. Tasdiqlaysizmi?")) return;
     setClearing(true);
     try {
       const snap = await getDocs(collection(db, "products"));
-      for (const d of snap.docs) await deleteDoc(doc(db, "products", d.id));
+      // Batch o'chirish kattaroq bazalar uchun xavfsizroq
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      
       toast({ title: "Tozalandi", description: "Barcha mahsulotlar o'chirildi." });
     } catch (err) {
       toast({ variant: "destructive", title: "Xato", description: "O'chirishda xatolik." });
@@ -166,8 +188,8 @@ export default function SettingsPage() {
 
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="bg-white border p-1 rounded-xl mb-8">
-            <TabsTrigger value="general" className="px-6">UMUMIY</TabsTrigger>
-            <TabsTrigger value="data" className="px-6">IMPORT</TabsTrigger>
+            <TabsTrigger value="general" className="px-6 font-semibold">UMUMIY</TabsTrigger>
+            <TabsTrigger value="data" className="px-6 font-semibold">IMPORT</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general">
@@ -176,7 +198,7 @@ export default function SettingsPage() {
                 <CardTitle className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-blue-500" /> Xavfsizlik
                 </CardTitle>
-                <CardDescription>Parolni yangilash</CardDescription>
+                <CardDescription>Profil parolini yangilash</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -188,7 +210,7 @@ export default function SettingsPage() {
                       onChange={(e) => setCurrentPassword(e.target.value)} 
                     />
                     <button onClick={() => setShowCurrentPwd(!showCurrentPwd)} className="absolute right-3 top-3">
-                      {showCurrentPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showCurrentPwd ? <EyeOff className="w-4 h-4 text-slate-500" /> : <Eye className="w-4 h-4 text-slate-500" />}
                     </button>
                   </div>
                 </div>
@@ -196,8 +218,12 @@ export default function SettingsPage() {
                   <Label>Yangi parol</Label>
                   <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                 </div>
-                <Button onClick={handleChangePassword} disabled={pwdLoading} className="w-full bg-blue-600">
-                  {pwdLoading ? <Loader2 className="animate-spin" /> : "SAQLASH"}
+                <div className="space-y-2">
+                  <Label>Yangi parolni tasdiqlang</Label>
+                  <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                </div>
+                <Button onClick={handleChangePassword} disabled={pwdLoading} className="w-full bg-blue-600 hover:bg-blue-700">
+                  {pwdLoading ? <Loader2 className="animate-spin" /> : "PAROLNI SAQLASH"}
                 </Button>
               </CardContent>
             </Card>
@@ -212,25 +238,25 @@ export default function SettingsPage() {
                 <CardDescription>Excel (Ruscha/Kirill qo'llab-quvvatlanadi)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center hover:bg-slate-50">
+                <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center hover:bg-slate-50 transition-all">
                   <input type="file" accept=".xlsx" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                   <Upload className="w-10 h-10 text-slate-400 mb-2" />
-                  <span className="text-sm text-slate-600">
-                    {excelData.length > 0 ? `${excelData.length} ta tovar tanlandi` : "Faylni tanlang"}
+                  <span className="text-sm text-slate-600 text-center">
+                    {excelData.length > 0 ? `${excelData.length} ta tovar tanlandi` : "Excel faylni yuklang (.xlsx)"}
                   </span>
                 </div>
-                <Button onClick={handleBulkImport} disabled={importing || excelData.length === 0} className="w-full h-12 bg-blue-500 font-bold">
+                <Button onClick={handleBulkImport} disabled={importing || excelData.length === 0} className="w-full h-12 bg-blue-500 hover:bg-blue-600 font-bold">
                   {importing ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />} IMPORTNI BOSHLASH
                 </Button>
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm rounded-3xl">
+            <Card className="border-none shadow-sm rounded-3xl border-rose-100">
               <CardHeader>
                 <CardTitle className="text-rose-600 flex items-center gap-2">
                   <Trash2 className="w-5 h-5" /> Bazani tozalash
                 </CardTitle>
-                <CardDescription>Barcha ma'lumotlarni o'chirish</CardDescription>
+                <CardDescription>Barcha mahsulotlarni butunlay o'chirib tashlash</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button variant="destructive" onClick={handleClearAllData} disabled={clearing} className="w-full h-12 font-bold">
