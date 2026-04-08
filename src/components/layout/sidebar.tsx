@@ -17,7 +17,6 @@ import {
   FileOutput,
   FileText,
   Globe,
-  ChevronDown,
   WalletCards,
   Coins,
   FlaskConical,
@@ -348,3 +347,4 @@ export function OmniSidebar() {
       </div>
     </>
   );
+}
