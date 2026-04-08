@@ -71,11 +71,15 @@ export default function SettingsPage() {
     reader.onload = (event) => {
       try {
         const bstr = event.target?.result;
-        const workbook = XLSX.read(bstr, { type: "binary" });
+        // Ruscha harflarni to'g'ri o'qish uchun codepage: 1251 qo'shildi
+        const workbook = XLSX.read(bstr, { type: "binary", codepage: 1251 });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
+        
+        // Header: 1 orqali barcha qatorlarni massiv sifatida olamiz
         const data = XLSX.utils.sheet_to_json(sheet);
         setExcelData(data);
+        
         toast({ 
           title: "Fayl o'qildi", 
           description: `${data.length} ta mahsulot yuklashga tayyor.` 
@@ -92,26 +96,39 @@ export default function SettingsPage() {
     setImporting(true);
     try {
       const batch = writeBatch(db);
+      
       excelData.forEach((item: any) => {
-        const productId = item.sku || item.artikul || Math.random().toString(36).substr(2, 9);
-        const docRef = doc(db, "products", productId);
+        // Ruscha va o'zbekcha ustun nomlarini tekshirish mantiqi
+        const findVal = (keys: string[]) => {
+          const foundKey = Object.keys(item).find(k => 
+            keys.includes(k.trim().toLowerCase())
+          );
+          return foundKey ? item[foundKey] : null;
+        };
+
+        const productId = findVal(["sku", "артикул", "kod"]) || Math.random().toString(36).substr(2, 9);
+        const docRef = doc(db, "products", String(productId));
+
         batch.set(docRef, {
-          id: productId,
-          name: item.nomi || item.name || "Nomsiz mahsulot",
-          sku: productId,
-          unit: item.birligi || "dona",
-          stock: Number(item.qoldiq) || 0,
-          salePrice: Number(item.narxi) || 0,
+          id: String(productId),
+          // Ruscha "наименование" yoki "название" bo'lsa ham o'qiydi
+          name: findVal(["nomi", "name", "наименование", "название", "товар"]) || "Nomsiz mahsulot",
+          sku: String(productId),
+          unit: findVal(["birligi", "unit", "ед.изм", "ед.изм."]) || "dona",
+          stock: Number(findVal(["qoldiq", "stock", "количество", "остаток"])) || 0,
+          salePrice: Number(findVal(["narxi", "price", "цена", "стоимость"])) || 0,
           isDeleted: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       });
+
       await batch.commit();
       toast({ title: "Muvaffaqiyatli ✅", description: "Ma'lumotlar yuklandi." });
       setExcelData([]);
-    } catch (err) {
-      toast({ variant: "destructive", title: "Xatolik", description: "Bazaga yozib bo'lmadi." });
+    } catch (err: any) {
+      console.error(err);
+      toast({ variant: "destructive", title: "Xatolik", description: "Bazaga yozib bo'lmadi: " + err.message });
     } finally {
       setImporting(false);
     }
@@ -175,7 +192,6 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* TAB 1 — UMUMIY */}
           <TabsContent value="general" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
@@ -218,7 +234,6 @@ export default function SettingsPage() {
             </div>
           </TabsContent>
 
-          {/* TAB 2 — DATA IMPORT */}
           <TabsContent value="data" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
