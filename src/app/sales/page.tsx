@@ -36,8 +36,6 @@ import {
   serverTimestamp,
   runTransaction,
   increment,
-  orderBy,
-  query,
   deleteDoc,
   writeBatch,
 } from "firebase/firestore";
@@ -113,12 +111,8 @@ export default function SalesPage() {
   const [quantity, setQuantity] = useState(1);
   const [formData, setFormData] = useState<FormData>(defaultForm);
  
-  // Sotuvlarni yangi→eski tartibda olish
   const salesQuery = useMemoFirebase(
-    () =>
-      db
-        ? query(collection(db, "sales"), orderBy("createdAt", "desc"))
-        : null,
+    () => (db ? collection(db, "sales") : null),
     [db]
   );
   const staffQuery = useMemoFirebase(
@@ -699,4 +693,3 @@ export default function SalesPage() {
       </main>
     </div>
   );
-}
