@@ -1,5 +1,5 @@
 "use client";
- 
+
 import { useState } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import {
@@ -43,20 +43,20 @@ import {
   EmailAuthProvider,
 } from "firebase/auth";
 import * as XLSX from "xlsx";
- 
+
 // ─── O'LCHOV BIRLIKLARI ───────────────────────────────────────────────────────
 const UNIT_OPTIONS = [
   "dona", "kg", "gramm", "litr",
   "metr", "sm", "quti", "paket", "м²",
 ];
- 
+
 const CURRENCY_OPTIONS = [
   { label: "so'm (UZS)", value: "so'm" },
   { label: "dollar ($)",  value: "$"     },
   { label: "euro (€)",    value: "€"     },
   { label: "rubl (₽)",    value: "₽"     },
 ];
- 
+
 // Excel ustun nomlarini tanish uchun map
 const KNOWN_COLS: Record<string, string[]> = {
   nomi:      ["nomi", "name", "наименование", "название", "товар", "mahsulot"],
@@ -65,7 +65,7 @@ const KNOWN_COLS: Record<string, string[]> = {
   stock:     ["qoldiq", "stock", "количество", "остаток", "miqdor", "soni"],
   salePrice: ["narxi", "price", "цена", "стоимость", "narx", "summa"],
 };
- 
+
 function matchColumns(headers: string[]) {
   const matched: Record<string, string> = {};
   Object.entries(KNOWN_COLS).forEach(([field, keys]) => {
@@ -74,7 +74,7 @@ function matchColumns(headers: string[]) {
   });
   return matched;
 }
- 
+
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { t } = useLanguage();
@@ -82,7 +82,7 @@ export default function SettingsPage() {
   const { role } = useUser();
   const db = useFirestore();
   const auth = getAuth();
- 
+
   // --- Import state ---
   const [importing, setImporting] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -91,37 +91,37 @@ export default function SettingsPage() {
   const [fileName, setFileName] = useState("");
   const [fileSize, setFileSize] = useState("");
   const [importDone, setImportDone] = useState(false);
- 
+
   // --- Unit & currency ---
   const [selectedUnit, setSelectedUnit] = useState("dona");
   const [customUnit, setCustomUnit] = useState("");
   const [currency, setCurrency] = useState("so'm");
   const [defaultPrice, setDefaultPrice] = useState<number>(0);
- 
+
   // --- Password state ---
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPwd, setShowCurrentPwd] = useState(false);
   const [pwdLoading, setPwdLoading] = useState(false);
- 
+
   const activeUnit = customUnit.trim() || selectedUnit;
   const matchedCols = matchColumns(headers);
   const hasUnitCol = !!matchedCols.unit;
- 
+
   // ─── EXCEL HANDLERS ────────────────────────────────────────────────────────
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     readFile(file);
   };
- 
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) readFile(file);
   };
- 
+
   const readFile = (file: File) => {
     setImportDone(false);
     const reader = new FileReader();
@@ -144,13 +144,13 @@ export default function SettingsPage() {
     };
     reader.readAsBinaryString(file);
   };
- 
+
   const handleBulkImport = async () => {
     if (!db || excelData.length === 0) return;
     setImporting(true);
     try {
       const batch = writeBatch(db);
- 
+
       excelData.forEach((item: any) => {
         const findVal = (keys: string[]) => {
           const foundKey = Object.keys(item).find((k) =>
@@ -158,16 +158,16 @@ export default function SettingsPage() {
           );
           return foundKey ? item[foundKey] : null;
         };
- 
+
         const skuVal = findVal(["sku", "артикул", "kod"]);
         const productId = skuVal
           ? String(skuVal)
           : Math.random().toString(36).substr(2, 9);
         const docRef = doc(db, "products", productId);
- 
+
         // Birlik: excel'dan ol, yo'q bo'lsa tanlangan birlikni ishlataki
         const unitFromExcel = findVal(["birligi", "unit", "ед.изм", "ед.изм.", "birlik"]);
- 
+
         batch.set(
           docRef,
           {
@@ -191,7 +191,7 @@ export default function SettingsPage() {
           { merge: true }
         );
       });
- 
+
       await batch.commit();
       setImportDone(true);
       toast({
@@ -211,14 +211,14 @@ export default function SettingsPage() {
       setImporting(false);
     }
   };
- 
+
   const clearImport = () => {
     setExcelData([]);
     setHeaders([]);
     setFileName("");
     setFileSize("");
   };
- 
+
   // ─── PASSWORD ──────────────────────────────────────────────────────────────
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword) {
@@ -244,7 +244,7 @@ export default function SettingsPage() {
       setPwdLoading(false);
     }
   };
- 
+
   // ─── CLEAR ALL ─────────────────────────────────────────────────────────────
   const handleClearAllData = async () => {
     if (!db || !confirm("DIQQAT! Barcha mahsulotlarni o'chirib yubormoqchisiz. Tasdiqlaysizmi?")) return;
@@ -261,7 +261,7 @@ export default function SettingsPage() {
       setClearing(false);
     }
   };
- 
+
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
@@ -273,13 +273,13 @@ export default function SettingsPage() {
           </div>
           <h1 className="text-3xl font-bold text-slate-900">Tizim sozlamalari</h1>
         </header>
- 
+
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="bg-white border p-1 rounded-xl mb-8">
             <TabsTrigger value="general" className="px-6 font-semibold">UMUMIY</TabsTrigger>
             <TabsTrigger value="data"    className="px-6 font-semibold">IMPORT</TabsTrigger>
           </TabsList>
- 
+
           {/* ── UMUMIY TAB ── */}
           <TabsContent value="general">
             <Card className="max-w-md border-none shadow-sm rounded-3xl">
@@ -326,10 +326,10 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
- 
+
           {/* ── IMPORT TAB ── */}
           <TabsContent value="data" className="grid grid-cols-1 md:grid-cols-2 gap-6">
- 
+
             {/* ── IMPORT CARD ── */}
             <Card className="border-none shadow-sm rounded-3xl">
               <CardHeader>
@@ -339,7 +339,7 @@ export default function SettingsPage() {
                 <CardDescription>Excel (Ruscha/Kirill qo'llab-quvvatlanadi)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
- 
+
                 {/* 1-qadam: O'lchov birligi */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -372,7 +372,7 @@ export default function SettingsPage() {
                     {" "}— Excel'da birlik ustuni bo'lmasa shu ishlatiladi
                   </p>
                 </div>
- 
+
                 {/* 2-qadam: Narx formati */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -404,13 +404,13 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
- 
+
                 {/* 3-qadam: Fayl yuklash */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     3-qadam — Fayl yuklang
                   </Label>
- 
+
                   {fileName ? (
                     <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
                       <FileSpreadsheet className="w-5 h-5 text-green-500 shrink-0" />
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                       <p className="text-xs text-slate-400 mt-1">.xlsx · .xls · .csv</p>
                     </div>
                   )}
- 
+
                   {/* Ustunlar ko'rinishi */}
                   {headers.length > 0 && (
                     <div className="space-y-1">
@@ -474,7 +474,7 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
- 
+
                 {/* Muvaffaqiyat xabari */}
                 {importDone && (
                   <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
@@ -484,7 +484,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 )}
- 
+
                 <Button
                   onClick={handleBulkImport}
                   disabled={importing || excelData.length === 0}
@@ -499,7 +499,7 @@ export default function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
- 
+
             {/* ── CLEAR CARD ── */}
             <Card className="border-none shadow-sm rounded-3xl border-rose-100">
               <CardHeader>
@@ -521,9 +521,10 @@ export default function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
- 
+
           </TabsContent>
         </Tabs>
       </main>
     </div>
   );
+}
