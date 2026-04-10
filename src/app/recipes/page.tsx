@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
  
@@ -35,7 +35,7 @@ const genId = () => Math.random().toString(36).slice(2, 11);
 type Component = { id: string; productId: string; quantity: number; unit: string };
 type FormMode = "create" | "edit";
  
-// ─── Animation presets (GPU-only: transform + opacity) ───────────────────────
+// ─── Animation presets ───────────────────────────────────────────────────────
 const SPRING = { type: "spring", stiffness: 380, damping: 34, mass: 0.65 } as const;
 const CARD_VARIANTS = {
   initial: { opacity: 0, transform: "translateY(10px) scale(0.98)" },
@@ -43,26 +43,18 @@ const CARD_VARIANTS = {
   exit:    { opacity: 0, transform: "translateY(-6px) scale(0.97)" },
 };
  
-// ─── Empty component factory ──────────────────────────────────────────────────
 const emptyComponent = (): Component => ({ id: genId(), productId: "", quantity: 1, unit: "kg" });
- 
-// ─── Default form state ───────────────────────────────────────────────────────
-const defaultForm = () => ({
-  name: "",
-  mainUnit: "m2",
-  components: [emptyComponent()],
-});
+const defaultForm = () => ({ name: "", mainUnit: "m2", components: [emptyComponent()] });
  
 export default function RecipesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role } = useUser();
+  const { role } = useUser();
   const prefersReduced = useReducedMotion();
  
   const canEdit = role === "Super Admin" || role === "Admin";
  
-  // ─── State ────────────────────────────────────────────────────────────────
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("create");
@@ -78,7 +70,7 @@ export default function RecipesPage() {
   const recipesQ = useMemoFirebase(() => db ? collection(db, "recipes") : null, [db]);
   const { data: recipes, isLoading } = useCollection(recipesQ);
  
-  // ─── Component CRUD helpers ───────────────────────────────────────────────
+  // ─── Component helpers ────────────────────────────────────────────────────
   const addComponent = useCallback(() => {
     setFormData(p => ({ ...p, components: [...p.components, emptyComponent()] }));
   }, []);
@@ -90,7 +82,7 @@ export default function RecipesPage() {
     }));
   }, []);
  
-  const updateComponent = useCallback((id: string, field: keyof Component, value: any) => {
+  const updateComponent = useCallback((id: string, field: keyof Component, value: string | number) => {
     setFormData(p => ({
       ...p,
       components: p.components.map(c => c.id === id ? { ...c, [field]: value } : c),
@@ -104,7 +96,7 @@ export default function RecipesPage() {
     return formData.components.every(c => c.productId && c.quantity > 0);
   }, [formData]);
  
-  // ─── Open create dialog ───────────────────────────────────────────────────
+  // ─── Dialog open handlers ─────────────────────────────────────────────────
   const handleOpenCreate = useCallback(() => {
     setFormMode("create");
     setEditingId(null);
@@ -112,7 +104,6 @@ export default function RecipesPage() {
     setIsDialogOpen(true);
   }, []);
  
-  // ─── Open edit dialog ─────────────────────────────────────────────────────
   const handleOpenEdit = useCallback((recipe: any) => {
     setFormMode("edit");
     setEditingId(recipe.id);
@@ -129,7 +120,7 @@ export default function RecipesPage() {
     setIsDialogOpen(true);
   }, []);
  
-  // ─── Duplicate recipe ─────────────────────────────────────────────────────
+  // ─── Duplicate ────────────────────────────────────────────────────────────
   const handleDuplicate = useCallback(async (recipe: any) => {
     if (!db) return;
     const id = doc(collection(db, "recipes")).id;
@@ -139,14 +130,15 @@ export default function RecipesPage() {
         id,
         name: `${recipe.name} (nusxa)`,
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
       toast({ title: "Retsept nusxalandi" });
     } catch {
       toast({ variant: "destructive", title: "Xatolik yuz berdi" });
     }
-  }, [db]);
+  }, [db, toast]);
  
-  // ─── Save (create or update) ──────────────────────────────────────────────
+  // ─── Save ─────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!db || !formValid) {
       toast({ variant: "destructive", title: "Barcha maydonlarni to'ldiring" });
@@ -160,7 +152,9 @@ export default function RecipesPage() {
         name: formData.name.trim(),
         mainUnit: formData.mainUnit,
         components: formData.components.map(({ productId, quantity, unit }) => ({
-          productId, quantity: Number(quantity), unit,
+          productId,
+          quantity: Number(quantity),
+          unit,
         })),
         ...(formMode === "create" ? { createdAt: new Date().toISOString() } : {}),
         updatedAt: new Date().toISOString(),
@@ -174,9 +168,9 @@ export default function RecipesPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [db, formData, formMode, editingId, formValid]);
+  }, [db, formData, formMode, editingId, formValid, toast]);
  
-  // ─── Delete recipe ────────────────────────────────────────────────────────
+  // ─── Delete ───────────────────────────────────────────────────────────────
   const handleDelete = useCallback(async (id: string, name: string) => {
     if (!db || !confirm(`"${name}" retseptini o'chirishni tasdiqlaysizmi?`)) return;
     try {
@@ -185,7 +179,7 @@ export default function RecipesPage() {
     } catch {
       toast({ variant: "destructive", title: "Xatolik yuz berdi" });
     }
-  }, [db]);
+  }, [db, toast]);
  
   // ─── Filter ───────────────────────────────────────────────────────────────
   const filteredRecipes = useMemo(() => {
@@ -193,16 +187,19 @@ export default function RecipesPage() {
     return (recipes || []).filter(r => !q || r.name?.toLowerCase().includes(q));
   }, [recipes, searchQuery]);
  
-  // ─── Helpers ──────────────────────────────────────────────────────────────
   const getProductName = useCallback((id: string) =>
     products?.find(p => p.id === id)?.name || "Noma'lum mahsulot",
   [products]);
  
-  // Duplicate product check inside form
   const duplicateProductIds = useMemo(() => {
     const ids = formData.components.map(c => c.productId).filter(Boolean);
     return new Set(ids.filter((id, i) => ids.indexOf(id) !== i));
   }, [formData.components]);
+ 
+  const closeDialog = useCallback(() => {
+    setIsDialogOpen(false);
+    setFormData(defaultForm());
+  }, []);
  
   return (
     <div className="flex min-h-screen bg-background font-body">
@@ -233,7 +230,7 @@ export default function RecipesPage() {
                 className="h-9 px-5 text-xs font-black rounded-xl gap-1.5 bg-primary text-white border-none shadow-lg shadow-primary/20"
                 onClick={handleOpenCreate}
               >
-                <Plus className="w-3.5 h-3.5" /> Retsept qo'shish
+                <Plus className="w-3.5 h-3.5" /> Retsept qo&apos;shish
               </Button>
             )}
           </div>
@@ -261,7 +258,7 @@ export default function RecipesPage() {
           </div>
         </div>
  
-        {/* ── Recipe Cards Grid ── */}
+        {/* ── Grid ── */}
         <div className="flex-1 overflow-auto p-8" style={{ contain: "strict" }}>
           {isLoading ? (
             <div className="flex justify-center py-24">
@@ -279,7 +276,7 @@ export default function RecipesPage() {
                   className="mt-4 h-8 px-4 text-xs font-black rounded-xl gap-1.5 bg-primary text-white border-none opacity-60 hover:opacity-100"
                   onClick={handleOpenCreate}
                 >
-                  <Plus className="w-3.5 h-3.5" /> Retsept qo'shish
+                  <Plus className="w-3.5 h-3.5" /> Retsept qo&apos;shish
                 </Button>
               )}
             </div>
@@ -288,7 +285,6 @@ export default function RecipesPage() {
               className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
               initial="initial"
               animate="animate"
-              style={{ willChange: "auto" }}
             >
               <AnimatePresence mode="popLayout">
                 {filteredRecipes.map((recipe: any, idx) => {
@@ -341,14 +337,13 @@ export default function RecipesPage() {
                                   className="text-rose-500 font-bold gap-2 cursor-pointer"
                                   onClick={() => handleDelete(recipe.id, recipe.name)}
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" /> O'chirish
+                                  <Trash2 className="w-3.5 h-3.5" /> O&apos;chirish
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
                         </div>
  
-                        {/* Component summary */}
                         <div className="mt-3 flex items-center gap-2">
                           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-bold">
                             <Layers className="w-3 h-3" />
@@ -361,13 +356,13 @@ export default function RecipesPage() {
                             {isExpanded ? (
                               <><ChevronUp className="w-3 h-3" /> Yopish</>
                             ) : (
-                              <><ChevronDown className="w-3 h-3" /> Ko'rish</>
+                              <><ChevronDown className="w-3 h-3" /> Ko&apos;rish</>
                             )}
                           </button>
                         </div>
                       </div>
  
-                      {/* Expandable component list */}
+                      {/* Expandable list */}
                       <AnimatePresence>
                         {isExpanded && (
                           <motion.div
@@ -402,11 +397,10 @@ export default function RecipesPage() {
           )}
         </div>
  
-        {/* ── Create / Edit Dialog ── */}
-        <Dialog open={isDialogOpen} onOpenChange={open => { if (!open) { setIsDialogOpen(false); setFormData(defaultForm()); } }}>
+        {/* ── Dialog ── */}
+        <Dialog open={isDialogOpen} onOpenChange={open => { if (!open) closeDialog(); }}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/50 backdrop-blur-3xl text-foreground max-w-2xl p-0 shadow-2xl overflow-hidden">
-            
-            {/* Dialog Header */}
+ 
             <div className="px-8 py-6 border-b border-border/20 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 <Settings2 className="w-5 h-5" />
@@ -416,9 +410,8 @@ export default function RecipesPage() {
               </DialogTitle>
             </div>
  
-            {/* Dialog Body */}
             <div className="px-8 py-6 space-y-5 max-h-[65vh] overflow-y-auto">
-              {/* Name + Unit row */}
+              {/* Name + Unit */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -454,9 +447,11 @@ export default function RecipesPage() {
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Tarkibiy mahsulotlar *
                   </Label>
-                  <Button variant="ghost" size="sm" onClick={addComponent}
-                    className="h-7 px-3 text-[10px] font-black text-primary gap-1 rounded-lg">
-                    <Plus className="w-3 h-3" /> Qo'shish
+                  <Button
+                    variant="ghost" size="sm" onClick={addComponent}
+                    className="h-7 px-3 text-[10px] font-black text-primary gap-1 rounded-lg"
+                  >
+                    <Plus className="w-3 h-3" /> Qo&apos;shish
                   </Button>
                 </div>
  
@@ -474,15 +469,13 @@ export default function RecipesPage() {
                         style={{ willChange: "transform, opacity" }}
                         className={cn(
                           "flex gap-2 items-center p-3 rounded-xl border transition-colors duration-100",
-                          isDuplicate
-                            ? "bg-amber-500/5 border-amber-500/20"
-                            : "bg-muted/20 border-border/10"
+                          isDuplicate ? "bg-amber-500/5 border-amber-500/20" : "bg-muted/20 border-border/10"
                         )}
                       >
-                        {/* Row number */}
-                        <span className="text-[10px] font-black text-muted-foreground/40 w-4 shrink-0 text-center">{idx + 1}</span>
+                        <span className="text-[10px] font-black text-muted-foreground/40 w-4 shrink-0 text-center">
+                          {idx + 1}
+                        </span>
  
-                        {/* Product select */}
                         <Select
                           value={comp.productId}
                           onValueChange={v => updateComponent(comp.id, "productId", v)}
@@ -497,7 +490,6 @@ export default function RecipesPage() {
                           </SelectContent>
                         </Select>
  
-                        {/* Quantity */}
                         <Input
                           type="number"
                           min={0.001}
@@ -507,7 +499,6 @@ export default function RecipesPage() {
                           onChange={e => updateComponent(comp.id, "quantity", parseFloat(e.target.value) || 0)}
                         />
  
-                        {/* Unit */}
                         <Select value={comp.unit} onValueChange={v => updateComponent(comp.id, "unit", v)}>
                           <SelectTrigger className="h-9 w-24 rounded-lg bg-background/70 border-border/30 font-bold text-xs text-primary">
                             <SelectValue />
@@ -519,12 +510,13 @@ export default function RecipesPage() {
                           </SelectContent>
                         </Select>
  
-                        {/* Duplicate warning */}
                         {isDuplicate && (
-                          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" title="Bu mahsulot allaqachon qo'shilgan" />
+                          <AlertCircle
+                            className="w-4 h-4 text-amber-500 shrink-0"
+                            title="Bu mahsulot allaqachon qo'shilgan"
+                          />
                         )}
  
-                        {/* Remove */}
                         <Button
                           variant="ghost" size="icon"
                           className="h-9 w-9 rounded-lg text-rose-500 hover:bg-rose-500/10 shrink-0"
@@ -538,22 +530,20 @@ export default function RecipesPage() {
                   })}
                 </AnimatePresence>
  
-                {/* Duplicate warning message */}
                 {duplicateProductIds.size > 0 && (
                   <p className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5">
                     <AlertCircle className="w-3 h-3" />
-                    Bir xil mahsulot bir necha marta qo'shilgan. Birlashtiring.
+                    Bir xil mahsulot bir necha marta qo&apos;shilgan. Birlashtiring.
                   </p>
                 )}
               </div>
             </div>
  
-            {/* Dialog Footer */}
             <DialogFooter className="px-8 pb-6 gap-2 border-t border-border/10 pt-4">
               <Button
                 variant="ghost"
                 className="h-10 rounded-xl font-bold px-5"
-                onClick={() => { setIsDialogOpen(false); setFormData(defaultForm()); }}
+                onClick={closeDialog}
               >
                 <X className="w-3.5 h-3.5 mr-1.5" /> Bekor qilish
               </Button>
@@ -562,7 +552,10 @@ export default function RecipesPage() {
                 onClick={handleSave}
                 disabled={isSaving || !formValid}
               >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                {isSaving
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <CheckCircle2 className="w-3.5 h-3.5" />
+                }
                 {formMode === "edit" ? "Saqlash" : "Yaratish"}
               </Button>
             </DialogFooter>
