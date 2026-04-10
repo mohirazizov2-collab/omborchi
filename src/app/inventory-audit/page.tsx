@@ -1,12 +1,9 @@
 "use client";
  
-import { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,7 +24,6 @@ import {
   Barcode,
   Plus,
   Copy,
-  FolderOpen,
   RefreshCw,
   FileSpreadsheet,
   ChevronDown,
@@ -39,15 +35,13 @@ import {
   Edit2,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import {
-  collection,
-  doc,
-  query,
-  where,
-  getDocs,
-  orderBy,
-} from "firebase/firestore";
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  useUser,
+} from "@/firebase";
+import { collection, doc, query, where, getDocs } from "firebase/firestore";
 import {
   addDocumentNonBlocking,
   updateDocumentNonBlocking,
@@ -87,8 +81,6 @@ interface AuditLog {
  
 type FilterType = "all" | "completed" | "draft" | "surplus" | "deficit";
 type SortCol = "date" | "num" | "surplus" | "deficit";
- 
-// Form mode: "new" = yangi audit, "edit" = mavjudni tahrirlash
 type FormMode = "new" | "edit";
  
 // ─── Yordamchi funksiyalar ─────────────────────────────────────────────────────
@@ -109,10 +101,8 @@ export default function InventoryAuditPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const router = useRouter();
   const { user, role, isUserLoading, assignedWarehouseId } = useUser();
  
-  // Sahifa holati
   const [view, setView] = useState<"list" | "form">("list");
   const [formMode, setFormMode] = useState<FormMode>("new");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
@@ -259,21 +249,25 @@ export default function InventoryAuditPage() {
     if (!products || !selectedWarehouseId) return [];
     let list = products.map((p) => {
       const inv = inventory?.find(
-        (i) => i.warehouseId === selectedWarehouseId && i.productId === p.id
+        (i) =>
+          (i as any).warehouseId === selectedWarehouseId &&
+          (i as any).productId === p.id
       );
-      return { ...p, warehouseStock: inv?.stock ?? 0 };
+      return { ...p, warehouseStock: (inv as any)?.stock ?? 0 };
     });
     if (formSearch) {
       const q = formSearch.toLowerCase();
       list = list.filter(
         (p) =>
-          p.name?.toLowerCase().includes(q) ||
-          p.sku?.toLowerCase().includes(q) ||
-          p.barcode?.includes(formSearch)
+          (p as any).name?.toLowerCase().includes(q) ||
+          (p as any).sku?.toLowerCase().includes(q) ||
+          (p as any).barcode?.includes(formSearch)
       );
     }
     if (showZeroOnly)
-      list = list.filter((p) => (auditData[p.id] ?? p.warehouseStock) === 0);
+      list = list.filter(
+        (p) => (auditData[p.id] ?? (p as any).warehouseStock) === 0
+      );
     return list;
   }, [
     products,
@@ -284,9 +278,18 @@ export default function InventoryAuditPage() {
     auditData,
   ]);
  
-  // ─────────────────────────────────────────────────────────────────────────────
-  // ASOSIY SUBMIT: Yangi yaratish YOKI mavjudni yangilash
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── Form reset ──
+  const resetForm = () => {
+    setAuditData({});
+    setAuditNumber(generateAuditNumber());
+    setAuditDate(new Date().toISOString().slice(0, 16));
+    setFormMode("new");
+    setEditingLogId(null);
+    setSelectedWarehouseId(assignedWarehouseId || "");
+    setFormSearch("");
+  };
+ 
+  // ── Asosiy Submit ──
   const handleSubmitAudit = async () => {
     if (!db || !user || !selectedWarehouseId) return;
     if (Object.keys(auditData).length === 0) {
@@ -305,17 +308,18 @@ export default function InventoryAuditPage() {
         surplusSum = 0,
         deficitSum = 0;
  
-      // Kitobiy stock — edit rejimida yangilanayotgan vaqtda ham to'g'ri hisoblash uchun
-      // inventory dan olamiz (forma yuklanganida olingan qiymat)
       const items: AuditLogItem[] = Object.entries(auditData).map(
         ([productId, actualCount]) => {
           const product = products?.find((p) => p.id === productId);
           const invItem = inventory?.find(
-            (i) => i.warehouseId === selectedWarehouseId && i.productId === productId
+            (i) =>
+              (i as any).warehouseId === selectedWarehouseId &&
+              (i as any).productId === productId
           );
-          const bookStock = invItem?.stock ?? product?.warehouseStock ?? 0;
+          const bookStock =
+            (invItem as any)?.stock ?? (product as any)?.warehouseStock ?? 0;
           const discrepancy = actualCount - bookStock;
-          const price = product?.price ?? 0;
+          const price = (product as any)?.price ?? 0;
           if (discrepancy > 0) {
             totalSurplus += discrepancy;
             surplusSum += discrepancy * price;
@@ -325,7 +329,7 @@ export default function InventoryAuditPage() {
           }
           return {
             productId,
-            productName: product?.name ?? "",
+            productName: (product as any)?.name ?? "",
             bookStock,
             actualCount,
             discrepancy,
@@ -336,7 +340,7 @@ export default function InventoryAuditPage() {
       const auditPayload = {
         auditNumber,
         warehouseId: selectedWarehouseId,
-        warehouseName: wh?.name ?? "",
+        warehouseName: (wh as any)?.name ?? "",
         auditDate,
         items,
         status: "completed" as AuditStatus,
@@ -348,16 +352,13 @@ export default function InventoryAuditPage() {
       };
  
       if (formMode === "edit" && editingLogId) {
-        // ── EDIT REJIMI: mavjud hujjatni yangilash ──
-        await updateDocumentNonBlocking(
-          doc(db, "auditLogs", editingLogId),
-          {
-            ...auditPayload,
-            updatedAt: new Date().toISOString(),
-          }
-        );
+        // Mavjud hujjatni yangilash
+        await updateDocumentNonBlocking(doc(db, "auditLogs", editingLogId), {
+          ...auditPayload,
+          updatedAt: new Date().toISOString(),
+        });
       } else {
-        // ── YANGI REJIM: yangi hujjat yaratish ──
+        // Yangi hujjat yaratish
         await addDocumentNonBlocking(collection(db, "auditLogs"), {
           ...auditPayload,
           createdAt: new Date().toISOString(),
@@ -365,20 +366,20 @@ export default function InventoryAuditPage() {
       }
  
       // ── MUHIM: Inventory stock-larini yangilash ──
-      // Bu qadamsiz inventarizatsiya natijasi skadga ta'sir qilmaydi!
+      // Bu bo'lmasdan inventarizatsiya skadga ta'sir qilmaydi!
       for (const [productId, actualCount] of Object.entries(auditData)) {
         const existingInv = inventory?.find(
-          (i) => i.warehouseId === selectedWarehouseId && i.productId === productId
+          (i) =>
+            (i as any).warehouseId === selectedWarehouseId &&
+            (i as any).productId === productId
         );
  
         if (existingInv) {
-          // Mavjud inventory hujjatini yangilash
           await updateDocumentNonBlocking(
             doc(db, "inventory", existingInv.id),
             { stock: actualCount }
           );
         } else {
-          // Inventory hujjati yo'q bo'lsa — yangi yaratish
           await addDocumentNonBlocking(collection(db, "inventory"), {
             warehouseId: selectedWarehouseId,
             productId,
@@ -395,10 +396,9 @@ export default function InventoryAuditPage() {
             : `${auditNumber} inventarizatsiyasi yakunlandi.`,
       });
  
-      // Formani tozalab ro'yxatga qaytish
       resetForm();
       setView("list");
-    } catch (err) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Xatolik",
@@ -409,17 +409,6 @@ export default function InventoryAuditPage() {
     }
   };
  
-  // ── Form reset ──
-  const resetForm = () => {
-    setAuditData({});
-    setAuditNumber(generateAuditNumber());
-    setAuditDate(new Date().toISOString().slice(0, 16));
-    setFormMode("new");
-    setEditingLogId(null);
-    setSelectedWarehouseId(assignedWarehouseId || "");
-    setFormSearch("");
-  };
- 
   // ── Hujjatni o'chirish (soft delete) ──
   const handleDelete = async (logId: string) => {
     if (!db) return;
@@ -427,7 +416,10 @@ export default function InventoryAuditPage() {
       status: "deleted",
     });
     setSelectedLogId(null);
-    toast({ title: "O'chirildi", description: "Hujjat o'chirilgan deb belgilandi." });
+    toast({
+      title: "O'chirildi",
+      description: "Hujjat o'chirilgan deb belgilandi.",
+    });
   };
  
   // ── Nusxa ko'chirish ──
@@ -443,7 +435,7 @@ export default function InventoryAuditPage() {
     setFormMode("new");
     setEditingLogId(null);
     setView("form");
-    toast({ title: "Nusxa", description: "Hujjat nusxasi yaratildi. Tahrirlang va yakunlang." });
+    toast({ title: "Nusxa", description: "Hujjat nusxasi yaratildi." });
   };
  
   // ── Hujjatni tahrirlash uchun ochish ──
@@ -460,21 +452,35 @@ export default function InventoryAuditPage() {
     setEditingLogId(log.id);
     setFormSearch("");
     setView("form");
-    toast({ title: "Tahrirlash rejimi", description: `${log.auditNumber} tahrirlash uchun ochildi.` });
+    toast({
+      title: "Tahrirlash rejimi",
+      description: `${log.auditNumber} tahrirlash uchun ochildi.`,
+    });
   };
  
   // ── Sort toggle ──
   const toggleSort = (col: SortCol) => {
     if (sortCol === col) setSortDir((d) => (d === 1 ? -1 : 1));
-    else { setSortCol(col); setSortDir(-1); }
+    else {
+      setSortCol(col);
+      setSortDir(-1);
+    }
   };
  
   // ── Statistika ──
   const stats = useMemo(() => {
     const total = filteredLogs.length;
-    const completed = filteredLogs.filter((l) => l.status === "completed").length;
-    const surplusTotal = filteredLogs.reduce((a, l) => a + (l.surplusSum ?? 0), 0);
-    const deficitTotal = filteredLogs.reduce((a, l) => a + (l.deficitSum ?? 0), 0);
+    const completed = filteredLogs.filter(
+      (l) => l.status === "completed"
+    ).length;
+    const surplusTotal = filteredLogs.reduce(
+      (a, l) => a + (l.surplusSum ?? 0),
+      0
+    );
+    const deficitTotal = filteredLogs.reduce(
+      (a, l) => a + (l.deficitSum ?? 0),
+      0
+    );
     return { total, completed, surplusTotal, deficitTotal };
   }, [filteredLogs]);
  
@@ -497,7 +503,10 @@ export default function InventoryAuditPage() {
         <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 flex-wrap">
           {view === "form" && (
             <button
-              onClick={() => { resetForm(); setView("list"); }}
+              onClick={() => {
+                resetForm();
+                setView("list");
+              }}
               className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mr-2"
             >
               <ArrowLeft className="w-4 h-4" /> Orqaga
@@ -512,7 +521,6 @@ export default function InventoryAuditPage() {
               : `Inventarizatsiya №${auditNumber}`}
           </h1>
  
-          {/* Edit rejimi badge */}
           {view === "form" && formMode === "edit" && (
             <Badge className="bg-amber-50 text-amber-600 border border-amber-200 ml-1">
               <Edit2 className="w-3 h-3 mr-1" /> Tahrirlash rejimi
@@ -548,7 +556,6 @@ export default function InventoryAuditPage() {
                   >
                     <Copy className="w-4 h-4" /> Nusxa
                   </Button>
-                  {/* YANGI: Tahrirlash tugmasi */}
                   <Button
                     size="sm"
                     variant="outline"
@@ -563,7 +570,7 @@ export default function InventoryAuditPage() {
                     onClick={() => handleDelete(selectedLog.id)}
                     className="gap-1 text-rose-500 border-rose-200 hover:bg-rose-50"
                   >
-                    <Trash2 className="w-4 h-4" /> O'chirish
+                    <Trash2 className="w-4 h-4" /> O&apos;chirish
                   </Button>
                 </>
               )}
@@ -593,7 +600,10 @@ export default function InventoryAuditPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => { resetForm(); setView("list"); }}
+                onClick={() => {
+                  resetForm();
+                  setView("list");
+                }}
               >
                 Bekor qilish
               </Button>
@@ -665,7 +675,7 @@ export default function InventoryAuditPage() {
                   onChange={(e) => setShowDeleted(e.target.checked)}
                   className="rounded"
                 />
-                O'chirilganlarni ko'rsatish
+                O&apos;chirilganlarni ko&apos;rsatish
               </label>
               <div className="flex-1" />
               <div className="relative">
@@ -709,15 +719,15 @@ export default function InventoryAuditPage() {
               <div className="flex items-center gap-4 text-[11px] text-slate-400">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-slate-800 inline-block" />
-                  O'tkazilgan
+                  O&apos;tkazilgan
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                  O'tkazilmagan
+                  O&apos;tkazilmagan
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-rose-400 inline-block" />
-                  O'chirilgan
+                  O&apos;chirilgan
                 </span>
               </div>
             </div>
@@ -725,12 +735,31 @@ export default function InventoryAuditPage() {
             {/* Statistika kartalar */}
             <div className="px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: "Jami hujjat", value: stats.total, color: "text-slate-700" },
-                { label: "O'tkazilgan", value: stats.completed, color: "text-emerald-600" },
-                { label: "Ortiqcha (so'm)", value: formatNum(stats.surplusTotal), color: "text-emerald-600" },
-                { label: "Kamomad (so'm)", value: formatNum(stats.deficitTotal), color: "text-rose-600" },
+                {
+                  label: "Jami hujjat",
+                  value: stats.total,
+                  color: "text-slate-700",
+                },
+                {
+                  label: "O'tkazilgan",
+                  value: stats.completed,
+                  color: "text-emerald-600",
+                },
+                {
+                  label: "Ortiqcha (so'm)",
+                  value: formatNum(stats.surplusTotal),
+                  color: "text-emerald-600",
+                },
+                {
+                  label: "Kamomad (so'm)",
+                  value: formatNum(stats.deficitTotal),
+                  color: "text-rose-600",
+                },
               ].map(({ label, value, color }) => (
-                <div key={label} className="bg-white rounded-xl border border-slate-100 px-4 py-3">
+                <div
+                  key={label}
+                  className="bg-white rounded-xl border border-slate-100 px-4 py-3"
+                >
                   <p className="text-[11px] text-slate-400 mb-1">{label}</p>
                   <p className={cn("text-lg font-semibold", color)}>{value}</p>
                 </div>
@@ -740,7 +769,10 @@ export default function InventoryAuditPage() {
             {/* Asosiy jadval */}
             <div className="flex-1 overflow-auto px-6 pb-6">
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+                <table
+                  className="w-full text-sm"
+                  style={{ tableLayout: "fixed" }}
+                >
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="w-8 px-3 py-2">
@@ -752,7 +784,11 @@ export default function InventoryAuditPage() {
                       >
                         Sana{" "}
                         {sortCol === "date" ? (
-                          sortDir === -1 ? <ChevronDown className="inline w-3 h-3" /> : <ChevronUp className="inline w-3 h-3" />
+                          sortDir === -1 ? (
+                            <ChevronDown className="inline w-3 h-3" />
+                          ) : (
+                            <ChevronUp className="inline w-3 h-3" />
+                          )
                         ) : null}
                       </th>
                       <th
@@ -761,7 +797,11 @@ export default function InventoryAuditPage() {
                       >
                         №{" "}
                         {sortCol === "num" ? (
-                          sortDir === -1 ? <ChevronDown className="inline w-3 h-3" /> : <ChevronUp className="inline w-3 h-3" />
+                          sortDir === -1 ? (
+                            <ChevronDown className="inline w-3 h-3" />
+                          ) : (
+                            <ChevronUp className="inline w-3 h-3" />
+                          )
                         ) : null}
                       </th>
                       <th className="px-3 py-2 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
@@ -779,7 +819,11 @@ export default function InventoryAuditPage() {
                       >
                         Ortiqcha{" "}
                         {sortCol === "surplus" ? (
-                          sortDir === -1 ? <ChevronDown className="inline w-3 h-3" /> : <ChevronUp className="inline w-3 h-3" />
+                          sortDir === -1 ? (
+                            <ChevronDown className="inline w-3 h-3" />
+                          ) : (
+                            <ChevronUp className="inline w-3 h-3" />
+                          )
                         ) : null}
                       </th>
                       <th
@@ -788,7 +832,11 @@ export default function InventoryAuditPage() {
                       >
                         Kamomad{" "}
                         {sortCol === "deficit" ? (
-                          sortDir === -1 ? <ChevronDown className="inline w-3 h-3" /> : <ChevronUp className="inline w-3 h-3" />
+                          sortDir === -1 ? (
+                            <ChevronDown className="inline w-3 h-3" />
+                          ) : (
+                            <ChevronUp className="inline w-3 h-3" />
+                          )
                         ) : null}
                       </th>
                       <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-28">
@@ -797,7 +845,6 @@ export default function InventoryAuditPage() {
                       <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-28">
                         Kamomad ∑
                       </th>
-                      {/* YANGI: Amallar ustuni */}
                       <th className="px-3 py-2 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-20">
                         Amallar
                       </th>
@@ -806,14 +853,20 @@ export default function InventoryAuditPage() {
                   <tbody className="divide-y divide-slate-50">
                     {logsLoading ? (
                       <tr>
-                        <td colSpan={11} className="text-center py-12 text-slate-400">
+                        <td
+                          colSpan={11}
+                          className="text-center py-12 text-slate-400"
+                        >
                           <Loader2 className="animate-spin inline w-5 h-5 mr-2" />
                           Yuklanmoqda...
                         </td>
                       </tr>
                     ) : filteredLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="text-center py-12 text-slate-400 text-sm">
+                        <td
+                          colSpan={11}
+                          className="text-center py-12 text-slate-400 text-sm"
+                        >
                           Hujjatlar topilmadi
                         </td>
                       </tr>
@@ -826,7 +879,9 @@ export default function InventoryAuditPage() {
                         return (
                           <tr
                             key={log.id}
-                            onClick={() => setSelectedLogId(isSelected ? null : log.id)}
+                            onClick={() =>
+                              setSelectedLogId(isSelected ? null : log.id)
+                            }
                             className={cn(
                               "cursor-pointer transition-colors hover:bg-slate-50",
                               isSelected && "bg-blue-50 hover:bg-blue-50",
@@ -841,14 +896,26 @@ export default function InventoryAuditPage() {
                                 className="rounded"
                               />
                             </td>
-                            <td className={cn("px-3 py-2.5 text-xs", isDeleted && "line-through text-slate-400", !isDeleted && "text-slate-600")}>
+                            <td
+                              className={cn(
+                                "px-3 py-2.5 text-xs",
+                                isDeleted && "line-through text-slate-400",
+                                !isDeleted && "text-slate-600"
+                              )}
+                            >
                               {log.auditDate?.slice(0, 10)}
                             </td>
                             <td className="px-3 py-2.5">
-                              <span className={cn(
-                                "text-xs font-mono font-semibold px-2 py-0.5 rounded",
-                                isDeleted ? "text-rose-400 line-through" : isCompleted ? "text-slate-800" : "text-blue-600"
-                              )}>
+                              <span
+                                className={cn(
+                                  "text-xs font-mono font-semibold px-2 py-0.5 rounded",
+                                  isDeleted
+                                    ? "text-rose-400 line-through"
+                                    : isCompleted
+                                    ? "text-slate-800"
+                                    : "text-blue-600"
+                                )}
+                              >
                                 {log.auditNumber}
                               </span>
                             </td>
@@ -856,31 +923,55 @@ export default function InventoryAuditPage() {
                               {log.warehouseName}
                             </td>
                             <td className="px-3 py-2.5 text-xs text-slate-500 truncate max-w-[160px]">
-                              {log.items?.slice(0, 2).map((i) => i.productName).join(", ")}
-                              {(log.items?.length ?? 0) > 2 && ` +${log.items.length - 2} ta`}
+                              {log.items
+                                ?.slice(0, 2)
+                                .map((i) => i.productName)
+                                .join(", ")}
+                              {(log.items?.length ?? 0) > 2 &&
+                                ` +${log.items.length - 2} ta`}
                             </td>
                             <td className="px-3 py-2.5 text-right">
-                              <span className={cn(
-                                "text-[11px] px-2 py-0.5 rounded-full font-medium",
-                                isDeleted ? "bg-rose-50 text-rose-500" : isCompleted ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-600"
-                              )}>
-                                {isDeleted ? "O'chirilgan" : isCompleted ? "O'tkazilgan" : "Qoralama"}
+                              <span
+                                className={cn(
+                                  "text-[11px] px-2 py-0.5 rounded-full font-medium",
+                                  isDeleted
+                                    ? "bg-rose-50 text-rose-500"
+                                    : isCompleted
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-blue-50 text-blue-600"
+                                )}
+                              >
+                                {isDeleted
+                                  ? "O'chirilgan"
+                                  : isCompleted
+                                  ? "O'tkazilgan"
+                                  : "Qoralama"}
                               </span>
                             </td>
                             <td className="px-3 py-2.5 text-right text-xs font-medium text-emerald-600">
-                              {(log.totalSurplus ?? 0) > 0 ? `+${formatNum(log.totalSurplus)}` : "—"}
+                              {(log.totalSurplus ?? 0) > 0
+                                ? `+${formatNum(log.totalSurplus)}`
+                                : "—"}
                             </td>
                             <td className="px-3 py-2.5 text-right text-xs font-medium text-rose-600">
-                              {(log.totalDeficit ?? 0) > 0 ? `−${formatNum(log.totalDeficit)}` : "—"}
+                              {(log.totalDeficit ?? 0) > 0
+                                ? `−${formatNum(log.totalDeficit)}`
+                                : "—"}
                             </td>
                             <td className="px-3 py-2.5 text-right text-xs text-emerald-700">
-                              {(log.surplusSum ?? 0) > 0 ? formatNum(log.surplusSum) : "—"}
+                              {(log.surplusSum ?? 0) > 0
+                                ? formatNum(log.surplusSum)
+                                : "—"}
                             </td>
                             <td className="px-3 py-2.5 text-right text-xs text-rose-700">
-                              {(log.deficitSum ?? 0) > 0 ? formatNum(log.deficitSum) : "—"}
+                              {(log.deficitSum ?? 0) > 0
+                                ? formatNum(log.deficitSum)
+                                : "—"}
                             </td>
-                            {/* Inline amallar tugmalari */}
-                            <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                            <td
+                              className="px-3 py-2.5 text-center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {!isDeleted && (
                                 <div className="flex items-center justify-center gap-1">
                                   <button
@@ -909,9 +1000,27 @@ export default function InventoryAuditPage() {
  
                 {/* Footer jami */}
                 <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-6 text-xs text-slate-500 bg-slate-50">
-                  <span>Jami: <strong className="text-slate-700">{filteredLogs.length}</strong> ta</span>
-                  <span>Ortiqcha: <strong className="text-emerald-600">{formatNum(stats.surplusTotal)}</strong> so'm</span>
-                  <span>Kamomad: <strong className="text-rose-600">{formatNum(stats.deficitTotal)}</strong> so'm</span>
+                  <span>
+                    Jami:{" "}
+                    <strong className="text-slate-700">
+                      {filteredLogs.length}
+                    </strong>{" "}
+                    ta
+                  </span>
+                  <span>
+                    Ortiqcha:{" "}
+                    <strong className="text-emerald-600">
+                      {formatNum(stats.surplusTotal)}
+                    </strong>{" "}
+                    so&apos;m
+                  </span>
+                  <span>
+                    Kamomad:{" "}
+                    <strong className="text-rose-600">
+                      {formatNum(stats.deficitTotal)}
+                    </strong>{" "}
+                    so&apos;m
+                  </span>
                 </div>
               </div>
  
@@ -929,11 +1038,16 @@ export default function InventoryAuditPage() {
                         {selectedLog.auditNumber} — Tafsilot
                       </p>
                       <div className="flex items-center gap-3 text-xs">
-                        <span className="text-slate-500">{selectedLog.warehouseName}</span>
-                        <span className="text-slate-400">{selectedLog.auditDate?.slice(0, 10)}</span>
+                        <span className="text-slate-500">
+                          {selectedLog.warehouseName}
+                        </span>
+                        <span className="text-slate-400">
+                          {selectedLog.auditDate?.slice(0, 10)}
+                        </span>
                         {selectedLog.updatedAt && (
                           <span className="text-amber-500 text-[10px]">
-                            (yangilangan: {selectedLog.updatedAt.slice(0, 10)})
+                            (yangilangan:{" "}
+                            {selectedLog.updatedAt.slice(0, 10)})
                           </span>
                         )}
                         <button
@@ -955,18 +1069,33 @@ export default function InventoryAuditPage() {
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {selectedLog.items?.map((item) => (
-                          <tr key={item.productId} className="hover:bg-slate-50">
-                            <td className="px-4 py-2 text-slate-700">{item.productName}</td>
-                            <td className="px-4 py-2 text-right text-slate-500">{item.bookStock}</td>
-                            <td className="px-4 py-2 text-right text-slate-700 font-medium">{item.actualCount}</td>
+                          <tr
+                            key={item.productId}
+                            className="hover:bg-slate-50"
+                          >
+                            <td className="px-4 py-2 text-slate-700">
+                              {item.productName}
+                            </td>
+                            <td className="px-4 py-2 text-right text-slate-500">
+                              {item.bookStock}
+                            </td>
+                            <td className="px-4 py-2 text-right text-slate-700 font-medium">
+                              {item.actualCount}
+                            </td>
                             <td className="px-4 py-2 text-right">
-                              <span className={cn(
-                                "px-2 py-0.5 rounded-full font-semibold",
-                                item.discrepancy === 0 ? "bg-slate-100 text-slate-400"
-                                  : item.discrepancy > 0 ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-rose-100 text-rose-700"
-                              )}>
-                                {item.discrepancy > 0 ? `+${item.discrepancy}` : item.discrepancy}
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded-full font-semibold",
+                                  item.discrepancy === 0
+                                    ? "bg-slate-100 text-slate-400"
+                                    : item.discrepancy > 0
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-rose-100 text-rose-700"
+                                )}
+                              >
+                                {item.discrepancy > 0
+                                  ? `+${item.discrepancy}`
+                                  : item.discrepancy}
                               </span>
                             </td>
                           </tr>
@@ -985,18 +1114,18 @@ export default function InventoryAuditPage() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Forma header */}
             <div className="bg-white border-b border-slate-100 px-6 py-3 flex flex-wrap items-end gap-4">
-              {/* Edit rejimi xabar */}
               {formMode === "edit" && (
                 <div className="w-full mb-1 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
                   <Edit2 className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    <strong>{auditNumber}</strong> raqamli inventarizatsiyani tahrirlayapsiz.
-                    O'zgarishlar saqlanganidan so'ng sklad qoldiqlari ham yangilanadi.
+                    <strong>{auditNumber}</strong> raqamli
+                    inventarizatsiyani tahrirlayapsiz. O&apos;zgarishlar
+                    saqlanganidan so&apos;ng sklad qoldiqlari ham
+                    yangilanadi.
                   </span>
                 </div>
               )}
  
-              {/* Sklad tanlash */}
               <div>
                 <Label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
                   Sklad
@@ -1004,7 +1133,7 @@ export default function InventoryAuditPage() {
                 <Select
                   value={selectedWarehouseId}
                   onValueChange={setSelectedWarehouseId}
-                  disabled={formMode === "edit"} // Edit rejimida sklad o'zgarmaydi
+                  disabled={formMode === "edit"}
                 >
                   <SelectTrigger className="w-52 h-9 text-sm border-slate-200">
                     <SelectValue placeholder="Omborni tanlang" />
@@ -1012,14 +1141,13 @@ export default function InventoryAuditPage() {
                   <SelectContent>
                     {warehouses?.map((w) => (
                       <SelectItem key={w.id} value={w.id}>
-                        {w.name}
+                        {(w as any).name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
  
-              {/* Sana */}
               <div>
                 <Label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
                   Sana
@@ -1032,7 +1160,6 @@ export default function InventoryAuditPage() {
                 />
               </div>
  
-              {/* Statistika */}
               <div className="flex items-center gap-4 ml-4">
                 <div className="text-center">
                   <p className="text-[11px] text-slate-400">Kiritilgan</p>
@@ -1043,17 +1170,27 @@ export default function InventoryAuditPage() {
                 <div className="text-center">
                   <p className="text-[11px] text-slate-400">Ortiqcha</p>
                   <p className="text-base font-semibold text-emerald-600">
-                    +{filteredProducts.filter(
-                      (p) => auditData[p.id] !== undefined && auditData[p.id] > p.warehouseStock
-                    ).length}
+                    +
+                    {
+                      filteredProducts.filter(
+                        (p) =>
+                          auditData[p.id] !== undefined &&
+                          auditData[p.id] > (p as any).warehouseStock
+                      ).length
+                    }
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-[11px] text-slate-400">Kamomad</p>
                   <p className="text-base font-semibold text-rose-600">
-                    −{filteredProducts.filter(
-                      (p) => auditData[p.id] !== undefined && auditData[p.id] < p.warehouseStock
-                    ).length}
+                    −
+                    {
+                      filteredProducts.filter(
+                        (p) =>
+                          auditData[p.id] !== undefined &&
+                          auditData[p.id] < (p as any).warehouseStock
+                      ).length
+                    }
                   </p>
                 </div>
               </div>
@@ -1100,7 +1237,10 @@ export default function InventoryAuditPage() {
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                  <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+                  <table
+                    className="w-full text-sm"
+                    style={{ tableLayout: "fixed" }}
+                  >
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
                         <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
@@ -1121,14 +1261,19 @@ export default function InventoryAuditPage() {
                     <tbody className="divide-y divide-slate-50">
                       {filteredProducts.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-10 text-slate-400 text-sm">
+                          <td
+                            colSpan={5}
+                            className="text-center py-10 text-slate-400 text-sm"
+                          >
                             Mahsulotlar topilmadi
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((p: any) => {
-                          const actual = auditData[p.id] ?? p.warehouseStock;
-                          const diff = actual - p.warehouseStock;
+                        filteredProducts.map((p) => {
+                          const pAny = p as any;
+                          const actual =
+                            auditData[p.id] ?? pAny.warehouseStock;
+                          const diff = actual - pAny.warehouseStock;
                           const hasInput = auditData[p.id] !== undefined;
  
                           return (
@@ -1141,14 +1286,20 @@ export default function InventoryAuditPage() {
                               )}
                             >
                               <td className="px-4 py-3">
-                                <p className="font-medium text-slate-800 text-sm">{p.name}</p>
+                                <p className="font-medium text-slate-800 text-sm">
+                                  {pAny.name}
+                                </p>
                                 <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                                  {p.barcode ?? "Shtrix-kod yo'q"}
-                                  {p.sku && <span className="ml-2 text-slate-300">{p.sku}</span>}
+                                  {pAny.barcode ?? "Shtrix-kod yo'q"}
+                                  {pAny.sku && (
+                                    <span className="ml-2 text-slate-300">
+                                      {pAny.sku}
+                                    </span>
+                                  )}
                                 </p>
                               </td>
                               <td className="px-4 py-3 text-center font-medium text-slate-500">
-                                {p.warehouseStock}
+                                {pAny.warehouseStock}
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <input
@@ -1156,8 +1307,12 @@ export default function InventoryAuditPage() {
                                   min={0}
                                   step={1}
                                   className="w-24 h-8 text-center text-sm font-semibold rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white mx-auto block"
-                                  value={auditData[p.id] !== undefined ? auditData[p.id] : ""}
-                                  placeholder={String(p.warehouseStock)}
+                                  value={
+                                    auditData[p.id] !== undefined
+                                      ? auditData[p.id]
+                                      : ""
+                                  }
+                                  placeholder={String(pAny.warehouseStock)}
                                   onChange={(e) => {
                                     const num = parseFloat(e.target.value);
                                     setAuditData((prev) => ({
@@ -1169,17 +1324,29 @@ export default function InventoryAuditPage() {
                               </td>
                               <td className="px-4 py-3 text-center">
                                 {hasInput ? (
-                                  <span className={cn(
-                                    "inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-                                    diff === 0 ? "bg-slate-100 text-slate-400"
-                                      : diff > 0 ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-rose-100 text-rose-700"
-                                  )}>
-                                    {diff > 0 ? <TrendingUp className="w-3 h-3" /> : diff < 0 ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-semibold",
+                                      diff === 0
+                                        ? "bg-slate-100 text-slate-400"
+                                        : diff > 0
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : "bg-rose-100 text-rose-700"
+                                    )}
+                                  >
+                                    {diff > 0 ? (
+                                      <TrendingUp className="w-3 h-3" />
+                                    ) : diff < 0 ? (
+                                      <TrendingDown className="w-3 h-3" />
+                                    ) : (
+                                      <Minus className="w-3 h-3" />
+                                    )}
                                     {diff > 0 ? `+${diff}` : diff}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-300 text-xs">—</span>
+                                  <span className="text-slate-300 text-xs">
+                                    —
+                                  </span>
                                 )}
                               </td>
                               <td className="px-4 py-3">
@@ -1206,15 +1373,23 @@ export default function InventoryAuditPage() {
                   {/* Forma footer */}
                   <div className="border-t border-slate-100 px-5 py-3 flex items-center gap-6 bg-slate-50 text-xs text-slate-500">
                     <span>
-                      Jami mahsulot: <strong className="text-slate-700">{filteredProducts.length}</strong>
+                      Jami mahsulot:{" "}
+                      <strong className="text-slate-700">
+                        {filteredProducts.length}
+                      </strong>
                     </span>
                     <span>
-                      Kiritildi: <strong className="text-blue-600">{Object.keys(auditData).length}</strong>
+                      Kiritildi:{" "}
+                      <strong className="text-blue-600">
+                        {Object.keys(auditData).length}
+                      </strong>
                     </span>
                     <div className="flex-1" />
                     <Button
                       size="sm"
-                      disabled={isSubmitting || Object.keys(auditData).length === 0}
+                      disabled={
+                        isSubmitting || Object.keys(auditData).length === 0
+                      }
                       onClick={handleSubmitAudit}
                       className={cn(
                         "text-white gap-1",
@@ -1230,7 +1405,9 @@ export default function InventoryAuditPage() {
                       ) : (
                         <CheckCircle2 className="w-4 h-4" />
                       )}
-                      {formMode === "edit" ? "Yangilash (saqlash)" : "O'tkazish (yakunlash)"}
+                      {formMode === "edit"
+                        ? "Yangilash (saqlash)"
+                        : "O'tkazish (yakunlash)"}
                     </Button>
                   </div>
                 </div>
@@ -1241,3 +1418,4 @@ export default function InventoryAuditPage() {
       </main>
     </div>
   );
+}
