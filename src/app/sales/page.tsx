@@ -1,224 +1,147 @@
-"use client";
+import React, { useState } from "react";
 
-import {
-  useState, useEffect, useCallback, useMemo, useRef,
-} from "react";
+const warehouses = [
+  { id: 1, name: "Ombor 1" },
+  { id: 2, name: "Ombor 2" },
+  { id: 3, name: "Ombor 3" }
+];
 
-// ─── Types ────────────────────────────────────────────────
-export interface Warehouse { id: string; name: string; location?: string; }
-export interface Product { 
-  id: string; name: string; price: number; stock: number; 
-  category: string; barcode?: string; image?: string; sku?: string; 
-}
-export interface Customer { id: string; name: string; phone?: string; }
-export type PaymentType = "cash" | "card" | "split";
-export type DiscountType = "percent" | "fixed";
-export interface CartItem { product: Product; quantity: number; }
+const initialProducts = [
+  { id: 1, name: "iPhone 13", category: "Telefonlar", price: 1000, stock: { 1: 10, 2: 5, 3: 8 } },
+  { id: 2, name: "AirPods", category: "Quloqliklar", price: 200, stock: { 1: 15, 2: 7, 3: 10 } },
+  { id: 3, name: "iPad", category: "Planshetlar", price: 800, stock: { 1: 5, 2: 3, 3: 6 } },
+  { id: 4, name: "Zaryadnik", category: "Aksessuarlar", price: 50, stock: { 1: 20, 2: 10, 3: 12 } }
+];
 
-export interface SalePayload {
-  warehouse_id: string;
-  customer_id?: string;
-  items: { product_id: string; quantity: number; price: number }[];
-  payment_type: PaymentType;
-  cash_amount?: number;
-  card_amount?: number;
-  total: number;
-  discount: number;
-  discount_type: DiscountType;
-}
+export default function POS() {
+  const [warehouse, setWarehouse] = useState(1);
+  const [products, setProducts] = useState(initialProducts);
+  const [cart, setCart] = useState([]);
+  const [category, setCategory] = useState("All");
+  const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState("sum");
+  const [paymentType, setPaymentType] = useState("naqd");
+  const [cash, setCash] = useState(0);
+  const [showCheck, setShowCheck] = useState(false);
 
-// ─── API Service ──────────────────────────────────────────
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
-async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts?.headers },
-    ...opts,
-  });
-  if (!res.ok) throw new Error("Server xatosi");
-  return res.json();
-}
+  const getStock = (p) => p.stock[warehouse];
 
-const api = {
-  warehouses: () => apiFetch<Warehouse[]>("/warehouses"),
-  products: (wid: string) => apiFetch<Product[]>(`/products?warehouse_id=${wid}`),
-  customers: () => apiFetch<Customer[]>("/customers"),
-  createCustomer: (data: { name: string; phone?: string }) =>
-    apiFetch<Customer>("/customers", { method: "POST", body: JSON.stringify(data) }),
-  sale: (payload: SalePayload) =>
-    apiFetch<{ id: string }>("/sales", { method: "POST", body: JSON.stringify(payload) }),
-};
+  const addToCart = (product) => {
+    if (getStock(product) <= 0) return;
 
-// ─── Main Component ───────────────────────────────────────
-export default function POSPage() {
-  // States
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [warehouseId, setWarehouseId] = useState("");
-  const [products, setProducts] = useState<Product[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [customerId, setCustomerId] = useState("");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [paymentType, setPaymentType] = useState<PaymentType>("cash");
-  const [cashAmount, setCashAmount] = useState(0);
-  const [cardAmount, setCardAmount] = useState(0);
-  const [discountVal, setDiscountVal] = useState(0);
-  const [discountType, setDiscountType] = useState<DiscountType>("fixed");
-  const [selling, setSelling] = useState(false);
+    setProducts(products.map(p =>
+      p.id === product.id
+        ? { ...p, stock: { ...p.stock, [warehouse]: p.stock[warehouse] - 1 } }
+        : p
+    ));
 
-  // Initial Data
-  useEffect(() => {
-    api.warehouses().then(setWarehouses);
-    api.customers().then(setCustomers);
-  }, []);
-
-  useEffect(() => {
-    if (warehouseId) api.products(warehouseId).then(setProducts);
-  }, [warehouseId]);
-
-  // ─── Logic: Cart & Pricing ──────────────────────────────
-  const subtotal = useMemo(() => cart.reduce((s, i) => s + i.product.price * i.quantity, 0), [cart]);
-  const discountAmount = useMemo(() => {
-    return discountType === "percent" ? Math.round(subtotal * discountVal / 100) : Math.min(discountVal, subtotal);
-  }, [subtotal, discountVal, discountType]);
-  const total = useMemo(() => subtotal - discountAmount, [subtotal, discountAmount]);
-
-  const addToCart = useCallback((product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.product.id === product.id);
-      if (existing) {
-        if (existing.quantity >= product.stock) return prev;
-        return prev.map(i => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
-  }, []);
-
-  // ─── Barcode & Shortcuts ────────────────────────────────
-  useEffect(() => {
-    let buffer = "";
-    let lastTime = Date.now();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Global Shortcut: Ctrl + F (Search)
-      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
-        e.preventDefault();
-        document.getElementById("pos-search")?.focus();
-      }
-
-      // Barcode Scanner Logic
-      if (Date.now() - lastTime > 100) buffer = "";
-      if (e.key === "Enter" && buffer.length > 2) {
-        const p = products.find(prod => prod.barcode === buffer || prod.sku === buffer);
-        if (p) { addToCart(p); buffer = ""; }
-      } else if (e.key.length === 1) {
-        buffer += e.key;
-      }
-      lastTime = Date.now();
-    };
-
-    window.addEventListener("keydown", handleKeyDown as any);
-    return () => window.removeEventListener("keydown", handleKeyDown as any);
-  }, [products, addToCart]);
-
-  // ─── Payment Handling ───────────────────────────────────
-  const finalizeSale = async () => {
-    if (!warehouseId || cart.length === 0 || selling) return;
-    setSelling(true);
-    try {
-      const payload: SalePayload = {
-        warehouse_id: warehouseId,
-        customer_id: customerId || undefined,
-        items: cart.map(i => ({ product_id: i.product.id, quantity: i.quantity, price: i.product.price })),
-        payment_type: paymentType,
-        cash_amount: paymentType !== "card" ? cashAmount : 0,
-        card_amount: paymentType !== "cash" ? cardAmount : 0,
-        total, discount: discountAmount, discount_type: discountType,
-      };
-      await api.sale(payload);
-      alert("Sotuv muvaffaqiyatli!");
-      setCart([]); setDiscountVal(0); setCashAmount(0); setCardAmount(0);
-      api.products(warehouseId).then(setProducts); // Refresh stock
-    } catch (e) {
-      alert("Xatolik yuz berdi");
-    } finally {
-      setSelling(false);
+    const exist = cart.find(c => c.id === product.id);
+    if (exist) {
+      setCart(cart.map(c => c.id === product.id ? { ...c, qty: c.qty + 1 } : c));
+    } else {
+      setCart([...cart, { ...product, qty: 1 }]);
     }
   };
 
-  return (
-    <div style={{ display: "flex", height: "100vh", background: "#f4f7f6", fontFamily: "sans-serif" }}>
-      {/* Chap tomondagi mahsulotlar paneli */}
-      <div style={{ flex: 1, padding: 20, overflowY: "auto" }}>
-        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-          <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} style={{ padding: 10, borderRadius: 8 }}>
-            <option value="">Omborni tanlang</option>
-            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
-          <input 
-            id="pos-search" 
-            placeholder="Qidirish (Ctrl+F)" 
-            value={search} 
-            onChange={e => setSearch(e.target.value)}
-            style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd" }}
-          />
-        </div>
+  const updateQty = (id, delta) => {
+    setCart(cart.map(item => {
+      if (item.id === id) {
+        const qty = item.qty + delta;
+        if (qty <= 0) return null;
+        return { ...item, qty };
+      }
+      return item;
+    }).filter(Boolean));
+  };
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 15 }}>
-          {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
-            <div key={p.id} onClick={() => addToCart(p)} style={{ background: "#fff", padding: 15, borderRadius: 12, cursor: "pointer", border: "1px solid #eee", textAlign: "center", opacity: p.stock <= 0 ? 0.5 : 1 }}>
-              <div style={{ fontWeight: "bold", marginBottom: 5 }}>{p.name}</div>
-              <div style={{ color: "#27ae60", fontWeight: "bold" }}>{p.price.toLocaleString()} so'm</div>
-              <div style={{ fontSize: 12, color: "#999" }}>Qoldiq: {p.stock} ta</div>
+  const clearCart = () => setCart([]);
+
+  const filtered = category === "All" ? products : products.filter(p => p.category === category);
+
+  let total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const discountValue = discountType === "%" ? (total * discount) / 100 : discount;
+  const finalTotal = Math.max(total - discountValue, 0);
+  const change = cash - finalTotal;
+
+  return (
+    <div className="p-4 grid grid-cols-2 gap-4">
+
+      <div>
+        <h2 className="font-bold">Sklad</h2>
+        <select onChange={(e)=>setWarehouse(Number(e.target.value))} className="border p-2">
+          {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+        </select>
+
+        <h2 className="mt-4 font-bold">Kategoriya</h2>
+        <select onChange={(e)=>setCategory(e.target.value)} className="border p-2">
+          <option value="All">Hammasi</option>
+          <option>Telefonlar</option>
+          <option>Quloqliklar</option>
+          <option>Planshetlar</option>
+          <option>Aksessuarlar</option>
+        </select>
+
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          {filtered.map(p => (
+            <div key={p.id} onClick={()=>addToCart(p)} className="border p-2 cursor-pointer">
+              <p>{p.name}</p>
+              <p>{p.price}</p>
+              <p>Qoldiq: {getStock(p)}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* O'ng tomondagi savatcha va to'lov paneli */}
-      <div style={{ width: 400, background: "#fff", borderLeft: "1px solid #ddd", display: "flex", flexDirection: "column", padding: 20 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 20 }}>Savat</h2>
-        <div style={{ flex: 1, overflowY: "auto", marginBottom: 20 }}>
-          {cart.map(item => (
-            <div key={item.product.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f9f9f9" }}>
-              <span>{item.product.name} (x{item.quantity})</span>
-              <span>{(item.product.price * item.quantity).toLocaleString()}</span>
+      <div>
+        <h2 className="font-bold">Savat</h2>
+        {cart.map(item => (
+          <div key={item.id} className="flex justify-between">
+            <span>{item.name}</span>
+            <div>
+              <button onClick={()=>updateQty(item.id,-1)}>-</button>
+              <span>{item.qty}</span>
+              <button onClick={()=>updateQty(item.id,1)}>+</button>
             </div>
-          ))}
+            <span>{item.price * item.qty}</span>
+          </div>
+        ))}
+
+        <button onClick={clearCart} className="bg-red-500 text-white p-1 mt-2">Tozalash</button>
+
+        <div className="mt-2">
+          <input type="number" placeholder="Chegirma" onChange={e=>setDiscount(Number(e.target.value))} />
+          <select onChange={e=>setDiscountType(e.target.value)}>
+            <option value="sum">So'm</option>
+            <option value="%">%</option>
+          </select>
         </div>
 
-        <div style={{ background: "#f9f9f9", padding: 15, borderRadius: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-            <span>Jami:</span>
-            <span style={{ fontWeight: "bold", fontSize: 20 }}>{total.toLocaleString()} so'm</span>
-          </div>
-
-          <div style={{ marginBottom: 15 }}>
-            <label style={{ fontSize: 12 }}>To'lov turi:</label>
-            <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
-              {(["cash", "card", "split"] as const).map(type => (
-                <button key={type} onClick={() => setPaymentType(type)} style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ddd", background: paymentType === type ? "#3498db" : "#fff", color: paymentType === type ? "#fff" : "#333" }}>
-                  {type === "cash" ? "Naqd" : type === "card" ? "Karta" : "Aralash"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {paymentType !== "card" && (
-            <input type="number" placeholder="Naqd summa" value={cashAmount || ""} onChange={e => setCashAmount(Number(e.target.value))} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ddd", marginBottom: 10 }} />
-          )}
-          {paymentType !== "cash" && (
-            <input type="number" placeholder="Karta summa" value={cardAmount || ""} onChange={e => setCardAmount(Number(e.target.value))} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ddd", marginBottom: 10 }} />
-          )}
-
-          <button 
-            disabled={selling || cart.length === 0}
-            onClick={finalizeSale}
-            style={{ width: "100%", padding: 15, background: "#2ecc71", color: "#fff", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}
-          >
-            {selling ? "Yuborilmoqda..." : "Sotishni yakunlash"}
-          </button>
+        <div className="mt-2">
+          <select onChange={e=>setPaymentType(e.target.value)}>
+            <option value="naqd">Naqd</option>
+            <option value="karta">Karta</option>
+            <option value="aralash">Aralash</option>
+          </select>
         </div>
+
+        {paymentType !== "karta" && (
+          <input type="number" placeholder="Naqd pul" onChange={e=>setCash(Number(e.target.value))} />
+        )}
+
+        <div className="mt-2">Jami: {finalTotal}</div>
+        {paymentType === "naqd" && <div>Qaytim: {change}</div>}
+
+        <button onClick={()=>setShowCheck(true)} className="bg-green-500 text-white p-2 mt-2">Sotish</button>
+
+        {showCheck && (
+          <div className="border p-4 mt-4">
+            <h3>Chek</h3>
+            {cart.map(i => <div key={i.id}>{i.name} x{i.qty}</div>)}
+            <p>Jami: {finalTotal}</p>
+            <button onClick={()=>{clearCart(); setShowCheck(false);}}>Yopish</button>
+          </div>
+        )}
       </div>
     </div>
   );
