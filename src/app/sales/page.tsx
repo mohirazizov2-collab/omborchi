@@ -1,23 +1,4 @@
 "use client";
-
-/**
- * POS (Point of Sale) Module
- * ─────────────────────────────────────────────────────────
- * Features:
- *  - Warehouse selection (mandatory)
- *  - Product grid with real-time search + category filter
- *  - Barcode search support
- *  - Cart with qty controls
- *  - Customer select + quick-add modal
- *  - Payment: Cash / Card / Split
- *  - Discount (% or fixed)
- *  - Offline cart persistence (localStorage)
- *  - Receipt print
- *  - Keyboard shortcuts: Ctrl+F → search, Enter → checkout
- *  - Loading skeletons, toasts, error handling
- *  - Dark mode compatible
- */
-
 import {
   useState, useEffect, useCallback, useMemo, useRef,
   KeyboardEvent,
