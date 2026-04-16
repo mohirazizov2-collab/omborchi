@@ -1,147 +1,168 @@
-import React, { useState } from "react";
+"use client";
 
-const warehouses = [
-  { id: 1, name: "Ombor 1" },
-  { id: 2, name: "Ombor 2" },
-  { id: 3, name: "Ombor 3" }
-];
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { 
+  collection, getDocs, query, where, addDoc, 
+  doc, runTransaction, serverTimestamp, increment 
+} from "firebase/firestore";
+import { db } from "@/lib/firebase"; // Firebase ulanish faylingiz
 
-const initialProducts = [
-  { id: 1, name: "iPhone 13", category: "Telefonlar", price: 1000, stock: { 1: 10, 2: 5, 3: 8 } },
-  { id: 2, name: "AirPods", category: "Quloqliklar", price: 200, stock: { 1: 15, 2: 7, 3: 10 } },
-  { id: 3, name: "iPad", category: "Planshetlar", price: 800, stock: { 1: 5, 2: 3, 3: 6 } },
-  { id: 4, name: "Zaryadnik", category: "Aksessuarlar", price: 50, stock: { 1: 20, 2: 10, 3: 12 } }
-];
+// ─── Tiplar ──────────────────────────────────────────────
+export interface Warehouse { id: string; name: string; }
+export interface Product { 
+  id: string; name: string; price: number; stock: number; 
+  category: string; barcode?: string; sku?: string; 
+}
+export interface CartItem { product: Product; quantity: number; }
 
-export default function POS() {
-  const [warehouse, setWarehouse] = useState(1);
-  const [products, setProducts] = useState(initialProducts);
-  const [cart, setCart] = useState([]);
-  const [category, setCategory] = useState("All");
-  const [discount, setDiscount] = useState(0);
-  const [discountType, setDiscountType] = useState("sum");
-  const [paymentType, setPaymentType] = useState("naqd");
-  const [cash, setCash] = useState(0);
-  const [showCheck, setShowCheck] = useState(false);
+// ─── Yordamchi Funksiyalar ────────────────────────────────
+const fmt = (n: number) => new Intl.NumberFormat("uz-UZ").format(Math.round(n));
 
-  const getStock = (p) => p.stock[warehouse];
+export default function POSPage() {
+  // States
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [warehouseId, setWarehouseId] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [selling, setSelling] = useState(false);
+  const [paymentType, setPaymentType] = useState<"cash" | "card">("cash");
 
-  const addToCart = (product) => {
-    if (getStock(product) <= 0) return;
+  // 1. Skladlarni yuklash
+  useEffect(() => {
+    const fetchWarehouses = async () => {
+      const snap = await getDocs(collection(db, "warehouses"));
+      setWarehouses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Warehouse)));
+    };
+    fetchWarehouses();
+  }, []);
 
-    setProducts(products.map(p =>
-      p.id === product.id
-        ? { ...p, stock: { ...p.stock, [warehouse]: p.stock[warehouse] - 1 } }
-        : p
-    ));
+  // 2. Mahsulotlarni yuklash (Sklad tanlanganda)
+  const loadProducts = useCallback(async (wId: string) => {
+    if (!wId) return;
+    const q = query(collection(db, "products"), where("warehouseId", "==", wId));
+    const snap = await getDocs(q);
+    setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+  }, []);
 
-    const exist = cart.find(c => c.id === product.id);
-    if (exist) {
-      setCart(cart.map(c => c.id === product.id ? { ...c, qty: c.qty + 1 } : c));
-    } else {
-      setCart([...cart, { ...product, qty: 1 }]);
+  useEffect(() => {
+    loadProducts(warehouseId);
+    setCart([]); // Sklad almashsa savatni tozalash
+  }, [warehouseId, loadProducts]);
+
+  // 3. Savat mantiqi
+  const addToCart = (product: Product) => {
+    if (product.stock <= 0) return alert("Omborda qolmagan!");
+    setCart(prev => {
+      const ex = prev.find(i => i.product.id === product.id);
+      if (ex) {
+        if (ex.quantity >= product.stock) return prev;
+        return prev.map(i => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  const total = useMemo(() => cart.reduce((s, i) => s + i.product.price * i.quantity, 0), [cart]);
+
+  // 4. Sotuv va Ombor qoldig'ini yangilash (FIREBASE TRANSACTION)
+  const handleCheckout = async () => {
+    if (!warehouseId || cart.length === 0 || selling) return;
+    setSelling(true);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // Har bir mahsulotni tekshirish va ayirish
+        for (const item of cart) {
+          const pRef = doc(db, "products", item.product.id);
+          const pSnap = await transaction.get(pRef);
+          
+          if (!pSnap.exists() || pSnap.data().stock < item.quantity) {
+            throw new Error(`${item.product.name} yetarli emas!`);
+          }
+          
+          transaction.update(pRef, { stock: increment(-item.quantity) });
+        }
+
+        // Sotuv tarixiga yozish
+        await addDoc(collection(db, "sales"), {
+          warehouseId,
+          items: cart.map(i => ({ id: i.product.id, name: i.product.name, qty: i.quantity })),
+          total,
+          paymentType,
+          createdAt: serverTimestamp()
+        });
+      });
+
+      alert("Sotuv muvaffaqiyatli!");
+      setCart([]);
+      loadProducts(warehouseId); // Qoldiqlarni qayta yuklash
+    } catch (e: any) {
+      alert("Xato: " + e.message);
+    } finally {
+      setSelling(false);
     }
   };
 
-  const updateQty = (id, delta) => {
-    setCart(cart.map(item => {
-      if (item.id === id) {
-        const qty = item.qty + delta;
-        if (qty <= 0) return null;
-        return { ...item, qty };
-      }
-      return item;
-    }).filter(Boolean));
-  };
-
-  const clearCart = () => setCart([]);
-
-  const filtered = category === "All" ? products : products.filter(p => p.category === category);
-
-  let total = cart.reduce((s, i) => s + i.price * i.qty, 0);
-
-  const discountValue = discountType === "%" ? (total * discount) / 100 : discount;
-  const finalTotal = Math.max(total - discountValue, 0);
-  const change = cash - finalTotal;
-
   return (
-    <div className="p-4 grid grid-cols-2 gap-4">
+    <div style={{ display: "flex", height: "100vh", backgroundColor: "#f0f2f5", fontFamily: "sans-serif" }}>
+      {/* Chap taraf: Mahsulotlar */}
+      <div style={{ flex: 1, padding: 20, overflowY: "auto" }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+          <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} style={{ padding: 10, borderRadius: 8, border: "1px solid #ccc" }}>
+            <option value="">Sklad tanlang</option>
+            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+          </select>
+          <input 
+            placeholder="Qidirish..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+          />
+        </div>
 
-      <div>
-        <h2 className="font-bold">Sklad</h2>
-        <select onChange={(e)=>setWarehouse(Number(e.target.value))} className="border p-2">
-          {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-
-        <h2 className="mt-4 font-bold">Kategoriya</h2>
-        <select onChange={(e)=>setCategory(e.target.value)} className="border p-2">
-          <option value="All">Hammasi</option>
-          <option>Telefonlar</option>
-          <option>Quloqliklar</option>
-          <option>Planshetlar</option>
-          <option>Aksessuarlar</option>
-        </select>
-
-        <div className="grid grid-cols-2 gap-2 mt-4">
-          {filtered.map(p => (
-            <div key={p.id} onClick={()=>addToCart(p)} className="border p-2 cursor-pointer">
-              <p>{p.name}</p>
-              <p>{p.price}</p>
-              <p>Qoldiq: {getStock(p)}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 15 }}>
+          {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
+            <div key={p.id} onClick={() => addToCart(p)} style={{ background: "#fff", padding: 15, borderRadius: 12, cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.05)", opacity: p.stock <= 0 ? 0.5 : 1 }}>
+              <div style={{ fontWeight: "bold", fontSize: 14 }}>{p.name}</div>
+              <div style={{ color: "#2ecc71", margin: "5px 0" }}>{fmt(p.price)} so'm</div>
+              <div style={{ fontSize: 12, color: "#888" }}>Zaxira: {p.stock} ta</div>
             </div>
           ))}
         </div>
       </div>
 
-      <div>
-        <h2 className="font-bold">Savat</h2>
-        {cart.map(item => (
-          <div key={item.id} className="flex justify-between">
-            <span>{item.name}</span>
-            <div>
-              <button onClick={()=>updateQty(item.id,-1)}>-</button>
-              <span>{item.qty}</span>
-              <button onClick={()=>updateQty(item.id,1)}>+</button>
+      {/* O'ng taraf: Savat va To'lov */}
+      <div style={{ width: 350, background: "#fff", borderLeft: "1px solid #ddd", padding: 20, display: "flex", flexDirection: "column" }}>
+        <h3 style={{ marginTop: 0 }}>Savat</h3>
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {cart.map(item => (
+            <div key={item.product.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
+              <span>{item.product.name} (x{item.quantity})</span>
+              <span>{fmt(item.product.price * item.quantity)}</span>
             </div>
-            <span>{item.price * item.qty}</span>
-          </div>
-        ))}
-
-        <button onClick={clearCart} className="bg-red-500 text-white p-1 mt-2">Tozalash</button>
-
-        <div className="mt-2">
-          <input type="number" placeholder="Chegirma" onChange={e=>setDiscount(Number(e.target.value))} />
-          <select onChange={e=>setDiscountType(e.target.value)}>
-            <option value="sum">So'm</option>
-            <option value="%">%</option>
-          </select>
+          ))}
         </div>
 
-        <div className="mt-2">
-          <select onChange={e=>setPaymentType(e.target.value)}>
-            <option value="naqd">Naqd</option>
-            <option value="karta">Karta</option>
-            <option value="aralash">Aralash</option>
-          </select>
-        </div>
-
-        {paymentType !== "karta" && (
-          <input type="number" placeholder="Naqd pul" onChange={e=>setCash(Number(e.target.value))} />
-        )}
-
-        <div className="mt-2">Jami: {finalTotal}</div>
-        {paymentType === "naqd" && <div>Qaytim: {change}</div>}
-
-        <button onClick={()=>setShowCheck(true)} className="bg-green-500 text-white p-2 mt-2">Sotish</button>
-
-        {showCheck && (
-          <div className="border p-4 mt-4">
-            <h3>Chek</h3>
-            {cart.map(i => <div key={i.id}>{i.name} x{i.qty}</div>)}
-            <p>Jami: {finalTotal}</p>
-            <button onClick={()=>{clearCart(); setShowCheck(false);}}>Yopish</button>
+        <div style={{ borderTop: "2px solid #eee", paddingTop: 15 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: 18, marginBottom: 15 }}>
+            <span>Jami:</span>
+            <span>{fmt(total)} so'm</span>
           </div>
-        )}
+
+          <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
+            <button onClick={() => setPaymentType("cash")} style={{ flex: 1, padding: 10, background: paymentType === "cash" ? "#3498db" : "#eee", color: paymentType === "cash" ? "#fff" : "#000", border: "none", borderRadius: 8 }}>Naqd</button>
+            <button onClick={() => setPaymentType("card")} style={{ flex: 1, padding: 10, background: paymentType === "card" ? "#3498db" : "#eee", color: paymentType === "card" ? "#fff" : "#000", border: "none", borderRadius: 8 }}>Karta</button>
+          </div>
+
+          <button 
+            disabled={selling || cart.length === 0}
+            onClick={handleCheckout}
+            style={{ width: "100%", padding: 15, background: "#27ae60", color: "#fff", border: "none", borderRadius: 10, fontWeight: "bold", cursor: "pointer" }}
+          >
+            {selling ? "Yuklanmoqda..." : "Sotishni yakunlash"}
+          </button>
+        </div>
       </div>
     </div>
   );
