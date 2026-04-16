@@ -1,29 +1,20 @@
 "use client";
- 
-/**
- * POS (Point of Sale) Module — Demo version with mock data
- * Features:
- *  - 3 ta sklad (mock data)
- *  - Mahsulot grid + kategoriya filter
- *  - Savat (qty +/−, ×, Tozalash)
- *  - Chegirma (so'm / %)
- *  - To'lov: Naqd (qaytim), Karta, Aralash
- *  - Sotish → Chek modal, ombor kamayadi
- *  - Hisobot tab: daromad, top mahsulotlar, tranzaksiyalar
- */
- 
+
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
- 
+// --- FIREBASE IMPORTLARI ---
+import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase"; // <-- O'ZINGIZNING FIREBASE FAYLINGIZ MANZILINI SHU YERGA YOZING
+
 // ─── Types ────────────────────────────────────────────────
 export interface Warehouse { id: string; name: string; location?: string; }
-export interface Product   { id: string; name: string; price: number; stock: number; category: string; barcode?: string; image?: string; sku?: string; }
-export interface Customer  { id: string; name: string; phone?: string; }
-export type PaymentType   = "cash" | "card" | "split";
-export type DiscountType  = "percent" | "fixed";
-export interface CartItem  { product: Product; quantity: number; }
+export interface Product { id: string; name: string; price: number; stock: number; category: string; barcode?: string; image?: string; sku?: string; warehouseId: string; }
+export interface Customer { id: string; name: string; phone?: string; }
+export type PaymentType = "cash" | "card" | "split";
+export type DiscountType = "percent" | "fixed";
+export interface CartItem { product: Product; quantity: number; }
 export interface Transaction {
-  id: string;
-  date: Date;
+  id?: string;
+  date: any; // Firebase Timestamp
   warehouseId: string;
   warehouseName: string;
   items: CartItem[];
@@ -35,56 +26,10 @@ export interface Transaction {
   cardAmount?: number;
   customerName?: string;
 }
- 
-// ─── Mock Data ────────────────────────────────────────────
-const MOCK_WAREHOUSES: Warehouse[] = [
-  { id: "w1", name: "Asosiy Sklad",   location: "Chilonzor" },
-  { id: "w2", name: "Shimoliy Filial", location: "Yunusobod" },
-  { id: "w3", name: "Janubiy Filial",  location: "Sergeli"   },
-];
- 
-const MOCK_PRODUCTS: Record<string, Product[]> = {
-  w1: [
-    { id: "p1",  name: "iPhone 15 Pro",       price: 14500000, stock: 8,  category: "Telefonlar",   sku: "IP15P", barcode: "111" },
-    { id: "p2",  name: "Samsung Galaxy S24",   price: 11200000, stock: 12, category: "Telefonlar",   sku: "SGS24", barcode: "112" },
-    { id: "p3",  name: "Xiaomi 14",            price: 8900000,  stock: 5,  category: "Telefonlar",   sku: "XI14",  barcode: "113" },
-    { id: "p4",  name: "AirPods Pro 2",        price: 3200000,  stock: 15, category: "Quloqliklar",  sku: "APP2",  barcode: "114" },
-    { id: "p5",  name: "Samsung Buds3",        price: 1850000,  stock: 20, category: "Quloqliklar",  sku: "SB3",   barcode: "115" },
-    { id: "p6",  name: "iPad Air M2",          price: 9800000,  stock: 4,  category: "Planshetlar",  sku: "IPA",   barcode: "116" },
-    { id: "p7",  name: "Samsung Tab S9",       price: 8700000,  stock: 3,  category: "Planshetlar",  sku: "STS9",  barcode: "117" },
-    { id: "p8",  name: "Apple Watch SE",       price: 3500000,  stock: 7,  category: "Aksessuarlar", sku: "AWSE",  barcode: "118" },
-    { id: "p9",  name: "Magsafe Zaryadlovchi", price:  650000,  stock: 30, category: "Aksessuarlar", sku: "MGSF",  barcode: "119" },
-    { id: "p10", name: "USB-C Kabel 2m",       price:  85000,   stock: 50, category: "Aksessuarlar", sku: "USBC",  barcode: "120" },
-    { id: "p11", name: "OnePlus 12",           price: 9100000,  stock: 0,  category: "Telefonlar",   sku: "OP12",  barcode: "121" },
-    { id: "p12", name: "Sony WH-1000XM5",     price: 4200000,  stock: 6,  category: "Quloqliklar",  sku: "SONY",  barcode: "122" },
-  ],
-  w2: [
-    { id: "p1",  name: "iPhone 15 Pro",       price: 14500000, stock: 3,  category: "Telefonlar",   sku: "IP15P", barcode: "111" },
-    { id: "p3",  name: "Xiaomi 14",            price: 8900000,  stock: 2,  category: "Telefonlar",   sku: "XI14",  barcode: "113" },
-    { id: "p4",  name: "AirPods Pro 2",        price: 3200000,  stock: 8,  category: "Quloqliklar",  sku: "APP2",  barcode: "114" },
-    { id: "p6",  name: "iPad Air M2",          price: 9800000,  stock: 1,  category: "Planshetlar",  sku: "IPA",   barcode: "116" },
-    { id: "p9",  name: "Magsafe Zaryadlovchi", price:  650000,  stock: 15, category: "Aksessuarlar", sku: "MGSF",  barcode: "119" },
-    { id: "p10", name: "USB-C Kabel 2m",       price:  85000,   stock: 25, category: "Aksessuarlar", sku: "USBC",  barcode: "120" },
-  ],
-  w3: [
-    { id: "p2",  name: "Samsung Galaxy S24",  price: 11200000, stock: 6,  category: "Telefonlar",   sku: "SGS24", barcode: "112" },
-    { id: "p5",  name: "Samsung Buds3",       price: 1850000,  stock: 10, category: "Quloqliklar",  sku: "SB3",   barcode: "115" },
-    { id: "p7",  name: "Samsung Tab S9",      price: 8700000,  stock: 2,  category: "Planshetlar",  sku: "STS9",  barcode: "117" },
-    { id: "p8",  name: "Apple Watch SE",      price: 3500000,  stock: 4,  category: "Aksessuarlar", sku: "AWSE",  barcode: "118" },
-    { id: "p10", name: "USB-C Kabel 2m",      price:  85000,   stock: 40, category: "Aksessuarlar", sku: "USBC",  barcode: "120" },
-    { id: "p12", name: "Sony WH-1000XM5",    price: 4200000,  stock: 3,  category: "Quloqliklar",  sku: "SONY",  barcode: "122" },
-  ],
-};
- 
-const MOCK_CUSTOMERS: Customer[] = [
-  { id: "c1", name: "Jasur Toshmatov",  phone: "+998901234567" },
-  { id: "c2", name: "Nilufar Yusupova", phone: "+998931234567" },
-  { id: "c3", name: "Bobur Aliyev",     phone: "+998911234567" },
-];
- 
+
 // ─── Utils ────────────────────────────────────────────────
 const fmt = (n: number) => new Intl.NumberFormat("uz-UZ").format(Math.round(n));
- 
+
 function useDebounce<T>(value: T, delay = 300): T {
   const [dv, setDv] = useState(value);
   useEffect(() => {
@@ -93,8 +38,7 @@ function useDebounce<T>(value: T, delay = 300): T {
   }, [value, delay]);
   return dv;
 }
- 
-// localStorage cart
+
 const CART_KEY = "pos_cart_v3";
 function loadCartFromLS(): CartItem[] {
   try { return JSON.parse(localStorage.getItem(CART_KEY) ?? "[]"); } catch { return []; }
@@ -102,7 +46,7 @@ function loadCartFromLS(): CartItem[] {
 function saveCartToLS(cart: CartItem[]) {
   try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch {}
 }
- 
+
 // ─── Toast ────────────────────────────────────────────────
 interface ToastMsg { id: number; type: "success" | "error" | "warn"; text: string; }
 function useToast() {
@@ -120,9 +64,8 @@ function useToast() {
     warn:    (t: string) => add("warn", t),
   };
 }
- 
+
 // ─── Sub-components ───────────────────────────────────────
- 
 function ToastStack({ toasts }: { toasts: ToastMsg[] }) {
   const colorMap = {
     success: { bg: "var(--color-background-success)", color: "var(--color-text-success)", border: "var(--color-border-success)" },
@@ -142,17 +85,7 @@ function ToastStack({ toasts }: { toasts: ToastMsg[] }) {
     </div>
   );
 }
- 
-function SkeletonCard() {
-  return (
-    <div style={{ background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-tertiary)", padding: 12, animation: "pulse 1.4s ease-in-out infinite" }}>
-      <div style={{ height: 72, borderRadius: 8, background: "var(--color-border-tertiary)", marginBottom: 8 }} />
-      <div style={{ height: 12, borderRadius: 6, background: "var(--color-border-tertiary)", marginBottom: 6, width: "80%" }} />
-      <div style={{ height: 12, borderRadius: 6, background: "var(--color-border-tertiary)", width: "50%" }} />
-    </div>
-  );
-}
- 
+
 function ProductCard({ product, inCart, onClick }: { product: Product; inCart: number; onClick: () => void }) {
   const outOfStock = product.stock <= 0;
   const lowStock   = product.stock > 0 && product.stock <= 3;
@@ -194,7 +127,7 @@ function ProductCard({ product, inCart, onClick }: { product: Product; inCart: n
     </button>
   );
 }
- 
+
 function CartRow({ item, onQty, onRemove, maxQty }: { item: CartItem; onQty: (d: number) => void; onRemove: () => void; maxQty: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
@@ -212,9 +145,11 @@ function CartRow({ item, onQty, onRemove, maxQty }: { item: CartItem; onQty: (d:
     </div>
   );
 }
- 
-// ─── Receipt Modal ─────────────────────────────────────────
+
 function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
+  // Sana formatini to'g'rilash (Firebase Timestamp bo'lishi mumkin)
+  const txDate = tx.date?.toDate ? tx.date.toDate() : new Date();
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>
       <div style={{ background: "var(--color-background-primary)", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-secondary)", padding: 0, width: 320, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
@@ -227,10 +162,10 @@ function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
         <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1, fontFamily: "monospace", fontSize: 12 }}>
           <div style={{ textAlign: "center", marginBottom: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-primary)" }}>DO'KON CHEKI</div>
-            <div style={{ color: "var(--color-text-secondary)", marginTop: 4 }}>#{tx.id}</div>
+            <div style={{ color: "var(--color-text-secondary)", marginTop: 4 }}>#{tx.id?.slice(0, 8)}</div>
           </div>
           <div style={{ borderTop: "1px dashed var(--color-border-secondary)", borderBottom: "1px dashed var(--color-border-secondary)", padding: "8px 0", margin: "8px 0", color: "var(--color-text-secondary)", lineHeight: 1.8 }}>
-            <div>Sana: {tx.date.toLocaleString("uz-UZ")}</div>
+            <div>Sana: {txDate.toLocaleString("uz-UZ")}</div>
             <div>Sklad: {tx.warehouseName}</div>
             {tx.customerName && <div>Mijoz: {tx.customerName}</div>}
           </div>
@@ -279,7 +214,7 @@ function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
             onClick={() => {
               const w = window.open("", "_blank");
               if (!w) return;
-              w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Chek</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font:12px monospace;padding:16px;max-width:280px}h2{text-align:center;font-size:14px;margin-bottom:8px}.d{border-top:1px dashed #000;margin:6px 0}table{width:100%}td{padding:2px 0}.t{font-weight:700;font-size:14px}</style></head><body><h2>DO'KON CHEKI</h2><div>#${tx.id}</div><div class="d"></div><div>Sana: ${tx.date.toLocaleString("uz-UZ")}</div><div>Sklad: ${tx.warehouseName}</div>${tx.customerName ? `<div>Mijoz: ${tx.customerName}</div>` : ""}<div class="d"></div><table><thead><tr><th style="text-align:left">Nomi</th><th>Soni</th><th style="text-align:right">Summa</th></tr></thead><tbody>${tx.items.map(i => `<tr><td>${i.product.name}</td><td style="text-align:center">${i.quantity}</td><td style="text-align:right">${fmt(i.product.price * i.quantity)}</td></tr>`).join("")}</tbody></table><div class="d"></div>${tx.discount > 0 ? `<div>Chegirma: ${fmt(tx.discount)} so'm</div>` : ""}<div class="t">JAMI: ${fmt(tx.total)} so'm</div><div>To'lov: ${tx.paymentType === "cash" ? "Naqd" : tx.paymentType === "card" ? "Karta" : "Aralash"}</div><div class="d"></div><div style="text-align:center;margin-top:8px">Rahmat! Yana keling!</div></body></html>`);
+              w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Chek</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font:12px monospace;padding:16px;max-width:280px}h2{text-align:center;font-size:14px;margin-bottom:8px}.d{border-top:1px dashed #000;margin:6px 0}table{width:100%}td{padding:2px 0}.t{font-weight:700;font-size:14px}</style></head><body><h2>DO'KON CHEKI</h2><div>#${tx.id?.slice(0,8)}</div><div class="d"></div><div>Sana: ${txDate.toLocaleString("uz-UZ")}</div><div>Sklad: ${tx.warehouseName}</div>${tx.customerName ? `<div>Mijoz: ${tx.customerName}</div>` : ""}<div class="d"></div><table><thead><tr><th style="text-align:left">Nomi</th><th>Soni</th><th style="text-align:right">Summa</th></tr></thead><tbody>${tx.items.map(i => `<tr><td>${i.product.name}</td><td style="text-align:center">${i.quantity}</td><td style="text-align:right">${fmt(i.product.price * i.quantity)}</td></tr>`).join("")}</tbody></table><div class="d"></div>${tx.discount > 0 ? `<div>Chegirma: ${fmt(tx.discount)} so'm</div>` : ""}<div class="t">JAMI: ${fmt(tx.total)} so'm</div><div>To'lov: ${tx.paymentType === "cash" ? "Naqd" : tx.paymentType === "card" ? "Karta" : "Aralash"}</div><div class="d"></div><div style="text-align:center;margin-top:8px">Rahmat! Yana keling!</div></body></html>`);
               w.document.close();
               w.print();
             }}
@@ -292,13 +227,12 @@ function ReceiptModal({ tx, onClose }: { tx: Transaction; onClose: () => void })
     </div>
   );
 }
- 
-// ─── Report Tab ────────────────────────────────────────────
+
 function ReportTab({ transactions }: { transactions: Transaction[] }) {
   const totalRevenue = useMemo(() => transactions.reduce((s, t) => s + t.total, 0), [transactions]);
   const totalDiscount = useMemo(() => transactions.reduce((s, t) => s + t.discount, 0), [transactions]);
   const totalItems = useMemo(() => transactions.reduce((s, t) => s + t.items.reduce((ss, i) => ss + i.quantity, 0), 0), [transactions]);
- 
+
   const productSales = useMemo(() => {
     const map: Record<string, { name: string; qty: number; revenue: number }> = {};
     transactions.forEach(tx => {
@@ -310,7 +244,7 @@ function ReportTab({ transactions }: { transactions: Transaction[] }) {
     });
     return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
   }, [transactions]);
- 
+
   const paymentBreakdown = useMemo(() => {
     let cash = 0, card = 0, split = 0;
     transactions.forEach(tx => {
@@ -320,7 +254,7 @@ function ReportTab({ transactions }: { transactions: Transaction[] }) {
     });
     return { cash, card, split };
   }, [transactions]);
- 
+
   if (transactions.length === 0) {
     return (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--color-text-tertiary)", gap: 8 }}>
@@ -330,7 +264,7 @@ function ReportTab({ transactions }: { transactions: Transaction[] }) {
       </div>
     );
   }
- 
+
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Summary cards */}
@@ -346,7 +280,7 @@ function ReportTab({ transactions }: { transactions: Transaction[] }) {
           </div>
         ))}
       </div>
- 
+
       {/* Payment breakdown */}
       <div style={{ background: "var(--color-background-primary)", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-tertiary)", padding: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 10 }}>To'lov usullari</div>
@@ -368,7 +302,7 @@ function ReportTab({ transactions }: { transactions: Transaction[] }) {
           )}
         </div>
       </div>
- 
+
       {/* Top products */}
       {productSales.length > 0 && (
         <div style={{ background: "var(--color-background-primary)", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-tertiary)", padding: 14 }}>
@@ -389,57 +323,105 @@ function ReportTab({ transactions }: { transactions: Transaction[] }) {
           </div>
         </div>
       )}
- 
+
       {/* Transactions */}
       <div style={{ background: "var(--color-background-primary)", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-tertiary)", padding: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 10 }}>📋 Tranzaksiyalar</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[...transactions].reverse().map(tx => (
-            <div key={tx.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--border-radius-md)", background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-tertiary)" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-primary)" }}>
-                  #{tx.id} · {tx.warehouseName}
+          {[...transactions].reverse().map(tx => {
+            const date = tx.date?.toDate ? tx.date.toDate() : new Date();
+            return (
+              <div key={tx.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--border-radius-md)", background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-tertiary)" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-primary)" }}>
+                    #{tx.id?.slice(0, 8)} · {tx.warehouseName}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
+                    {date.toLocaleString("uz-UZ")} · {tx.items.reduce((s, i) => s + i.quantity, 0)} ta mahsulot
+                    {tx.customerName ? ` · ${tx.customerName}` : ""}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
-                  {tx.date.toLocaleString("uz-UZ")} · {tx.items.reduce((s, i) => s + i.quantity, 0)} ta mahsulot
-                  {tx.customerName ? ` · ${tx.customerName}` : ""}
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-success)" }}>{fmt(tx.total)} so'm</div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>{tx.paymentType === "cash" ? "Naqd" : tx.paymentType === "card" ? "Karta" : "Aralash"}</div>
                 </div>
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-success)" }}>{fmt(tx.total)} so'm</div>
-                <div style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>{tx.paymentType === "cash" ? "Naqd" : tx.paymentType === "card" ? "Karta" : "Aralash"}</div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
   );
 }
- 
+
 // ═════════════════════════════════════════════════════════
 // MAIN POS COMPONENT
 // ═════════════════════════════════════════════════════════
 export default function POSPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<"pos" | "report">("pos");
- 
-  // ── Warehouses ─────────────────────────────────────────
+  const [loading, setLoading] = useState(true);
+
+  // ── Firebase Data States ────────────────────────────────
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
   const [warehouseId, setWarehouseId] = useState("");
-  const warehouses = MOCK_WAREHOUSES;
-  const selectedWarehouse = useMemo(() => warehouses.find(w => w.id === warehouseId) ?? null, [warehouseId]);
- 
-  // ── Products (mock, with local stock) ─────────────────
+  const selectedWarehouse = useMemo(() => warehouses.find(w => w.id === warehouseId) ?? null, [warehouses, warehouseId]);
+
+  // Fetch Data from Firebase on Mount
+  useEffect(() => {
+    const fetchFirebaseData = async () => {
+      try {
+        setLoading(true);
+        // 1. Warehouses
+        const whSnap = await getDocs(collection(db, "warehouses"));
+        const whData = whSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Warehouse));
+        setWarehouses(whData);
+        if (whData.length > 0 && !warehouseId) setWarehouseId(whData[0].id);
+
+        // 2. Products
+        const prSnap = await getDocs(collection(db, "products"));
+        const prData = prSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        setAllProducts(prData);
+
+        // 3. Customers
+        const custSnap = await getDocs(collection(db, "customers"));
+        const custData = custSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        setCustomers(custData);
+
+        // 4. Sales (Transactions)
+        const salesSnap = await getDocs(collection(db, "sales"));
+        const salesData = salesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+        setTransactions(salesData);
+
+      } catch (error) {
+        console.error("Ma'lumotlarni yuklashda xatolik:", error);
+        toast.error("Bazaga ulanishda xatolik yuz berdi");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFirebaseData();
+  }, [toast]);
+
+
+  // ── Products (Filtered by Warehouse + Local Stock) ─────
   const [stockOverride, setStockOverride] = useState<Record<string, Record<string, number>>>({});
- 
+
   const products: Product[] = useMemo(() => {
     if (!warehouseId) return [];
-    return (MOCK_PRODUCTS[warehouseId] ?? []).map(p => ({
+    // O'sha omborga tegishli mahsulotlarni filtrlash (yoki barchasini ko'rsatish)
+    const warehouseProducts = allProducts.filter(p => p.warehouseId === warehouseId || !p.warehouseId);
+    
+    return warehouseProducts.map(p => ({
       ...p,
       stock: stockOverride[warehouseId]?.[p.id] ?? p.stock,
     }));
-  }, [warehouseId, stockOverride]);
- 
+  }, [warehouseId, allProducts, stockOverride]);
+
   const reduceStock = useCallback((items: CartItem[]) => {
     setStockOverride(prev => {
       const wid = warehouseId;
@@ -451,24 +433,23 @@ export default function POSPage() {
       return { ...prev, [wid]: updated };
     });
   }, [warehouseId]);
- 
+
   // ── Customers ──────────────────────────────────────────
-  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
   const [customerId, setCustomerId] = useState("");
   const [showNewCustomer, setShowNewCustomer] = useState(false);
- 
+
   // ── Search & filter ────────────────────────────────────
   const searchRef = useRef<HTMLInputElement>(null);
   const [searchRaw, setSearchRaw] = useState("");
   const search   = useDebounce(searchRaw, 300);
   const [category, setCategory] = useState("all");
- 
+
   const categories = useMemo(() => {
     const cats = new Set<string>();
-    products.forEach(p => cats.add(p.category));
+    products.forEach(p => p.category && cats.add(p.category));
     return Array.from(cats).sort();
   }, [products]);
- 
+
   const filteredProducts = useMemo(() => {
     const q = search.toLowerCase();
     return products.filter(p => {
@@ -477,15 +458,14 @@ export default function POSPage() {
       return p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.includes(search);
     });
   }, [products, search, category]);
- 
-  // Clear category when warehouse changes
+
   useEffect(() => { setCategory("all"); setSearchRaw(""); }, [warehouseId]);
- 
+
   // ── Cart ───────────────────────────────────────────────
   const [cart, setCart] = useState<CartItem[]>(() => loadCartFromLS());
   useEffect(() => { saveCartToLS(cart); }, [cart]);
   useEffect(() => { if (warehouseId) setCart([]); }, [warehouseId]);
- 
+
   const addToCart = useCallback((product: Product) => {
     setCart(prev => {
       const existing = prev.find(i => i.product.id === product.id);
@@ -499,7 +479,7 @@ export default function POSPage() {
       return [...prev, { product, quantity: 1 }];
     });
   }, [toast, stockOverride, warehouseId]);
- 
+
   const changeQty = useCallback((productId: string, delta: number) => {
     setCart(prev =>
       prev.map(i => {
@@ -512,29 +492,29 @@ export default function POSPage() {
       }).filter(Boolean)
     );
   }, [toast, stockOverride, warehouseId]);
- 
+
   const removeFromCart = useCallback((productId: string) => { setCart(prev => prev.filter(i => i.product.id !== productId)); }, []);
   const clearCart      = useCallback(() => setCart([]), []);
   const cartQty        = useCallback((productId: string) => cart.find(i => i.product.id === productId)?.quantity ?? 0, [cart]);
- 
+
   // ── Pricing ────────────────────────────────────────────
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.product.price * i.quantity, 0), [cart]);
   const [discountType, setDiscountType] = useState<DiscountType>("fixed");
   const [discountVal, setDiscountVal]   = useState(0);
- 
+
   const discountAmount = useMemo(() => {
     if (!discountVal) return 0;
     if (discountType === "percent") return Math.round(subtotal * discountVal / 100);
     return Math.min(discountVal, subtotal);
   }, [subtotal, discountVal, discountType]);
- 
+
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
- 
+
   // ── Payment ────────────────────────────────────────────
   const [paymentType, setPaymentType] = useState<PaymentType>("cash");
   const [cashAmount, setCashAmount]   = useState(0);
   const [cardAmount, setCardAmount]   = useState(0);
- 
+
   const change     = useMemo(() => paymentType === "cash" ? Math.max(0, cashAmount - total) : 0, [paymentType, cashAmount, total]);
   const splitValid = useMemo(() => paymentType !== "split" || Math.round(cashAmount + cardAmount) >= Math.round(total), [paymentType, cashAmount, cardAmount, total]);
   const paymentValid = useMemo(() => {
@@ -543,27 +523,22 @@ export default function POSPage() {
     if (paymentType === "card") return true;
     return splitValid;
   }, [cart, paymentType, cashAmount, total, splitValid]);
- 
+
   // ── Transactions & Receipt ─────────────────────────────
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [receipt, setReceipt] = useState<Transaction | null>(null);
   const [selling, setSelling] = useState(false);
- 
+
   const handleSell = useCallback(async () => {
     if (selling || !paymentValid) return;
     if (!warehouseId) { toast.error("Sklad tanlanmagan"); return; }
     if (!cart.length)  { toast.error("Savat bo'sh"); return; }
- 
+
     setSelling(true);
-    // Simulate slight delay
-    await new Promise(r => setTimeout(r, 400));
- 
-    const id = Math.random().toString(36).slice(2, 8).toUpperCase();
+
     const customer = customers.find(c => c.id === customerId);
- 
-    const tx: Transaction = {
-      id,
-      date: new Date(),
+    
+    const newTx: Transaction = {
+      date: serverTimestamp(), // Firebase server vaqti
       warehouseId,
       warehouseName: selectedWarehouse?.name ?? "",
       items: cart.map(i => ({ ...i })),
@@ -575,21 +550,39 @@ export default function POSPage() {
       cardAmount: paymentType !== "cash" ? cardAmount : undefined,
       customerName: customer?.name,
     };
- 
-    reduceStock(cart);
-    setTransactions(prev => [...prev, tx]);
-    setReceipt(tx);
-    toast.success(`Sotuv amalga oshdi! #${id}`);
- 
-    // Reset
-    clearCart();
-    setDiscountVal(0);
-    setCashAmount(0);
-    setCardAmount(0);
-    setCustomerId("");
-    setSelling(false);
-  }, [selling, paymentValid, warehouseId, cart, customers, customerId, selectedWarehouse, subtotal, discountAmount, total, paymentType, cashAmount, cardAmount, reduceStock, clearCart, toast]);
- 
+
+    try {
+      // 1. Sotuvni bazaga qo'shish
+      const docRef = await addDoc(collection(db, "sales"), newTx);
+      const savedTx = { ...newTx, id: docRef.id };
+      
+      // 2. Mahsulotlar qoldig'ini (stock) Firebase'da yangilash
+      for (const item of cart) {
+        const productRef = doc(db, "products", item.product.id);
+        const liveStock = stockOverride[warehouseId]?.[item.product.id] ?? item.product.stock;
+        await updateDoc(productRef, { stock: Math.max(0, liveStock - item.quantity) });
+      }
+
+      // Mahalliy holatni yangilash
+      reduceStock(cart);
+      setTransactions(prev => [...prev, savedTx]);
+      setReceipt(savedTx);
+      toast.success(`Sotuv amalga oshdi! #${savedTx.id.slice(0,6)}`);
+
+      clearCart();
+      setDiscountVal(0);
+      setCashAmount(0);
+      setCardAmount(0);
+      setCustomerId("");
+
+    } catch (error) {
+      console.error("Xatolik:", error);
+      toast.error("Saqlashda xatolik yuz berdi.");
+    } finally {
+      setSelling(false);
+    }
+  }, [selling, paymentValid, warehouseId, cart, customers, customerId, selectedWarehouse, subtotal, discountAmount, total, paymentType, cashAmount, cardAmount, reduceStock, clearCart, toast, stockOverride]);
+
   // ── Keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
@@ -601,8 +594,12 @@ export default function POSPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [handleSell]);
- 
+
   // ══════════════════════════════════════════════════════
+  if (loading) {
+    return <div style={{height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-secondary)"}}>Ma'lumotlar yuklanmoqda...</div>;
+  }
+
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--color-background-tertiary)", fontFamily: "var(--font-sans)", position: "relative" }}>
       <style>{`
@@ -620,15 +617,15 @@ export default function POSPage() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--color-border-secondary); border-radius: 4px; }
       `}</style>
- 
+
       <ToastStack toasts={toast.toasts} />
- 
+
       {/* ── LEFT: Products ─────────────────────────────────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
- 
+
         {/* Top bar */}
         <div style={{ background: "var(--color-background-primary)", borderBottom: "0.5px solid var(--color-border-tertiary)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
- 
+
           {/* Tab switcher */}
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
             {([
@@ -648,7 +645,7 @@ export default function POSPage() {
               >{label}</button>
             ))}
           </div>
- 
+
           {activeTab === "pos" && (
             <>
               {/* Warehouse */}
@@ -660,10 +657,10 @@ export default function POSPage() {
                   style={{ minWidth: 150, borderColor: !warehouseId ? "var(--color-border-warning)" : undefined, fontWeight: warehouseId ? 500 : 400 }}
                 >
                   <option value="">Sklad tanlang *</option>
-                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name} ({w.location})</option>)}
+                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name} {w.location ? `(${w.location})` : ""}</option>)}
                 </select>
               </div>
- 
+
               {/* Search */}
               <div style={{ position: "relative", flex: 1, maxWidth: 300 }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-tertiary)", pointerEvents: "none" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -676,7 +673,7 @@ export default function POSPage() {
                   style={{ width: "100%", paddingLeft: 30, boxSizing: "border-box" }}
                 />
               </div>
- 
+
               {/* Category filter */}
               {categories.length > 0 && (
                 <div style={{ display: "flex", gap: 6, overflowX: "auto", flex: 1 }}>
@@ -693,12 +690,12 @@ export default function POSPage() {
                   ))}
                 </div>
               )}
- 
+
               <span style={{ fontSize: 12, color: "var(--color-text-tertiary)", flexShrink: 0 }}>{filteredProducts.length} ta</span>
             </>
           )}
         </div>
- 
+
         {/* Content */}
         {activeTab === "pos" ? (
           <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
@@ -732,10 +729,10 @@ export default function POSPage() {
           <ReportTab transactions={transactions} />
         )}
       </div>
- 
+
       {/* ── RIGHT: Cart & Checkout ──────────────────────────── */}
       <div style={{ width: 340, flexShrink: 0, background: "var(--color-background-primary)", borderLeft: "0.5px solid var(--color-border-tertiary)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
- 
+
         {/* Cart header */}
         <div style={{ padding: "12px 16px 10px", borderBottom: "0.5px solid var(--color-border-tertiary)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -751,7 +748,7 @@ export default function POSPage() {
             <button onClick={clearCart} style={{ fontSize: 11, color: "var(--color-text-danger)", border: "none", background: "none", cursor: "pointer" }}>Tozalash</button>
           )}
         </div>
- 
+
         {/* Cart items */}
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px" }}>
           {cart.length === 0 ? (
@@ -770,10 +767,10 @@ export default function POSPage() {
             ))
           )}
         </div>
- 
+
         {/* Bottom form */}
         <div style={{ borderTop: "0.5px solid var(--color-border-tertiary)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, flexShrink: 0, background: "var(--color-background-secondary)" }}>
- 
+
           {/* Customer */}
           <div style={{ display: "flex", gap: 6 }}>
             <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={{ flex: 1 }}>
@@ -782,7 +779,7 @@ export default function POSPage() {
             </select>
             <button onClick={() => setShowNewCustomer(true)} style={{ padding: "6px 10px", fontSize: 18, lineHeight: 1 }} title="Yangi mijoz">+</button>
           </div>
- 
+
           {/* Discount */}
           {cart.length > 0 && (
             <div style={{ display: "flex", gap: 6 }}>
@@ -799,7 +796,7 @@ export default function POSPage() {
               />
             </div>
           )}
- 
+
           {/* Totals */}
           {cart.length > 0 && (
             <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: "var(--border-radius-md)", padding: "10px 12px" }}>
@@ -817,7 +814,7 @@ export default function POSPage() {
               </div>
             </div>
           )}
- 
+
           {/* Payment type */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
             {([
@@ -833,7 +830,7 @@ export default function POSPage() {
               }}>{label}</button>
             ))}
           </div>
- 
+
           {/* Cash input */}
           {paymentType === "cash" && cart.length > 0 && (
             <div>
@@ -843,7 +840,7 @@ export default function POSPage() {
               )}
             </div>
           )}
- 
+
           {/* Split input */}
           {paymentType === "split" && cart.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -854,7 +851,7 @@ export default function POSPage() {
               )}
             </div>
           )}
- 
+
           {/* Sell button */}
           <button
             onClick={handleSell}
@@ -874,56 +871,70 @@ export default function POSPage() {
               : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>Sotish — {fmt(total)} so'm</>
             }
           </button>
- 
+
           <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", textAlign: "center" }}>
             Enter → sotish · Ctrl+F → qidirish
           </div>
         </div>
       </div>
- 
+
       {/* ── New Customer Modal ──────────────────────────────── */}
       {showNewCustomer && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
           <div style={{ background: "var(--color-background-primary)", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-secondary)", padding: 24, width: 320, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
             <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 16, color: "var(--color-text-primary)" }}>Yangi mijoz qo'shish</div>
             <NewCustomerForm
-              onSave={c => { setCustomers(prev => [...prev, c]); setCustomerId(c.id); setShowNewCustomer(false); toast.success(`${c.name} qo'shildi`); }}
+              onSave={async (c) => { 
+                try {
+                  const docRef = await addDoc(collection(db, "customers"), c);
+                  const newC = { ...c, id: docRef.id };
+                  setCustomers(prev => [...prev, newC]); 
+                  setCustomerId(newC.id); 
+                  setShowNewCustomer(false); 
+                  toast.success(`${c.name} bazaga qo'shildi`);
+                } catch (e) {
+                  toast.error("Xatolik");
+                }
+              }}
               onClose={() => setShowNewCustomer(false)}
             />
           </div>
         </div>
       )}
- 
+
       {/* ── Receipt Modal ───────────────────────────────────── */}
       {receipt && <ReceiptModal tx={receipt} onClose={() => setReceipt(null)} />}
     </div>
   );
 }
- 
+
 // ─── New Customer Form ─────────────────────────────────────
-function NewCustomerForm({ onSave, onClose }: { onSave: (c: Customer) => void; onClose: () => void }) {
+function NewCustomerForm({ onSave, onClose }: { onSave: (c: any) => void; onClose: () => void }) {
   const [name, setName]   = useState("");
   const [phone, setPhone] = useState("");
   const [err, setErr]     = useState("");
- 
-  const save = () => {
+  const [loading, setLoading] = useState(false);
+
+  const save = async () => {
     if (!name.trim()) { setErr("Ism kiritilishi shart"); return; }
-    const c: Customer = { id: `c${Date.now()}`, name: name.trim(), phone: phone.trim() || undefined };
-    onSave(c);
+    setLoading(true);
+    // id'ni Firebase o'zi beradi, shuning uchun bu yerdan olib tashladik
+    const c = { name: name.trim(), phone: phone.trim() || null };
+    await onSave(c);
+    setLoading(false);
   };
- 
+
   return (
     <>
       {err && <div style={{ color: "var(--color-text-danger)", fontSize: 12, marginBottom: 8 }}>{err}</div>}
       <input placeholder="Ism *" value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", marginBottom: 10, boxSizing: "border-box" }} />
       <input placeholder="Telefon" value={phone} onChange={e => setPhone(e.target.value)} style={{ width: "100%", marginBottom: 16, boxSizing: "border-box" }} />
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button onClick={onClose} style={{ padding: "7px 16px" }}>Bekor</button>
-        <button onClick={save} style={{ padding: "7px 16px", background: "var(--color-background-info)", color: "var(--color-text-info)", border: "0.5px solid var(--color-border-info)", borderRadius: "var(--border-radius-md)", cursor: "pointer" }}>
-          Saqlash
+        <button onClick={onClose} disabled={loading} style={{ padding: "7px 16px" }}>Bekor</button>
+        <button onClick={save} disabled={loading} style={{ padding: "7px 16px", background: "var(--color-background-info)", color: "var(--color-text-info)", border: "0.5px solid var(--color-border-info)", borderRadius: "var(--border-radius-md)", cursor: "pointer" }}>
+          {loading ? "..." : "Saqlash"}
         </button>
       </div>
     </>
   );
 }
- 
