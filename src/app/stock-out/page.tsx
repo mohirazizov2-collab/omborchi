@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Trash2, Plus, Loader2, Search, Download,
   CheckCircle2, FileOutput, AlertTriangle, ArrowRight, Info,
@@ -517,8 +516,8 @@ export default function StockOutPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
-                            {["Поставщик", "Сотрудник", "Гость", "Юридическое лицо", "Другое"].map(t => (
-                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            {["Поставщик", "Сотрудник", "Гость", "Юридическое лицо", "Другое"].map(buyerOpt => (
+                              <SelectItem key={buyerOpt} value={buyerOpt}>{buyerOpt}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -758,7 +757,7 @@ export default function StockOutPage() {
                               <td className="px-2 py-1.5 bg-blue-500/[0.02]">
                                 <Input
                                   type="number" min={0}
-                                  className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-center w-18"
+                                  className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-center w-16"
                                   value={item.inPackage}
                                   onChange={e => updateItem(item.id, "inPackage", parseFloat(e.target.value) || 0)}
                                 />
@@ -767,7 +766,7 @@ export default function StockOutPage() {
                                 <Input
                                   type="number" min={0}
                                   className={cn(
-                                    "h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-center w-18",
+                                    "h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-center w-16",
                                     item.inUnit > calc.stockBefore && "border-rose-500 text-rose-600"
                                   )}
                                   value={item.inUnit}
