@@ -1,5 +1,5 @@
 "use client";
- 
+
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { generateInvoicePDF } from "@/services/pdf-service";
- 
+
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
- 
+
 async function getNextOrderNumber(db: any): Promise<string> {
   const counterRef = doc(db, "counters", "stockOut");
   try {
@@ -41,7 +41,7 @@ async function getNextOrderNumber(db: any): Promise<string> {
     return `AO-${Date.now().toString().slice(-4)}`;
   }
 }
- 
+
 // iiko product tabs
 const PRODUCT_TABS = [
   { key: "all", label: "Все" },
@@ -51,27 +51,27 @@ const PRODUCT_TABS = [
   { key: "services", label: "Услуги" },
   { key: "modifiers", label: "Модификаторы" },
 ] as const;
- 
+
 type ProductTab = typeof PRODUCT_TABS[number]["key"];
- 
+
 // VAT rates
 const VAT_RATES = ["0%", "12%", "20%", "Без НДС"];
- 
+
 // Concept options
 const CONCEPTS = ["Столовая", "Ресторан", "Кафе", "Бар", "Фастфуд"];
- 
+
 // Revenue / expense accounts
 const REVENUE_ACCOUNTS = ["Торговая выручка", "Прочие доходы", "Оптовая выручка"];
 const EXPENSE_ACCOUNTS = ["Расход продуктов", "Себестоимость продаж", "Прочие расходы"];
- 
+
 // ✅ YANGI: Chiqim turi
 const OUTGOING_TYPES = [
   { value: "sale", label: "Sotuv", description: "Mahsulot sotildi" },
   { value: "expense", label: "Xarajat", description: "Mahsulot sarflandi / hisobdan chiqarildi" },
 ] as const;
- 
+
 type OutgoingType = "sale" | "expense";
- 
+
 interface StockItem {
   id: string;
   productId: string;
@@ -86,21 +86,21 @@ interface StockItem {
   writeoffCoeff: number;
   itemComment: string;
 }
- 
+
 export default function StockOutPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, assignedWarehouseId } = useUser();
- 
+
   // Tabs
   const [activeTab, setActiveTab] = useState<"properties" | "delivery">("properties");
   const [productTab, setProductTab] = useState<ProductTab>("all");
- 
+
   // Loading
   const [loading, setLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
- 
+
   // iiko Основные свойства fields
   const [orderNumber, setOrderNumber] = useState("");
   const [orderDate, setOrderDate] = useState(() => {
@@ -109,7 +109,7 @@ export default function StockOutPage() {
   });
   const [concept, setConcept] = useState("");
   const [docComment, setDocComment] = useState("");
- 
+
   // iiko right-side fields
   const [buyerType, setBuyerType] = useState("Поставщик");
   const [recipient, setRecipient] = useState("");
@@ -117,10 +117,10 @@ export default function StockOutPage() {
   const [shipFromWarehouse, setShipFromWarehouse] = useState(true);
   const [revenueAccount, setRevenueAccount] = useState("Торговая выручка");
   const [expenseAccount, setExpenseAccount] = useState("Расход продуктов");
- 
+
   // ✅ YANGI: Chiqim turi state
   const [outgoingType, setOutgoingType] = useState<OutgoingType>("sale");
- 
+
   // Items
   const [items, setItems] = useState<StockItem[]>([
     {
@@ -131,36 +131,36 @@ export default function StockOutPage() {
       writeoffCoeff: 1, itemComment: "",
     },
   ]);
- 
+
   // Dialogs
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [processedInvoice, setProcessedInvoice] = useState<any>(null);
- 
+
   const isAdmin = role === "Super Admin" || role === "Admin";
- 
+
   useEffect(() => {
     if (!db) return;
     setOrderLoading(true);
     getNextOrderNumber(db).then((num) => setOrderNumber(num)).finally(() => setOrderLoading(false));
   }, [db]);
- 
+
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
   }, [isAdmin, assignedWarehouseId]);
- 
+
   const productsQuery = useMemoFirebase(() => db ? collection(db, "products") : null, [db]);
   const { data: products } = useCollection(productsQuery);
- 
+
   const warehousesQuery = useMemoFirebase(() => db ? collection(db, "warehouses") : null, [db]);
   const { data: warehouses } = useCollection(warehousesQuery);
- 
+
   const inventoryQuery = useMemoFirebase(() => db ? collection(db, "inventory") : null, [db]);
   const { data: inventory } = useCollection(inventoryQuery);
- 
+
   const formatMoney = (val: number) =>
     val.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
- 
+
   const getStockForProduct = useCallback(
     (pId: string) => {
       if (!warehouseId || !pId || !inventory) return 0;
@@ -169,14 +169,14 @@ export default function StockOutPage() {
     },
     [warehouseId, inventory]
   );
- 
+
   // Filter products by active tab
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (productTab === "all") return products;
     return products.filter(p => (p.category || "goods") === productTab);
   }, [products, productTab]);
- 
+
   const addItem = () => setItems(prev => [...prev, {
     id: generateId(), productId: "", searchQuery: "",
     size: "шт", inPackage: 1, inUnit: 1,
@@ -184,11 +184,11 @@ export default function StockOutPage() {
     discount: 0, vatRate: "Без НДС",
     writeoffCoeff: 1, itemComment: "",
   }]);
- 
+
   const removeItem = (id: string) => {
     if (items.length > 1) setItems(items.filter(i => i.id !== id));
   };
- 
+
   const updateItem = (id: string, field: string, value: any) => {
     setItems(prev => prev.map(item => {
       if (item.id !== id) return item;
@@ -206,7 +206,7 @@ export default function StockOutPage() {
       return updated;
     }));
   };
- 
+
   // Calculations per row
   const getRowCalc = (item: StockItem) => {
     const qty = item.inUnit || 0;
@@ -231,7 +231,7 @@ export default function StockOutPage() {
       costPerUnit, costTotal,
     };
   };
- 
+
   const validation = useMemo(() => {
     const errors: string[] = [];
     const itemErrors: Record<string, string> = {};
@@ -248,7 +248,7 @@ export default function StockOutPage() {
     });
     return { isValid: errors.length === 0 && Object.keys(itemErrors).length === 0, errors, itemErrors };
   }, [items, warehouseId, recipient, getStockForProduct]);
- 
+
   const totals = useMemo(() => {
     let gross = 0, discount = 0, vat = 0, noVat = 0, cost = 0;
     items.forEach(item => {
@@ -261,7 +261,7 @@ export default function StockOutPage() {
     });
     return { gross, discount, vat, noVat, net: gross - discount, cost };
   }, [items, getStockForProduct, products]);
- 
+
   const handlePreDispatch = () => {
     if (!validation.isValid) {
       toast({ variant: "destructive", title: "Xatolik", description: validation.errors[0] || "Jadvaldagi xatoliklarni to'g'rilang." });
@@ -269,7 +269,7 @@ export default function StockOutPage() {
     }
     setIsConfirmOpen(true);
   };
- 
+
   const handleFinalProcess = async () => {
     setIsConfirmOpen(false);
     setLoading(true);
@@ -277,14 +277,14 @@ export default function StockOutPage() {
     try {
       const invoiceItems: any[] = [];
       const currentUserName = user?.displayName || user?.email || "Noma'lum";
- 
+
       for (const item of items) {
         const product = products?.find(p => p.id === item.productId);
         const { inUnit } = item;
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
         const calc = getRowCalc(item);
- 
+
         invoiceItems.push({
           name: product?.name || "Noma'lum",
           sku: product?.sku || "",
@@ -298,7 +298,7 @@ export default function StockOutPage() {
           costPerUnit: calc.costPerUnit,
           costTotal: calc.costTotal,
         });
- 
+
         addDocumentNonBlocking(collection(db, "stockMovements"), {
           productId: item.productId,
           productName: product?.name || "Noma'lum",
@@ -325,14 +325,14 @@ export default function StockOutPage() {
           totalPrice: calc.afterDiscount,
           unit: product?.unit || "шт",
         });
- 
+
         if (product) {
           updateDocumentNonBlocking(doc(db, "products", item.productId), {
             stock: (product.stock || 0) - inUnit,
             updatedAt: new Date().toISOString(),
           });
         }
- 
+
         const invSnap = await getDoc(invRef);
         if (invSnap.exists()) {
           updateDocumentNonBlocking(invRef, {
@@ -346,7 +346,7 @@ export default function StockOutPage() {
           });
         }
       }
- 
+
       setProcessedInvoice({
         orderNumber: saleId, recipient, buyerType, concept,
         warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
@@ -354,7 +354,7 @@ export default function StockOutPage() {
         responsible: currentUserName, totals,
         outgoingType,
       });
- 
+
       toast({ title: "Chiqim nakladnoyi", description: `${saleId} — muvaffaqiyatli bajarildi.` });
       setIsSuccessOpen(true);
       setItems([{
@@ -377,7 +377,7 @@ export default function StockOutPage() {
       setLoading(false);
     }
   };
- 
+
   const handleDownloadPDF = async () => {
     if (!processedInvoice) return;
     const currencyStr = t.settings.currency.split(" ")[0];
@@ -396,7 +396,7 @@ export default function StockOutPage() {
       },
     });
   };
- 
+
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
@@ -410,7 +410,7 @@ export default function StockOutPage() {
               от {new Date(orderDate).toLocaleDateString("ru-RU")}
             </span>
           </h1>
- 
+
           {/* Tabs */}
           <div className="flex gap-0">
             {[
@@ -432,7 +432,7 @@ export default function StockOutPage() {
             ))}
           </div>
         </div>
- 
+
         <div className="flex-1 overflow-y-auto">
           {/* ===== TAB 1: Основные свойства ===== */}
           {activeTab === "properties" && (
@@ -454,7 +454,7 @@ export default function StockOutPage() {
                           />
                         </div>
                       </div>
- 
+
                       {/* Дата и время */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Дата и время выдачи:</Label>
@@ -465,7 +465,7 @@ export default function StockOutPage() {
                           onChange={e => setOrderDate(e.target.value)}
                         />
                       </div>
- 
+
                       {/* Концепция */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Концепция:</Label>
@@ -478,7 +478,7 @@ export default function StockOutPage() {
                           </SelectContent>
                         </Select>
                       </div>
- 
+
                       {/* Комментарий */}
                       <div className="flex items-start gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0 mt-2">Комментарий:</Label>
@@ -491,7 +491,7 @@ export default function StockOutPage() {
                           </SelectContent>
                         </Select>
                       </div>
- 
+
                       {/* Действия */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 shrink-0" />
@@ -506,7 +506,7 @@ export default function StockOutPage() {
                         </Select>
                       </div>
                     </div>
- 
+
                     {/* RIGHT column */}
                     <div className="space-y-3">
                       {/* Тип покупателя */}
@@ -523,7 +523,7 @@ export default function StockOutPage() {
                           </SelectContent>
                         </Select>
                       </div>
- 
+
                       {/* Покупатель */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Покупатель:</Label>
@@ -539,7 +539,7 @@ export default function StockOutPage() {
                           </Button>
                         </div>
                       </div>
- 
+
                       {/* Отгрузить со склада */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Отгрузить со склада:</Label>
@@ -566,7 +566,7 @@ export default function StockOutPage() {
                           </Button>
                         </div>
                       </div>
- 
+
                       {/* Счет выручки */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Счет выручки:</Label>
@@ -584,7 +584,7 @@ export default function StockOutPage() {
                           </Button>
                         </div>
                       </div>
- 
+
                       {/* Расходный счет */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Расходный счет:</Label>
@@ -602,7 +602,7 @@ export default function StockOutPage() {
                           </Button>
                         </div>
                       </div>
- 
+
                       {/* ✅ YANGI: Chiqim turi — Sotuv yoki Xarajat */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Chiqim turi:</Label>
@@ -629,7 +629,7 @@ export default function StockOutPage() {
                   </div>
                 </CardContent>
               </Card>
- 
+
               {/* ===== Product tabs ===== */}
               <Card className="border border-border/30 rounded-xl bg-card/50 overflow-hidden">
                 {/* Tab strip */}
@@ -659,7 +659,7 @@ export default function StockOutPage() {
                     </Button>
                   </div>
                 </div>
- 
+
                 {/* Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -692,7 +692,7 @@ export default function StockOutPage() {
                           const product = products?.find(p => p.id === item.productId);
                           const calc = getRowCalc(item);
                           const hasError = validation.itemErrors[item.id];
- 
+
                           return (
                             <motion.tr
                               key={item.id}
@@ -851,7 +851,7 @@ export default function StockOutPage() {
                           );
                         })}
                       </AnimatePresence>
- 
+
                       {/* Totals row */}
                       <tr className="bg-muted/20 font-black text-xs border-t-2 border-border/30">
                         <td colSpan={8} className="px-3 py-2 text-right text-muted-foreground">Итого:</td>
@@ -868,7 +868,7 @@ export default function StockOutPage() {
                   </table>
                 </div>
               </Card>
- 
+
               {/* iiko-style bottom warning + totals */}
               <div className="flex items-center justify-between pt-1">
                 <p className="text-xs text-rose-600 font-bold flex items-center gap-1.5">
@@ -882,7 +882,7 @@ export default function StockOutPage() {
                   </span>
                 </p>
               </div>
- 
+
               {/* iiko-style action buttons */}
               <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/20">
                 <Button
@@ -922,7 +922,7 @@ export default function StockOutPage() {
               </div>
             </div>
           )}
- 
+
           {/* TAB 2: Доставка и оплата */}
           {activeTab === "delivery" && (
             <div className="p-6">
@@ -936,7 +936,7 @@ export default function StockOutPage() {
             </div>
           )}
         </div>
- 
+
         {/* ===== Confirm Dialog ===== */}
         <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
@@ -997,7 +997,7 @@ export default function StockOutPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
- 
+
         {/* ===== Success Dialog ===== */}
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground p-8 shadow-2xl text-center">
