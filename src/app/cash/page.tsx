@@ -1,176 +1,225 @@
-"use client";
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, type User as FirebaseUser,
-} from "firebase/auth";
-import {
-  getFirestore, collection, getDocs, addDoc, doc, getDoc, updateDoc, increment,
-  serverTimestamp, query, orderBy, limit, onSnapshot, where,
-} from "firebase/firestore";
-import { app } from "@/lib/firebase";
+    // ============ AUTH FUNKSIYALARI ============
 
-const auth = getAuth(app);
-const db   = getFirestore(app);
+    function isAuthenticated() {
+      return request.auth != null;
+    }
 
-type Role = "cashier" | "seller" | "admin" | "master";
+    function isMasterAdmin() {
+      return isAuthenticated() &&
+        request.auth.token.email == "f2472839@gmail.com";
+    }
 
-interface StaffDoc {
-  uid: string;
-  name: string;
-  email: string;
-  role: Role;
-  warehouseId?: string;
+    // Staff hujjatidan role ni olish (custom claims ishlamasa ham ishlaydi)
+    function getUserRole() {
+      return get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && (
+        isMasterAdmin() ||
+        (request.auth.token.role == role) ||
+        // Fallback: Firestore dan o'qish (custom claims yo'q bo'lsa)
+        getUserRole() == role
+      );
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        isMasterAdmin() ||
+        request.auth.token.role in ["admin", "master"] ||
+        getUserRole() in ["admin", "master"]
+      );
+    }
+
+    function isCashier() {
+      return isAuthenticated() && (
+        isMasterAdmin() ||
+        request.auth.token.role in ["cashier", "admin", "master"] ||
+        getUserRole() in ["cashier", "admin", "master"]
+      );
+    }
+
+    // ============ VALIDATION ============
+
+    function validProduct() {
+      let d = request.resource.data;
+      return d.keys().hasAll(["name", "price", "stock", "category", "warehouseId"]) &&
+             d.name is string && d.name.size() > 0 &&
+             d.price is number && d.price > 0 &&
+             d.stock is number && d.stock >= 0 &&
+             d.category is string &&
+             d.warehouseId is string;
+    }
+
+    function validSale() {
+      let d = request.resource.data;
+      return d.keys().hasAll(["items", "total", "warehouseId"]) &&
+             d.items is list && d.items.size() > 0 &&
+             d.total is number && d.total >= 0 &&
+             d.warehouseId is string;
+    }
+
+    function validStaff() {
+      let d = request.resource.data;
+      return d.keys().hasAll(["email", "role", "name"]) &&
+             d.email is string &&
+             d.role in ["master", "admin", "cashier", "seller"] &&
+             d.name is string && d.name.size() > 0;
+    }
+
+    // ============ STAFF / USERS ============
+    // Bu kolleksiya getUserRole() uchun kerak — eng muhim!
+    match /staff/{userId} {
+      // Foydalanuvchi o'z hujjatini o'qiy oladi
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || isAdmin()
+      );
+      allow create: if isMasterAdmin() && validStaff();
+      allow update: if isMasterAdmin() && validStaff();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ PRODUCTS ============
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && validProduct();
+      allow update: if isAdmin() && validProduct();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ WAREHOUSES ============
+    match /warehouses/{warehouseId} {
+      allow read: if isAuthenticated();
+      allow create: if isMasterAdmin();
+      allow update: if isAdmin(); // Admin ham update qila olsin
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ CUSTOMERS ============
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow create: if isCashier(); // Cashier ham yaratsin
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ SALES / TRANSACTIONS ============
+    match /sales/{saleId} {
+      allow read: if isAuthenticated();
+      allow create: if isCashier() && validSale();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ EMPLOYEES ============
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ EXPENSES ============
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ REPORTS ============
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isMasterAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ CATEGORIES ============
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ NOTIFICATIONS ============
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      // Faqat o'z notifikatsiyasini read qilib update qilsin
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ============ SETTINGS ============
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow create: if isMasterAdmin();
+      allow update: if isMasterAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ LOGS ============
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // Har kim log yoza olsin
+      allow update: if false;            // Hech kim o'zgartira olmaydi
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ ORDERS ============
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create: if isCashier();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ INVENTORY ============
+    match /inventory/{itemId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ TRANSFERS ============
+    match /transfers/{transferId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ PAYMENTS ============
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isCashier();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ SUPPLIERS ============
+    match /suppliers/{supplierId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ============ FALLBACK (oxirgi qoida) ============
+    // Yuqorida ko'rsatilmagan kolleksiyalar uchun
+    match /{collection}/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isMasterAdmin();
+    }
+  }
 }
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  category: string;
-  barcode?: string;
-  unit: string;
-  stock: number;
-  warehouseId: string;
-  color?: string;
-}
-
-interface OrderItem {
-  product: Product;
-  qty: number;
-  discount: number;
-}
-
-interface ActiveOrder {
-  id: string;
-  items: OrderItem[];
-  createdAt: Date;
-  note: string;
-}
-
-type PaymentMethod = "cash" | "card" | "mixed";
-
-const fmt = (n: number) =>
-  new Intl.NumberFormat("uz-UZ").format(Math.round(n)) + " so'm";
-
-const genId = () =>
-  Math.random().toString(36).slice(2, 7).toUpperCase();
-
-export default function CashPage() {
-  const [fbUser,setFbUser]=useState<FirebaseUser|null>(null);
-  const [staff,setStaff]=useState<StaffDoc|null>(null);
-  const [authLoading,setAuthLoading]=useState(true);
-
-  const [email,setEmail]=useState("");
-  const [password,setPassword]=useState("");
-
-  const [products,setProducts]=useState<Product[]>([]);
-  const [order,setOrder]=useState<ActiveOrder>({
-    id:genId(),items:[],createdAt:new Date(),note:""
-  });
-
-  const [barcodeBuffer,setBarcodeBuffer]=useState("");
-  const barcodeTimer=useRef<any>(null);
-
-  const subtotal = useMemo(() =>
-    order.items.reduce((s,i)=>s+i.product.price*i.qty,0), [order.items]);
-
-  const numVal = Number("0") || 0;
-
-  useEffect(()=>{
-    const unsub=onAuthStateChanged(auth,async user=>{
-      setFbUser(user);
-      if(user){
-        const snap=await getDoc(doc(db,"staff",user.uid));
-        if(snap.exists()){
-          setStaff({uid:user.uid,...snap.data() as any});
-        }
-      } else setStaff(null);
-      setAuthLoading(false);
-    });
-    return ()=>unsub();
-  },[]);
-
-  useEffect(()=>{
-    if(!staff)return;
-    const q=query(collection(db,"products"));
-    const unsub=onSnapshot(q,snap=>{
-      setProducts(snap.docs.map(d=>({id:d.id,...d.data() as any})));
-    });
-    return ()=>unsub();
-  },[staff]);
-
-  useEffect(()=>{
-    const handler=(e:KeyboardEvent)=>{
-      if(e.key==="Enter"){
-        const found=products.find(p=>p.barcode===barcodeBuffer);
-        if(found)addToOrder(found);
-        setBarcodeBuffer("");
-        return;
-      }
-      if(e.key.length===1)setBarcodeBuffer(p=>p+e.key);
-    };
-    window.addEventListener("keydown",handler);
-    return ()=>window.removeEventListener("keydown",handler);
-  },[products]);
-
-  const addToOrder=(product:Product)=>{
-    setOrder(prev=>{
-      const f=prev.items.find(i=>i.product.id===product.id);
-      if(f)f.qty++;
-      else prev.items.push({product,qty:1,discount:0});
-      return {...prev};
-    });
-  };
-
-  const confirmPayment=async()=>{
-    const current=[...order.items];
-    await addDoc(collection(db,"sales"),{
-      total:subtotal,
-      items:current.map(i=>({
-        name:i.product.name,qty:i.qty,price:i.product.price
-      })),
-      createdAt:serverTimestamp()
-    });
-
-    await Promise.all(current.map(i=>
-      updateDoc(doc(db,"products",i.product.id),{
-        stock:increment(-i.qty)
-      }).catch(()=>null)
-    ));
-
-    setOrder({id:genId(),items:[],createdAt:new Date(),note:""});
-  };
-
-  if(authLoading)return <div>Loading...</div>;
-
-  if(!fbUser)return (
-    <div>
-      <input onChange={e=>setEmail(e.target.value)} placeholder="email"/>
-      <input onChange={e=>setPassword(e.target.value)} placeholder="password"/>
-      <button onClick={()=>signInWithEmailAndPassword(auth,email,password)}>Login</button>
-    </div>
-  );
-
-  return (
-    <div>
-      <h2>POS</h2>
-      <div>Total: {fmt(subtotal)}</div>
-
-      {products.map(p=>(
-        <button key={p.id} onClick={()=>addToOrder(p)}>
-          {p.name}
-        </button>
-      ))}
-
-      <button onClick={confirmPayment}>PAY</button>
-      <button onClick={()=>signOut(auth)}>Logout</button>
-    </div>
-  );
-}
-"""
-
-path = Path('/mnt/data/CashPage.tsx')
-path.write_text(code)
-
-str(path)
