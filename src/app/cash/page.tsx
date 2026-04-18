@@ -10,6 +10,13 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
  
 // ============ TYPES ============
+interface Warehouse {
+  id: string;
+  name: string;
+  address?: string;
+  color?: string;
+}
+ 
 interface Product {
   id: string;
   name: string;
@@ -42,6 +49,7 @@ interface Sale {
   cashierName: string;
   cashierId: string;
   warehouseId: string;
+  warehouseName?: string;
   cashGiven?: number;
   change?: number;
   createdAt: any;
@@ -72,10 +80,18 @@ const PAY_CONFIG = {
   transfer: { label: "O'tkazma", icon: "⇄", color: "#a855f7", bg: "rgba(168,85,247,0.12)", border: "rgba(168,85,247,0.3)" },
 };
  
+const WAREHOUSE_COLORS = [
+  "#00d4aa", "#3b82f6", "#f59e0b", "#a855f7",
+  "#ef4444", "#06b6d4", "#84cc16", "#f97316",
+];
+ 
 // ============ MAIN ============
 export default function CashPage() {
   const { user } = useAuth();
  
+  const [warehouses, setWarehouses]           = useState<Warehouse[]>([]);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [showWarehousePicker, setShowWarehousePicker] = useState(false);
   const [products, setProducts]             = useState<Product[]>([]);
   const [cart, setCart]                     = useState<CartItem[]>([]);
   const [search, setSearch]                 = useState("");
@@ -83,6 +99,7 @@ export default function CashPage() {
   const [payMethod, setPayMethod]           = useState<PayMethod>("cash");
   const [cashGiven, setCashGiven]           = useState(0);
   const [loading, setLoading]               = useState(false);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [toast, setToast]                   = useState<{msg:string;type:"ok"|"err"}|null>(null);
   const [tab, setTab]                       = useState<TabType>("pos");
   const [showReceipt, setShowReceipt]       = useState(false);
@@ -95,6 +112,7 @@ export default function CashPage() {
     totalRevenue:0, cashRevenue:0, cardRevenue:0, transferRevenue:0,
     salesCount:0, itemsSold:0,
     topProducts:[] as {name:string;qty:number;revenue:number}[],
+    byWarehouse:[] as {name:string;revenue:number}[],
   });
  
   const searchRef = useRef<HTMLInputElement>(null);
@@ -106,37 +124,94 @@ export default function CashPage() {
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   };
  
-  // ===== FETCH =====
-  const fetchProducts = useCallback(async () => {
+  // ===== FETCH WAREHOUSES =====
+  const fetchWarehouses = useCallback(async () => {
     try {
-      const snap = await getDocs(collection(db, "products"));
+      const snap = await getDocs(collection(db, "warehouses"));
+      const data = snap.docs.map((d, i) => ({
+        id: d.id,
+        color: WAREHOUSE_COLORS[i % WAREHOUSE_COLORS.length],
+        ...d.data(),
+      } as Warehouse));
+      setWarehouses(data);
+      // Auto-select first warehouse if none selected
+      if (data.length > 0 && !selectedWarehouse) {
+        setSelectedWarehouse(data[0]);
+      }
+    } catch {
+      showToast("Omborlarni yuklashda xato", "err");
+    }
+  }, [selectedWarehouse]);
+ 
+  // ===== FETCH PRODUCTS (filtered by warehouse) =====
+  const fetchProducts = useCallback(async () => {
+    setProductsLoading(true);
+    try {
+      let q;
+      if (selectedWarehouse) {
+        q = query(collection(db, "products"), where("warehouseId", "==", selectedWarehouse.id));
+      } else {
+        q = query(collection(db, "products"));
+      }
+      const snap = await getDocs(q);
       setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
-    } catch { showToast("Mahsulotlarni yuklashda xato", "err"); }
-  }, []);
+    } catch {
+      showToast("Mahsulotlarni yuklashda xato", "err");
+    } finally {
+      setProductsLoading(false);
+    }
+  }, [selectedWarehouse]);
  
   const fetchSales = useCallback(async () => {
     try {
-      const q = query(collection(db, "sales"), orderBy("createdAt","desc"), limit(40));
+      let q;
+      if (selectedWarehouse) {
+        q = query(
+          collection(db, "sales"),
+          where("warehouseId", "==", selectedWarehouse.id),
+          orderBy("createdAt","desc"),
+          limit(40)
+        );
+      } else {
+        q = query(collection(db, "sales"), orderBy("createdAt","desc"), limit(40));
+      }
       const snap = await getDocs(q);
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
       setRecentSales(data);
       setPayments(data);
     } catch {}
-  }, []);
+  }, [selectedWarehouse]);
  
   const fetchReport = useCallback(async () => {
     try {
       const { start, end } = todayRange();
-      const q = query(collection(db,"sales"), where("createdAt",">=",start), where("createdAt","<=",end));
+      let q;
+      if (selectedWarehouse) {
+        q = query(
+          collection(db,"sales"),
+          where("warehouseId","==",selectedWarehouse.id),
+          where("createdAt",">=",start),
+          where("createdAt","<=",end)
+        );
+      } else {
+        q = query(collection(db,"sales"), where("createdAt",">=",start), where("createdAt","<=",end));
+      }
       const snap = await getDocs(q);
       const sales = snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
       let total=0, cash=0, card=0, transfer=0, items=0;
       const pmap: Record<string,{name:string;qty:number;revenue:number}> = {};
+      const wmap: Record<string,{name:string;revenue:number}> = {};
       for (const s of sales) {
         total += s.total;
         if (s.paymentMethod==="cash") cash+=s.total;
         else if (s.paymentMethod==="card") card+=s.total;
         else transfer+=s.total;
+        // warehouse breakdown
+        const wname = s.warehouseName || s.warehouseId;
+        if (wname) {
+          if (!wmap[s.warehouseId]) wmap[s.warehouseId]={name:wname,revenue:0};
+          wmap[s.warehouseId].revenue += s.total;
+        }
         for (const it of s.items||[]) {
           items += it.quantity;
           if (!pmap[it.id]) pmap[it.id]={name:it.name,qty:0,revenue:0};
@@ -148,13 +223,33 @@ export default function CashPage() {
         totalRevenue:total, cashRevenue:cash, cardRevenue:card, transferRevenue:transfer,
         salesCount:sales.length, itemsSold:items,
         topProducts:Object.values(pmap).sort((a,b)=>b.revenue-a.revenue).slice(0,5),
+        byWarehouse:Object.values(wmap).sort((a,b)=>b.revenue-a.revenue),
       });
     } catch {}
+  }, [selectedWarehouse]);
+ 
+  useEffect(() => {
+    fetchWarehouses();
   }, []);
  
   useEffect(() => {
-    fetchProducts(); fetchSales(); fetchReport();
-  }, [fetchProducts, fetchSales, fetchReport]);
+    if (selectedWarehouse !== undefined) {
+      fetchProducts();
+      fetchSales();
+      fetchReport();
+    }
+  }, [selectedWarehouse, fetchProducts, fetchSales, fetchReport]);
+ 
+  // ===== WAREHOUSE SELECTION =====
+  const handleSelectWarehouse = (wh: Warehouse) => {
+    setSelectedWarehouse(wh);
+    setCart([]); // Clear cart when switching warehouse
+    setCashGiven(0);
+    setSearch("");
+    setSelectedCat("all");
+    setShowWarehousePicker(false);
+    showToast(`${wh.name} ombori tanlandi`);
+  };
  
   // ===== CART =====
   const addToCart = (p: Product) => {
@@ -194,6 +289,7 @@ export default function CashPage() {
   // ===== CHECKOUT =====
   const handleCheckout = async () => {
     if (!cart.length) return;
+    if (!selectedWarehouse) { showToast("Ombor tanlanmagan!", "err"); return; }
     if (payMethod==="cash"&&cashGiven<total) { showToast("Naqd pul yetarli emas!", "err"); return; }
     setLoading(true);
     try {
@@ -208,7 +304,8 @@ export default function CashPage() {
         change: payMethod==="cash"?Math.max(0,change):0,
         cashierName: user?.displayName||user?.email||"Cashier",
         cashierId: user?.uid||"",
-        warehouseId: cart[0]?.warehouseId||"",
+        warehouseId: selectedWarehouse.id,
+        warehouseName: selectedWarehouse.name,
         createdAt: serverTimestamp(),
       };
       const ref = await addDoc(collection(db,"sales"), saleData);
@@ -238,6 +335,8 @@ export default function CashPage() {
     {key:"payments",label:"To'lovlar",icon:"◈"},
     {key:"report",label:"Hisobot",icon:"◉"},
   ];
+ 
+  const whColor = selectedWarehouse?.color || "#00d4aa";
  
   // ===== RENDER =====
   return (
@@ -311,6 +410,50 @@ export default function CashPage() {
           color: var(--text);
         }
  
+        /* WAREHOUSE SELECTOR in header */
+        .wh-selector-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 5px 12px 5px 8px;
+          background: var(--elevated);
+          border: 1px solid var(--border2);
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.15s;
+          font-family: 'Syne', sans-serif;
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--text);
+          max-width: 200px;
+        }
+ 
+        .wh-selector-btn:hover {
+          border-color: var(--border2);
+          background: rgba(255,255,255,0.06);
+        }
+ 
+        .wh-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+ 
+        .wh-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 130px;
+        }
+ 
+        .wh-chevron {
+          font-size: 10px;
+          color: var(--muted);
+          margin-left: 2px;
+          flex-shrink: 0;
+        }
+ 
         .kassa-nav {
           display: flex;
           gap: 2px;
@@ -372,6 +515,180 @@ export default function CashPage() {
         .kassa-toast.err { background: rgba(255,77,106,0.15); border: 1px solid rgba(255,77,106,0.3); color: var(--danger); }
         @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(-8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
  
+        /* NO WAREHOUSE BANNER */
+        .no-wh-banner {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin: 12px;
+          padding: 14px 16px;
+          background: rgba(245,158,11,0.08);
+          border: 1px solid rgba(245,158,11,0.25);
+          border-radius: 12px;
+          font-size: 12px;
+          color: var(--warn);
+          font-weight: 600;
+        }
+ 
+        .no-wh-banner-btn {
+          margin-left: auto;
+          padding: 6px 14px;
+          background: rgba(245,158,11,0.15);
+          border: 1px solid rgba(245,158,11,0.3);
+          border-radius: 8px;
+          color: var(--warn);
+          font-family: 'Syne', sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.15s;
+          white-space: nowrap;
+        }
+        .no-wh-banner-btn:hover { background: rgba(245,158,11,0.25); }
+ 
+        /* WAREHOUSE PICKER MODAL */
+        .wh-picker-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.85);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 300;
+          padding: 16px;
+          backdrop-filter: blur(6px);
+          animation: fadeIn 0.15s ease;
+        }
+ 
+        .wh-picker-box {
+          background: var(--surface);
+          border: 1px solid var(--border2);
+          border-radius: 20px;
+          width: 100%;
+          max-width: 460px;
+          overflow: hidden;
+          animation: slideUp 0.2s ease;
+        }
+ 
+        .wh-picker-header {
+          padding: 20px 20px 16px;
+          border-bottom: 1px solid var(--border);
+        }
+ 
+        .wh-picker-title {
+          font-size: 16px;
+          font-weight: 800;
+          letter-spacing: -0.4px;
+          margin-bottom: 4px;
+        }
+ 
+        .wh-picker-sub {
+          font-size: 11px;
+          color: var(--muted);
+        }
+ 
+        .wh-list {
+          padding: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+ 
+        .wh-list::-webkit-scrollbar { width: 3px; }
+        .wh-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+ 
+        .wh-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 16px;
+          background: var(--elevated);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.15s;
+          width: 100%;
+          text-align: left;
+          font-family: 'Syne', sans-serif;
+        }
+ 
+        .wh-item:hover {
+          border-color: var(--border2);
+          transform: translateY(-1px);
+        }
+ 
+        .wh-item.selected {
+          border-width: 1.5px;
+        }
+ 
+        .wh-item-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          flex-shrink: 0;
+        }
+ 
+        .wh-item-info {
+          flex: 1;
+          min-width: 0;
+        }
+ 
+        .wh-item-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+ 
+        .wh-item-address {
+          font-size: 11px;
+          color: var(--muted);
+          margin-top: 2px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+ 
+        .wh-item-check {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 700;
+          flex-shrink: 0;
+        }
+ 
+        .wh-picker-footer {
+          padding: 12px 20px;
+          border-top: 1px solid var(--border);
+        }
+ 
+        .wh-picker-cancel {
+          width: 100%;
+          padding: 10px;
+          background: var(--elevated);
+          border: 1px solid var(--border2);
+          border-radius: 10px;
+          color: var(--muted);
+          font-family: 'Syne', sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .wh-picker-cancel:hover { color: var(--text); }
+ 
         /* POS LAYOUT */
         .pos-layout {
           display: flex;
@@ -394,6 +711,50 @@ export default function CashPage() {
           flex-direction: column;
           gap: 8px;
           background: var(--surface);
+        }
+ 
+        /* Warehouse mini-bar inside products */
+        .wh-mini-bar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 10px;
+          background: var(--elevated);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          cursor: pointer;
+          transition: border-color 0.15s;
+        }
+        .wh-mini-bar:hover { border-color: var(--border2); }
+ 
+        .wh-mini-label {
+          font-size: 10px;
+          color: var(--muted);
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+ 
+        .wh-mini-name {
+          font-size: 12px;
+          font-weight: 700;
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+ 
+        .wh-mini-change {
+          font-size: 10px;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: 6px;
+          background: rgba(255,255,255,0.06);
+          color: var(--muted);
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+          border: 1px solid var(--border2);
+          white-space: nowrap;
         }
  
         .search-wrap {
@@ -530,6 +891,15 @@ export default function CashPage() {
  
         .product-stock.low { color: var(--danger); }
  
+        /* Loading skeleton */
+        .skeleton {
+          background: linear-gradient(90deg, var(--elevated) 25%, rgba(255,255,255,0.04) 50%, var(--elevated) 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.2s infinite;
+          border-radius: 8px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+ 
         /* CART SIDE */
         .cart-side {
           width: 320px;
@@ -568,6 +938,18 @@ export default function CashPage() {
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+ 
+        .cart-wh-tag {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 2px 8px;
+          border-radius: 20px;
+          font-size: 10px;
+          font-weight: 700;
+          border: 1px solid;
+          letter-spacing: 0.2px;
         }
  
         .cart-clear {
@@ -743,6 +1125,34 @@ export default function CashPage() {
           gap: 10px;
         }
  
+        /* Warehouse info row in payment */
+        .payment-wh-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 10px;
+          background: var(--elevated);
+          border-radius: 8px;
+          border: 1px solid var(--border);
+          cursor: pointer;
+          transition: border-color 0.15s;
+        }
+        .payment-wh-row:hover { border-color: var(--border2); }
+ 
+        .payment-wh-label {
+          font-size: 10px;
+          color: var(--muted);
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+        }
+ 
+        .payment-wh-name {
+          font-size: 12px;
+          font-weight: 700;
+          flex: 1;
+        }
+ 
         .total-row {
           display: flex;
           align-items: center;
@@ -891,6 +1301,33 @@ export default function CashPage() {
           gap: 10px;
         }
  
+        /* Page warehouse filter */
+        .page-wh-filter {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-bottom: 14px;
+        }
+ 
+        .page-wh-pill {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 5px 12px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 700;
+          border: 1px solid var(--border2);
+          background: transparent;
+          color: var(--muted);
+          cursor: pointer;
+          transition: all 0.15s;
+          font-family: 'Syne', sans-serif;
+          letter-spacing: 0.3px;
+        }
+        .page-wh-pill:hover { color: var(--text); }
+        .page-wh-pill.active { color: #000; }
+ 
         /* SALE CARDS */
         .sale-card {
           background: var(--surface);
@@ -928,6 +1365,22 @@ export default function CashPage() {
           letter-spacing: 0.3px;
         }
  
+        .wh-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 8px;
+          border-radius: 20px;
+          font-size: 10px;
+          font-weight: 700;
+          margin-top: 4px;
+          border: 1px solid rgba(255,255,255,0.1);
+          color: var(--muted);
+          background: var(--elevated);
+          margin-left: 4px;
+          font-family: 'Syne', sans-serif;
+        }
+ 
         .sale-items-list { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 3px; }
         .sale-item-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
  
@@ -950,12 +1403,12 @@ export default function CashPage() {
         .bar-label { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
         .bar-track { height: 8px; background: var(--elevated); border-radius: 4px; overflow: hidden; display: flex; gap: 1px; }
         .bar-seg { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
-        .bar-legend { display: flex; gap: 14px; margin-top: 8px; }
+        .bar-legend { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
         .bar-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
         .bar-dot { width: 8px; height: 8px; border-radius: 50%; }
  
         /* TOP PRODUCTS */
-        .top-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+        .top-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
         .top-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .top-rank { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); width: 16px; }
         .top-info { flex: 1; }
@@ -964,6 +1417,13 @@ export default function CashPage() {
         .top-bar { height: 3px; background: var(--elevated); border-radius: 2px; }
         .top-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s ease; }
         .top-revenue { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); margin-top: 2px; }
+ 
+        /* WAREHOUSE REVENUE TABLE */
+        .wh-revenue-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .wh-rev-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .wh-rev-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .wh-rev-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; }
+        .wh-rev-val { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); }
  
         /* PAYMENTS SUMMARY */
         .pay-sum-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 12px; }
@@ -1024,6 +1484,7 @@ export default function CashPage() {
         .receipt-title { font-size: 16px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.3px; }
         .receipt-id { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; margin-top: 2px; }
         .receipt-cashier { font-size: 11px; color: #888; }
+        .receipt-wh { font-size: 11px; color: #888; margin-top: 2px; font-weight: 600; }
  
         .receipt-divider { border: none; border-top: 1px dashed #ddd; margin: 10px 0; }
  
@@ -1062,6 +1523,18 @@ export default function CashPage() {
             ))}
           </nav>
  
+          {/* Warehouse selector in header */}
+          <button
+            className="wh-selector-btn"
+            onClick={()=>setShowWarehousePicker(true)}
+          >
+            <span className="wh-dot" style={{background: whColor}} />
+            <span className="wh-name">
+              {selectedWarehouse ? selectedWarehouse.name : "Ombor tanlang"}
+            </span>
+            <span className="wh-chevron">▾</span>
+          </button>
+ 
           <div className="kassa-user">{user?.displayName||user?.email||"Cashier"}</div>
         </header>
  
@@ -1076,12 +1549,22 @@ export default function CashPage() {
             {/* Products */}
             <div className="products-side">
               <div className="products-toolbar">
+                {/* Warehouse mini bar */}
+                <div className="wh-mini-bar" onClick={()=>setShowWarehousePicker(true)}>
+                  <span className="wh-dot" style={{background: whColor}} />
+                  <span className="wh-mini-label">Ombor:</span>
+                  <span className="wh-mini-name" style={{color: whColor}}>
+                    {selectedWarehouse ? selectedWarehouse.name : "Tanlanmagan"}
+                  </span>
+                  <span className="wh-mini-change">O'zgartirish ▾</span>
+                </div>
+ 
                 <div className="search-wrap">
                   <span className="search-icon">⊕</span>
                   <input
                     ref={searchRef}
                     className="kassa-search"
-                    placeholder="Mahsulot qidirish..."
+                    placeholder={selectedWarehouse ? `${selectedWarehouse.name}da mahsulot qidirish...` : "Mahsulot qidirish..."}
                     value={search}
                     onChange={e=>setSearch(e.target.value)}
                   />
@@ -1099,26 +1582,49 @@ export default function CashPage() {
                 </div>
               </div>
  
-              <div className="products-grid">
-                {filtered.map(p=>(
-                  <button
-                    key={p.id}
-                    className={`product-card${p.stock<=0?" out":""}`}
-                    onClick={()=>addToCart(p)}
-                    disabled={p.stock<=0}
-                  >
-                    <div className="product-icon">📦</div>
-                    <div className="product-name">{p.name}</div>
-                    <div className="product-price">{fmt(p.price)}</div>
-                    <div className={`product-stock${p.stock<=5?" low":""}`}>
-                      {p.stock<=0?"Tugagan":`Qoldi: ${p.stock}`}
-                    </div>
+              {/* No warehouse warning */}
+              {!selectedWarehouse && (
+                <div className="no-wh-banner">
+                  <span>⚠</span>
+                  <span>Mahsulotlarni ko'rish uchun ombor tanlang</span>
+                  <button className="no-wh-banner-btn" onClick={()=>setShowWarehousePicker(true)}>
+                    Ombor tanlash
                   </button>
-                ))}
-                {filtered.length===0&&(
-                  <div style={{gridColumn:"1/-1"}} className="empty-state">
-                    Mahsulot topilmadi
-                  </div>
+                </div>
+              )}
+ 
+              <div className="products-grid">
+                {productsLoading ? (
+                  Array.from({length: 12}).map((_,i) => (
+                    <div key={i} className="product-card">
+                      <div className="skeleton" style={{width:"100%",aspectRatio:"1",borderRadius:8}} />
+                      <div className="skeleton" style={{height:12,borderRadius:4,marginTop:4}} />
+                      <div className="skeleton" style={{height:10,width:"60%",borderRadius:4}} />
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    {filtered.map(p=>(
+                      <button
+                        key={p.id}
+                        className={`product-card${p.stock<=0?" out":""}`}
+                        onClick={()=>addToCart(p)}
+                        disabled={p.stock<=0}
+                      >
+                        <div className="product-icon">📦</div>
+                        <div className="product-name">{p.name}</div>
+                        <div className="product-price">{fmt(p.price)}</div>
+                        <div className={`product-stock${p.stock<=5?" low":""}`}>
+                          {p.stock<=0?"Tugagan":`Qoldi: ${p.stock}`}
+                        </div>
+                      </button>
+                    ))}
+                    {filtered.length===0&&selectedWarehouse&&(
+                      <div style={{gridColumn:"1/-1"}} className="empty-state">
+                        Mahsulot topilmadi
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1129,6 +1635,21 @@ export default function CashPage() {
                 <div className="cart-title">
                   Savat
                   {cart.length>0&&<span className="cart-count">{cart.length}</span>}
+                  {selectedWarehouse && cart.length > 0 && (
+                    <span
+                      className="cart-wh-tag"
+                      style={{
+                        color: whColor,
+                        borderColor: whColor + "40",
+                        background: whColor + "14",
+                        fontSize: 10,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span style={{width:5,height:5,borderRadius:"50%",background:whColor,display:"inline-block"}} />
+                      {selectedWarehouse.name}
+                    </span>
+                  )}
                 </div>
                 {cart.length>0&&(
                   <button className="cart-clear" onClick={clearCart}>Tozalash</button>
@@ -1140,6 +1661,11 @@ export default function CashPage() {
                   <div className="cart-empty">
                     <div className="cart-empty-icon">⊙</div>
                     <div className="cart-empty-text">Savat bo'sh</div>
+                    {!selectedWarehouse && (
+                      <div style={{fontSize:11,color:"var(--muted)",textAlign:"center",marginTop:4}}>
+                        Avval ombor tanlang
+                      </div>
+                    )}
                   </div>
                 )}
                 {cart.map(item=>(
@@ -1171,6 +1697,21 @@ export default function CashPage() {
  
               {/* Payment */}
               <div className="payment-section">
+                {/* Warehouse row in payment */}
+                <div
+                  className="payment-wh-row"
+                  onClick={()=>setShowWarehousePicker(true)}
+                >
+                  <span style={{width:8,height:8,borderRadius:"50%",background:whColor,flexShrink:0}} />
+                  <div style={{flex:1}}>
+                    <div className="payment-wh-label">Sotuv ombori</div>
+                    <div className="payment-wh-name" style={{color: selectedWarehouse ? whColor : "var(--muted)"}}>
+                      {selectedWarehouse ? selectedWarehouse.name : "Ombor tanlanmagan — bosing"}
+                    </div>
+                  </div>
+                  <span style={{fontSize:11,color:"var(--muted)"}}>▾</span>
+                </div>
+ 
                 <div className="total-row">
                   <span className="total-label">Jami to'lov</span>
                   <span className="total-amount">{fmt(total)}</span>
@@ -1222,9 +1763,15 @@ export default function CashPage() {
                 <button
                   className="checkout-btn"
                   onClick={handleCheckout}
-                  disabled={loading||cart.length===0||(payMethod==="cash"&&cashGiven<total)}
+                  disabled={loading||cart.length===0||!selectedWarehouse||(payMethod==="cash"&&cashGiven<total)}
                 >
-                  {loading?"Amalga oshirilmoqda...":cart.length===0?"Savat bo'sh":`✓ To'lash — ${fmt(total)}`}
+                  {loading
+                    ? "Amalga oshirilmoqda..."
+                    : !selectedWarehouse
+                    ? "⚠ Ombor tanlanmagan"
+                    : cart.length===0
+                    ? "Savat bo'sh"
+                    : `✓ To'lash — ${fmt(total)}`}
                 </button>
               </div>
             </div>
@@ -1235,6 +1782,31 @@ export default function CashPage() {
         {tab==="history"&&(
           <div className="page-content">
             <div className="page-title">◷ So'nggi sotuvlar</div>
+ 
+            {/* Warehouse filter */}
+            <div className="page-wh-filter">
+              <button
+                className={`page-wh-pill${!selectedWarehouse?" active":""}`}
+                style={!selectedWarehouse ? {background:"var(--accent)",borderColor:"var(--accent)",color:"#000"} : {}}
+                onClick={()=>{setSelectedWarehouse(null as any);}}
+              >
+                Barcha omborlar
+              </button>
+              {warehouses.map(wh=>(
+                <button
+                  key={wh.id}
+                  className={`page-wh-pill${selectedWarehouse?.id===wh.id?" active":""}`}
+                  style={selectedWarehouse?.id===wh.id
+                    ? {background:wh.color+"22",borderColor:wh.color+"66",color:wh.color}
+                    : {}}
+                  onClick={()=>handleSelectWarehouse(wh)}
+                >
+                  <span style={{width:6,height:6,borderRadius:"50%",background:wh.color,display:"inline-block"}} />
+                  {wh.name}
+                </button>
+              ))}
+            </div>
+ 
             {recentSales.length===0&&<div className="empty-state">Sotuvlar yo'q</div>}
             {recentSales.map(sale=>(
               <div key={sale.id} className="sale-card">
@@ -1243,15 +1815,20 @@ export default function CashPage() {
                     <div className="sale-id">#{sale.id.slice(-10)}</div>
                     <div className="sale-date">{fmtDate(sale.createdAt)}</div>
                     <div className="sale-cashier">{sale.cashierName}</div>
-                    <div
-                      className="pay-badge"
-                      style={{
-                        color: PAY_CONFIG[sale.paymentMethod]?.color||"#888",
-                        background: PAY_CONFIG[sale.paymentMethod]?.bg||"transparent",
-                        borderColor: PAY_CONFIG[sale.paymentMethod]?.border||"#333",
-                      }}
-                    >
-                      {PAY_CONFIG[sale.paymentMethod]?.icon} {PAY_CONFIG[sale.paymentMethod]?.label}
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                      <div
+                        className="pay-badge"
+                        style={{
+                          color: PAY_CONFIG[sale.paymentMethod]?.color||"#888",
+                          background: PAY_CONFIG[sale.paymentMethod]?.bg||"transparent",
+                          borderColor: PAY_CONFIG[sale.paymentMethod]?.border||"#333",
+                        }}
+                      >
+                        {PAY_CONFIG[sale.paymentMethod]?.icon} {PAY_CONFIG[sale.paymentMethod]?.label}
+                      </div>
+                      {sale.warehouseName && (
+                        <span className="wh-badge">⊟ {sale.warehouseName}</span>
+                      )}
                     </div>
                   </div>
                   <div style={{textAlign:"right"}}>
@@ -1299,6 +1876,9 @@ export default function CashPage() {
                   <div className="sale-id">#{sale.id.slice(-10)}</div>
                   <div className="sale-date">{fmtDate(sale.createdAt)}</div>
                   <div className="sale-cashier">{sale.items?.length} ta mahsulot</div>
+                  {sale.warehouseName && (
+                    <div className="wh-badge" style={{marginTop:4,marginLeft:0}}>⊟ {sale.warehouseName}</div>
+                  )}
                   {sale.paymentMethod==="cash"&&sale.change!==undefined&&(
                     <div style={{fontSize:10,color:"var(--muted)",marginTop:2,fontFamily:"'JetBrains Mono',monospace"}}>
                       Qaytim: {fmt(sale.change)}
@@ -1329,6 +1909,23 @@ export default function CashPage() {
             <div className="page-title" style={{justifyContent:"space-between"}}>
               <span>◉ Kunlik hisobot</span>
               <button className="refresh-btn" onClick={fetchReport}>↻ Yangilash</button>
+            </div>
+ 
+            {/* Warehouse filter */}
+            <div className="page-wh-filter">
+              {warehouses.map(wh=>(
+                <button
+                  key={wh.id}
+                  className={`page-wh-pill${selectedWarehouse?.id===wh.id?" active":""}`}
+                  style={selectedWarehouse?.id===wh.id
+                    ? {background:wh.color+"22",borderColor:wh.color+"66",color:wh.color}
+                    : {}}
+                  onClick={()=>handleSelectWarehouse(wh)}
+                >
+                  <span style={{width:6,height:6,borderRadius:"50%",background:wh.color,display:"inline-block"}} />
+                  {wh.name}
+                </button>
+              ))}
             </div>
  
             <div className="kpi-grid">
@@ -1393,7 +1990,82 @@ export default function CashPage() {
               </div>
             )}
  
+            {report.byWarehouse.length>1&&(
+              <div className="wh-revenue-wrap">
+                <div className="bar-label">⊟ Omborlar bo'yicha daromad</div>
+                {report.byWarehouse.map((wh, i)=>{
+                  const wdata = warehouses.find(w=>w.name===wh.name);
+                  const color = wdata?.color || WAREHOUSE_COLORS[i % WAREHOUSE_COLORS.length];
+                  return (
+                    <div key={i} className="wh-rev-row">
+                      <span className="wh-rev-dot" style={{background:color}} />
+                      <span className="wh-rev-name">{wh.name}</span>
+                      <span className="wh-rev-val">{fmt(wh.revenue)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+ 
             {report.salesCount===0&&<div className="empty-state">Bugun sotuvlar yo'q</div>}
+          </div>
+        )}
+ 
+        {/* ===== WAREHOUSE PICKER MODAL ===== */}
+        {showWarehousePicker&&(
+          <div className="wh-picker-overlay" onClick={e=>{if(e.target===e.currentTarget)setShowWarehousePicker(false);}}>
+            <div className="wh-picker-box">
+              <div className="wh-picker-header">
+                <div className="wh-picker-title">Ombor tanlang</div>
+                <div className="wh-picker-sub">
+                  Sotuv qaysi ombordan amalga oshirilishini tanlang
+                </div>
+              </div>
+ 
+              <div className="wh-list">
+                {warehouses.length===0&&(
+                  <div className="empty-state" style={{padding:"30px 0"}}>
+                    Omborlar topilmadi
+                  </div>
+                )}
+                {warehouses.map(wh=>{
+                  const isSelected = selectedWarehouse?.id===wh.id;
+                  return (
+                    <button
+                      key={wh.id}
+                      className={`wh-item${isSelected?" selected":""}`}
+                      style={isSelected?{borderColor:wh.color}:{}}
+                      onClick={()=>handleSelectWarehouse(wh)}
+                    >
+                      <div
+                        className="wh-item-icon"
+                        style={{background:wh.color+"18",border:`1px solid ${wh.color}30`}}
+                      >
+                        <span style={{fontSize:18}}>🏪</span>
+                      </div>
+                      <div className="wh-item-info">
+                        <div className="wh-item-name" style={isSelected?{color:wh.color}:{}}>{wh.name}</div>
+                        {wh.address&&<div className="wh-item-address">{wh.address}</div>}
+                      </div>
+                      <div
+                        className="wh-item-check"
+                        style={isSelected
+                          ? {background:wh.color,color:"#000"}
+                          : {background:"var(--elevated)",border:"1px solid var(--border2)"}}
+                      >
+                        {isSelected?"✓":""}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+ 
+              <div className="wh-picker-footer">
+                <button className="wh-picker-cancel" onClick={()=>setShowWarehousePicker(false)}>
+                  Bekor qilish
+                </button>
+              </div>
+            </div>
           </div>
         )}
  
@@ -1430,6 +2102,9 @@ export default function CashPage() {
                 <div className="receipt-title">Chek</div>
                 <div className="receipt-id">#{lastSale.id?.slice(-10)}</div>
                 <div className="receipt-cashier">{lastSale.cashierName}</div>
+                {lastSale.warehouseName&&(
+                  <div className="receipt-wh">🏪 {lastSale.warehouseName}</div>
+                )}
               </div>
  
               <hr className="receipt-divider" />
@@ -1471,3 +2146,5 @@ export default function CashPage() {
   );
 }
  
+
+
