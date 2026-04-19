@@ -10,12 +10,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Trash2, Plus, Loader2, Search, Download,
   CheckCircle2, FileOutput, AlertTriangle, ArrowRight, Info,
-  RefreshCw, X, Save, LogOut,
+  RefreshCw, X, Save, LogOut, Pencil, Clock, RotateCcw,
 } from "lucide-react";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, getDoc, setDoc, runTransaction } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc, runTransaction, updateDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,7 +41,6 @@ async function getNextOrderNumber(db: any): Promise<string> {
   }
 }
  
-// iiko product tabs
 const PRODUCT_TABS = [
   { key: "all", label: "Все" },
   { key: "goods", label: "Товары" },
@@ -53,17 +52,11 @@ const PRODUCT_TABS = [
  
 type ProductTab = typeof PRODUCT_TABS[number]["key"];
  
-// VAT rates
 const VAT_RATES = ["0%", "12%", "20%", "Без НДС"];
- 
-// Concept options
 const CONCEPTS = ["Столовая", "Ресторан", "Кафе", "Бар", "Фастфуд"];
- 
-// Revenue / expense accounts
 const REVENUE_ACCOUNTS = ["Торговая выручка", "Прочие доходы", "Оптовая выручка"];
 const EXPENSE_ACCOUNTS = ["Расход продуктов", "Себестоимость продаж", "Прочие расходы"];
  
-// ✅ YANGI: Chiqim turi
 const OUTGOING_TYPES = [
   { value: "sale", label: "Sotuv", description: "Mahsulot sotildi" },
   { value: "expense", label: "Xarajat", description: "Mahsulot sarflandi / hisobdan chiqarildi" },
@@ -86,41 +79,68 @@ interface StockItem {
   itemComment: string;
 }
  
+// ===== EDIT: Eski nakladnoy interfeysi =====
+interface ExistingInvoice {
+  id: string;
+  orderNumber: string;
+  orderDate: string;
+  concept: string;
+  docComment: string;
+  buyerType: string;
+  recipient: string;
+  warehouseId: string;
+  revenueAccount: string;
+  expenseAccount: string;
+  outgoingType: OutgoingType;
+  shipFromWarehouse: boolean;
+  items: StockItem[];
+  status?: "draft" | "posted";
+}
+ 
+interface EditSearchResult {
+  id: string;
+  orderNumber: string;
+  recipient: string;
+  date: string;
+  total: number;
+  status?: string;
+}
+ 
 export default function StockOutPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, assignedWarehouseId } = useUser();
  
-  // Tabs
   const [activeTab, setActiveTab] = useState<"properties" | "delivery">("properties");
   const [productTab, setProductTab] = useState<ProductTab>("all");
  
-  // Loading
   const [loading, setLoading] = useState(false);
   const [orderLoading, setOrderLoading] = useState(false);
  
-  // iiko Основные свойства fields
+  // ===== EDIT MODE STATE =====
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editDocId, setEditDocId] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [isEditSearchOpen, setIsEditSearchOpen] = useState(false);
+  const [editSearchQuery, setEditSearchQuery] = useState("");
+  const [editSearchResults, setEditSearchResults] = useState<EditSearchResult[]>([]);
+  const [editSearchLoading, setEditSearchLoading] = useState(false);
+  // Eski inventar holatini saqlash (qaytarish uchun)
+  const [originalItems, setOriginalItems] = useState<Array<{ productId: string; inUnit: number }>>([]);
+ 
   const [orderNumber, setOrderNumber] = useState("");
-  const [orderDate, setOrderDate] = useState(() => {
-    const now = new Date();
-    return now.toISOString().slice(0, 16);
-  });
+  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 16));
   const [concept, setConcept] = useState("");
   const [docComment, setDocComment] = useState("");
- 
-  // iiko right-side fields
   const [buyerType, setBuyerType] = useState("Поставщик");
   const [recipient, setRecipient] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [shipFromWarehouse, setShipFromWarehouse] = useState(true);
   const [revenueAccount, setRevenueAccount] = useState("Торговая выручка");
   const [expenseAccount, setExpenseAccount] = useState("Расход продуктов");
- 
-  // ✅ YANGI: Chiqim turi state
   const [outgoingType, setOutgoingType] = useState<OutgoingType>("sale");
  
-  // Items
   const [items, setItems] = useState<StockItem[]>([
     {
       id: generateId(), productId: "", searchQuery: "",
@@ -131,7 +151,6 @@ export default function StockOutPage() {
     },
   ]);
  
-  // Dialogs
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [processedInvoice, setProcessedInvoice] = useState<any>(null);
@@ -139,10 +158,10 @@ export default function StockOutPage() {
   const isAdmin = role === "Super Admin" || role === "Admin";
  
   useEffect(() => {
-    if (!db) return;
+    if (!db || isEditMode) return;
     setOrderLoading(true);
     getNextOrderNumber(db).then((num) => setOrderNumber(num)).finally(() => setOrderLoading(false));
-  }, [db]);
+  }, [db, isEditMode]);
  
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
@@ -169,7 +188,154 @@ export default function StockOutPage() {
     [warehouseId, inventory]
   );
  
-  // Filter products by active tab
+  // ===== EDIT: Eski nakladnoylarda qidirish =====
+  const handleEditSearch = async () => {
+    if (!db) return;
+    setEditSearchLoading(true);
+    try {
+      // stockMovements'dan unikal orderNumber larni topamiz
+      const movRef = collection(db, "stockMovements");
+      const q = query(
+        movRef,
+        where("movementType", "==", "StockOut"),
+        orderBy("movementDate", "desc"),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+ 
+      // orderNumber bo'yicha guruhlash
+      const grouped: Record<string, EditSearchResult> = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const on = data.orderNumber;
+        if (!grouped[on]) {
+          grouped[on] = {
+            id: on,
+            orderNumber: on,
+            recipient: data.recipient || "—",
+            date: data.movementDate,
+            total: 0,
+            status: data.status || "posted",
+          };
+        }
+        grouped[on].total += data.totalPrice || 0;
+      });
+ 
+      let results = Object.values(grouped);
+      if (editSearchQuery.trim()) {
+        const q = editSearchQuery.toLowerCase();
+        results = results.filter(r =>
+          r.orderNumber.toLowerCase().includes(q) ||
+          r.recipient.toLowerCase().includes(q)
+        );
+      }
+      setEditSearchResults(results.slice(0, 20));
+    } catch (err) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Qidiruvda xatolik yuz berdi." });
+    } finally {
+      setEditSearchLoading(false);
+    }
+  };
+ 
+  useEffect(() => {
+    if (isEditSearchOpen) handleEditSearch();
+  }, [isEditSearchOpen]);
+ 
+  // ===== EDIT: Tanlangan nakladnoyny yuklash =====
+  const handleLoadInvoiceForEdit = async (orderNum: string) => {
+    if (!db) return;
+    setEditLoading(true);
+    setIsEditSearchOpen(false);
+ 
+    try {
+      // stockMovements'dan ushbu orderNumber bo'yicha barcha qatorlarni olish
+      const movRef = collection(db, "stockMovements");
+      const q = query(movRef, where("orderNumber", "==", orderNum), where("movementType", "==", "StockOut"));
+      const snap = await getDocs(q);
+ 
+      if (snap.empty) {
+        toast({ variant: "destructive", title: "Topilmadi", description: `${orderNum} hujjat topilmadi.` });
+        setEditLoading(false);
+        return;
+      }
+ 
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      const firstDoc = docs[0];
+ 
+      // Forma maydonlarini to'ldirish
+      setOrderNumber(firstDoc.orderNumber);
+      setOrderDate(firstDoc.movementDate || new Date().toISOString().slice(0, 16));
+      setConcept(firstDoc.concept || "");
+      setDocComment("");
+      setBuyerType(firstDoc.buyerType || "Поставщик");
+      setRecipient(firstDoc.recipient || "");
+      setWarehouseId(firstDoc.warehouseId || "");
+      setRevenueAccount(firstDoc.revenueAccount || "Торговая выручка");
+      setExpenseAccount(firstDoc.expenseAccount || "Расход продуктов");
+      setOutgoingType(firstDoc.outgoingType || "sale");
+      setShipFromWarehouse(true);
+ 
+      // Eski itemlarni saqlash (inventar tiklash uchun)
+      setOriginalItems(docs.map(d => ({
+        productId: d.productId,
+        inUnit: Math.abs(d.quantityChange || 0),
+      })));
+ 
+      // Itemlarni reconstruct qilish
+      const reconstructed: StockItem[] = docs.map(d => ({
+        id: d.id,
+        productId: d.productId || "",
+        searchQuery: "",
+        size: d.unit || "шт",
+        inPackage: 1,
+        inUnit: Math.abs(d.quantityChange || 0),
+        pricePerPackage: d.unitPrice || 0,
+        price: d.unitPrice || 0,
+        discount: d.discount || 0,
+        vatRate: d.vatRate || "Без НДС",
+        writeoffCoeff: 1,
+        itemComment: "",
+      }));
+ 
+      setItems(reconstructed.length > 0 ? reconstructed : [{
+        id: generateId(), productId: "", searchQuery: "",
+        size: "шт", inPackage: 1, inUnit: 1,
+        pricePerPackage: 0, price: 0,
+        discount: 0, vatRate: "Без НДС",
+        writeoffCoeff: 1, itemComment: "",
+      }]);
+ 
+      setEditDocId(orderNum);
+      setIsEditMode(true);
+ 
+      toast({ title: "Tahrirlash rejimi", description: `${orderNum} hujjat yuklandi.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Xatolik", description: "Hujjatni yuklashda xatolik." });
+    } finally {
+      setEditLoading(false);
+    }
+  };
+ 
+  // ===== EDIT: Tahrirlash rejimidan chiqish =====
+  const handleExitEditMode = () => {
+    setIsEditMode(false);
+    setEditDocId(null);
+    setOriginalItems([]);
+    setItems([{
+      id: generateId(), productId: "", searchQuery: "",
+      size: "шт", inPackage: 1, inUnit: 1,
+      pricePerPackage: 0, price: 0,
+      discount: 0, vatRate: "Без НДС",
+      writeoffCoeff: 1, itemComment: "",
+    }]);
+    setRecipient("");
+    setConcept("");
+    setOrderDate(new Date().toISOString().slice(0, 16));
+    if (isAdmin) setWarehouseId("");
+    setOrderLoading(true);
+    getNextOrderNumber(db).then(n => setOrderNumber(n)).finally(() => setOrderLoading(false));
+  };
+ 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (productTab === "all") return products;
@@ -206,7 +372,6 @@ export default function StockOutPage() {
     }));
   };
  
-  // Calculations per row
   const getRowCalc = (item: StockItem) => {
     const qty = item.inUnit || 0;
     const price = item.price || 0;
@@ -218,15 +383,22 @@ export default function StockOutPage() {
       : parseFloat(item.vatRate) || 0;
     const vatAmt = (afterDiscount * vatPct) / (100 + vatPct);
     const amountNoVat = afterDiscount - vatAmt;
-    const stock = getStockForProduct(item.productId);
-    const stockAfter = stock - qty;
+ 
+    // Edit modeda: mavjud stokga eski miqdorni qo'shamiz (chunki u allaqachon ayirilgan)
+    let stockBase = getStockForProduct(item.productId);
+    if (isEditMode) {
+      const original = originalItems.find(o => o.productId === item.productId);
+      if (original) stockBase += original.inUnit;
+    }
+ 
+    const stockAfter = stockBase - qty;
     const product = products?.find(p => p.id === item.productId);
     const costPerUnit = product?.costPrice || 0;
     const costTotal = qty * costPerUnit;
     return {
       gross, discountAmt, afterDiscount,
       vatAmt, amountNoVat,
-      stockBefore: stock, stockAfter,
+      stockBefore: stockBase, stockAfter,
       costPerUnit, costTotal,
     };
   };
@@ -240,13 +412,17 @@ export default function StockOutPage() {
       if (!item.productId) {
         itemErrors[item.id] = "Mahsulot tanlanmagan";
       } else {
-        const stock = getStockForProduct(item.productId);
+        let stock = getStockForProduct(item.productId);
+        if (isEditMode) {
+          const orig = originalItems.find(o => o.productId === item.productId);
+          if (orig) stock += orig.inUnit;
+        }
         if (item.inUnit <= 0) itemErrors[item.id] = "Miqdor noto'g'ri";
         else if (item.inUnit > stock) itemErrors[item.id] = `Zaxira yetarli emas (Mavjud: ${stock})`;
       }
     });
     return { isValid: errors.length === 0 && Object.keys(itemErrors).length === 0, errors, itemErrors };
-  }, [items, warehouseId, recipient, getStockForProduct]);
+  }, [items, warehouseId, recipient, getStockForProduct, isEditMode, originalItems]);
  
   const totals = useMemo(() => {
     let gross = 0, discount = 0, vat = 0, noVat = 0, cost = 0;
@@ -259,7 +435,7 @@ export default function StockOutPage() {
       cost += c.costTotal;
     });
     return { gross, discount, vat, noVat, net: gross - discount, cost };
-  }, [items, getStockForProduct, products]);
+  }, [items, getStockForProduct, products, isEditMode, originalItems]);
  
   const handlePreDispatch = () => {
     if (!validation.isValid) {
@@ -269,9 +445,153 @@ export default function StockOutPage() {
     setIsConfirmOpen(true);
   };
  
+  // ===== EDIT: Yangilash logikasi =====
   const handleFinalProcess = async () => {
     setIsConfirmOpen(false);
     setLoading(true);
+ 
+    if (isEditMode && editDocId) {
+      await handleUpdateInvoice();
+    } else {
+      await handleCreateInvoice();
+    }
+  };
+ 
+  const handleUpdateInvoice = async () => {
+    try {
+      const currentUserName = user?.displayName || user?.email || "Noma'lum";
+      const movRef = collection(db, "stockMovements");
+ 
+      // 1. Eski stockMovements'ni o'chirish va inventarni tiklash
+      const oldQ = query(movRef, where("orderNumber", "==", editDocId), where("movementType", "==", "StockOut"));
+      const oldSnap = await getDocs(oldQ);
+ 
+      for (const oldDoc of oldSnap.docs) {
+        const oldData = oldDoc.data();
+        const oldQty = Math.abs(oldData.quantityChange || 0);
+        const oldProductId = oldData.productId;
+ 
+        // Inventarni tiklash (eski miqdorni qaytarish)
+        const invId = `${warehouseId}_${oldProductId}`;
+        const invRef = doc(db, "inventory", invId);
+        const invSnap = await getDoc(invRef);
+        if (invSnap.exists()) {
+          updateDocumentNonBlocking(invRef, {
+            stock: (invSnap.data().stock || 0) + oldQty,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+ 
+        // Product stock tiklash
+        const oldProduct = products?.find(p => p.id === oldProductId);
+        if (oldProduct) {
+          updateDocumentNonBlocking(doc(db, "products", oldProductId), {
+            stock: (oldProduct.stock || 0) + oldQty,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+ 
+        // Eski yozuvni o'chirish (non-blocking delete)
+        updateDocumentNonBlocking(oldDoc.ref, { _deleted: true, deletedAt: new Date().toISOString() });
+      }
+ 
+      // 2. Yangi itemlarni yozish
+      const invoiceItems: any[] = [];
+ 
+      for (const item of items) {
+        const product = products?.find(p => p.id === item.productId);
+        const { inUnit } = item;
+        const invId = `${warehouseId}_${item.productId}`;
+        const invRef = doc(db, "inventory", invId);
+        const calc = getRowCalc(item);
+ 
+        invoiceItems.push({
+          name: product?.name || "Noma'lum",
+          sku: product?.sku || "",
+          quantity: inUnit,
+          price: item.price,
+          discount: item.discount,
+          vatRate: item.vatRate,
+          vatAmount: calc.vatAmt,
+          total: calc.afterDiscount,
+          unit: product?.unit || "шт",
+          costPerUnit: calc.costPerUnit,
+          costTotal: calc.costTotal,
+        });
+ 
+        addDocumentNonBlocking(movRef, {
+          productId: item.productId,
+          productName: product?.name || "Noma'lum",
+          warehouseId,
+          warehouseName: warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum",
+          quantityChange: -inUnit,
+          movementType: "StockOut",
+          movementDate: orderDate || new Date().toISOString(),
+          responsibleUserId: user?.uid,
+          responsibleUserName: currentUserName,
+          orderNumber: editDocId,
+          recipient,
+          buyerType,
+          concept,
+          revenueAccount,
+          expenseAccount,
+          outgoingType,
+          outgoingTypeLabel: outgoingType === "sale" ? "Sotuv" : "Xarajat",
+          saleId: editDocId,
+          unitPrice: item.price,
+          discount: item.discount,
+          vatRate: item.vatRate,
+          totalPrice: calc.afterDiscount,
+          unit: product?.unit || "шт",
+          editedAt: new Date().toISOString(),
+          editedBy: currentUserName,
+        });
+ 
+        // Inventarni yangilash
+        if (product) {
+          updateDocumentNonBlocking(doc(db, "products", item.productId), {
+            stock: (product.stock || 0) - inUnit,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+ 
+        const invSnap = await getDoc(invRef);
+        if (invSnap.exists()) {
+          updateDocumentNonBlocking(invRef, {
+            stock: (invSnap.data().stock || 0) - inUnit,
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          await setDoc(invRef, {
+            id: invId, warehouseId, productId: item.productId,
+            stock: -inUnit, updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+ 
+      setProcessedInvoice({
+        orderNumber: editDocId, recipient, buyerType, concept,
+        warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
+        date: orderDate, items: invoiceItems,
+        responsible: currentUserName, totals,
+        outgoingType,
+        isEdited: true,
+      });
+ 
+      toast({ title: "Yangilandi ✓", description: `${editDocId} — muvaffaqiyatli yangilandi.` });
+      setIsSuccessOpen(true);
+      handleExitEditMode();
+    } catch (err: any) {
+      toast({
+        variant: "destructive", title: "Xatolik",
+        description: err?.code === "permission-denied" ? "Ruxsat yo'q." : "Yangilashda xatolik yuz berdi.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+ 
+  const handleCreateInvoice = async () => {
     const saleId = orderNumber;
     try {
       const invoiceItems: any[] = [];
@@ -314,7 +634,6 @@ export default function StockOutPage() {
           concept,
           revenueAccount,
           expenseAccount,
-          // ✅ YANGI: Chiqim turi — hisobot bo'limi bilan ishlaydi
           outgoingType,
           outgoingTypeLabel: outgoingType === "sale" ? "Sotuv" : "Xarajat",
           saleId,
@@ -400,15 +719,84 @@ export default function StockOutPage() {
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* iiko-style header */}
+        {/* Header */}
         <div className="px-6 pt-5 pb-0 border-b border-border/20 bg-card/30">
-          <h1 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2 mb-3">
-            <FileOutput className="w-5 h-5 text-rose-600" />
-            Расходная накладная №{orderLoading ? "..." : orderNumber}
-            <span className="text-muted-foreground font-normal text-sm ml-1">
-              от {new Date(orderDate).toLocaleDateString("ru-RU")}
-            </span>
-          </h1>
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
+              <FileOutput className="w-5 h-5 text-rose-600" />
+              {isEditMode ? (
+                <>
+                  <span className="text-amber-600">Tahrirlash:</span>
+                  Расходная накладная №{orderNumber}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                    <Pencil className="w-2.5 h-2.5" /> Edit rejimi
+                  </span>
+                </>
+              ) : (
+                <>
+                  Расходная накладная №{orderLoading ? "..." : orderNumber}
+                  <span className="text-muted-foreground font-normal text-sm ml-1">
+                    от {new Date(orderDate).toLocaleDateString("ru-RU")}
+                  </span>
+                </>
+              )}
+            </h1>
+ 
+            {/* ===== EDIT tugmasi ===== */}
+            <div className="flex items-center gap-2">
+              {isEditMode ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExitEditMode}
+                  className="h-8 px-3 text-xs font-bold rounded-lg border-amber-500/30 text-amber-600 hover:bg-amber-500/5 gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Yangi hujjat
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditSearchOpen(true)}
+                  disabled={editLoading}
+                  className="h-8 px-3 text-xs font-bold rounded-lg border-border/40 gap-1.5 hover:border-amber-500/40 hover:text-amber-600"
+                >
+                  {editLoading
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Pencil className="w-3.5 h-3.5" />
+                  }
+                  Eski hujjatni tahrirlash
+                </Button>
+              )}
+            </div>
+          </div>
+ 
+          {/* Edit mode banner */}
+          <AnimatePresence>
+            {isEditMode && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="mb-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2.5"
+              >
+                <Pencil className="w-4 h-4 text-amber-600 shrink-0" />
+                <p className="text-xs font-bold text-amber-700 flex-1">
+                  <span className="font-black">{orderNumber}</span> — hujjat tahrirlash rejimida.
+                  Saqlash tugmasini bosganingizda eski ma'lumotlar o'chirilib, yangilari yoziladi va inventar qayta hisoblanadi.
+                </p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-lg text-amber-600 hover:bg-amber-500/10"
+                  onClick={handleExitEditMode}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
  
           {/* Tabs */}
           <div className="flex gap-0">
@@ -433,28 +821,32 @@ export default function StockOutPage() {
         </div>
  
         <div className="flex-1 overflow-y-auto">
-          {/* ===== TAB 1: Основные свойства ===== */}
           {activeTab === "properties" && (
             <div className="p-6 space-y-4">
-              <Card className="border border-border/30 rounded-xl bg-card/50">
+              <Card className={cn(
+                "border rounded-xl bg-card/50 transition-colors",
+                isEditMode ? "border-amber-500/30" : "border-border/30"
+              )}>
                 <CardContent className="p-5">
                   <div className="grid grid-cols-2 gap-x-10 gap-y-4">
                     {/* LEFT column */}
                     <div className="space-y-3">
-                      {/* Номер документа */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Номер документа:</Label>
                         <div className="relative flex-1">
                           {orderLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-rose-500" />}
                           <Input
-                            className="h-8 text-sm font-mono font-bold bg-background/80 border-border/40 rounded-lg"
+                            className={cn(
+                              "h-8 text-sm font-mono font-bold bg-background/80 border-border/40 rounded-lg",
+                              isEditMode && "border-amber-500/40 bg-amber-500/5"
+                            )}
                             value={orderNumber}
-                            onChange={e => setOrderNumber(e.target.value)}
+                            onChange={e => !isEditMode && setOrderNumber(e.target.value)}
+                            readOnly={isEditMode}
                           />
                         </div>
                       </div>
  
-                      {/* Дата и время */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Дата и время выдачи:</Label>
                         <Input
@@ -465,7 +857,6 @@ export default function StockOutPage() {
                         />
                       </div>
  
-                      {/* Концепция */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Концепция:</Label>
                         <Select value={concept} onValueChange={setConcept}>
@@ -478,7 +869,6 @@ export default function StockOutPage() {
                         </Select>
                       </div>
  
-                      {/* Комментарий */}
                       <div className="flex items-start gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0 mt-2">Комментарий:</Label>
                         <Select value={docComment} onValueChange={setDocComment}>
@@ -491,7 +881,6 @@ export default function StockOutPage() {
                         </Select>
                       </div>
  
-                      {/* Действия */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 shrink-0" />
                         <Select>
@@ -508,7 +897,6 @@ export default function StockOutPage() {
  
                     {/* RIGHT column */}
                     <div className="space-y-3">
-                      {/* Тип покупателя */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Тип покупателя:</Label>
                         <Select value={buyerType} onValueChange={setBuyerType}>
@@ -523,7 +911,6 @@ export default function StockOutPage() {
                         </Select>
                       </div>
  
-                      {/* Покупатель */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Покупатель:</Label>
                         <div className="flex flex-1 gap-1">
@@ -539,7 +926,6 @@ export default function StockOutPage() {
                         </div>
                       </div>
  
-                      {/* Отгрузить со склада */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Отгрузить со склада:</Label>
                         <div className="flex flex-1 items-center gap-2">
@@ -566,7 +952,6 @@ export default function StockOutPage() {
                         </div>
                       </div>
  
-                      {/* Счет выручки */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Счет выручки:</Label>
                         <div className="flex flex-1 gap-1">
@@ -584,7 +969,6 @@ export default function StockOutPage() {
                         </div>
                       </div>
  
-                      {/* Расходный счет */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Расходный счет:</Label>
                         <div className="flex flex-1 gap-1">
@@ -602,7 +986,6 @@ export default function StockOutPage() {
                         </div>
                       </div>
  
-                      {/* ✅ YANGI: Chiqim turi — Sotuv yoki Xarajat */}
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Chiqim turi:</Label>
                         <div className="flex flex-1 gap-2">
@@ -629,9 +1012,11 @@ export default function StockOutPage() {
                 </CardContent>
               </Card>
  
-              {/* ===== Product tabs ===== */}
-              <Card className="border border-border/30 rounded-xl bg-card/50 overflow-hidden">
-                {/* Tab strip */}
+              {/* Product table */}
+              <Card className={cn(
+                "border rounded-xl bg-card/50 overflow-hidden",
+                isEditMode ? "border-amber-500/30" : "border-border/30"
+              )}>
                 <div className="flex border-b border-border/20 bg-muted/10 px-4 pt-3 gap-1 flex-wrap">
                   {PRODUCT_TABS.map(tab => (
                     <button
@@ -659,7 +1044,6 @@ export default function StockOutPage() {
                   </div>
                 </div>
  
-                {/* Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-muted/30 border-b border-border/20">
@@ -868,7 +1252,6 @@ export default function StockOutPage() {
                 </div>
               </Card>
  
-              {/* iiko-style bottom warning + totals */}
               <div className="flex items-center justify-between pt-1">
                 <p className="text-xs text-rose-600 font-bold flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -882,7 +1265,7 @@ export default function StockOutPage() {
                 </p>
               </div>
  
-              {/* iiko-style action buttons */}
+              {/* Action buttons */}
               <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/20">
                 <Button
                   variant="outline"
@@ -893,36 +1276,51 @@ export default function StockOutPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-9 px-4 text-xs font-bold rounded-lg gap-1.5"
-                  onClick={handlePreDispatch}
-                  disabled={loading || !validation.isValid}
-                >
-                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  Сохранить
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-9 px-4 text-xs font-bold rounded-lg gap-1.5"
-                  onClick={() => window.history.back()}
-                >
-                  <LogOut className="w-3.5 h-3.5" /> Выйти без сохранения
-                </Button>
-                <Button
-                  className="h-9 px-5 text-xs font-black rounded-lg gap-1.5 bg-rose-600 text-white hover:bg-rose-700 border-none shadow-lg shadow-rose-600/20"
+                  className={cn(
+                    "h-9 px-4 text-xs font-bold rounded-lg gap-1.5",
+                    isEditMode && "border-amber-500/30 text-amber-600 hover:bg-amber-500/5"
+                  )}
                   onClick={handlePreDispatch}
                   disabled={loading || !validation.isValid}
                 >
                   {loading
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <FileOutput className="w-3.5 h-3.5" />
+                    : isEditMode
+                      ? <Pencil className="w-3.5 h-3.5" />
+                      : <Save className="w-3.5 h-3.5" />
                   }
-                  Сохранить и закрыть
+                  {isEditMode ? "Yangilash" : "Сохранить"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-9 px-4 text-xs font-bold rounded-lg gap-1.5"
+                  onClick={isEditMode ? handleExitEditMode : () => window.history.back()}
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  {isEditMode ? "Tahrirlashni bekor qilish" : "Выйти без сохранения"}
+                </Button>
+                <Button
+                  className={cn(
+                    "h-9 px-5 text-xs font-black rounded-lg gap-1.5 border-none shadow-lg",
+                    isEditMode
+                      ? "bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20"
+                      : "bg-rose-600 text-white hover:bg-rose-700 shadow-rose-600/20"
+                  )}
+                  onClick={handlePreDispatch}
+                  disabled={loading || !validation.isValid}
+                >
+                  {loading
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : isEditMode
+                      ? <Pencil className="w-3.5 h-3.5" />
+                      : <FileOutput className="w-3.5 h-3.5" />
+                  }
+                  {isEditMode ? "Saqlash va yopish" : "Сохранить и закрыть"}
                 </Button>
               </div>
             </div>
           )}
  
-          {/* TAB 2: Доставка и оплата */}
           {activeTab === "delivery" && (
             <div className="p-6">
               <Card className="border border-border/30 rounded-xl bg-card/50">
@@ -936,15 +1334,110 @@ export default function StockOutPage() {
           )}
         </div>
  
+        {/* ===== EDIT SEARCH DIALOG ===== */}
+        <Dialog open={isEditSearchOpen} onOpenChange={setIsEditSearchOpen}>
+          <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-2xl p-8 shadow-2xl">
+            <DialogHeader>
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-3">
+                <Clock className="w-7 h-7" />
+              </div>
+              <DialogTitle className="text-xl font-black tracking-tight">Eski nakladnoylni tanlang</DialogTitle>
+              <p className="text-muted-foreground font-medium text-sm pt-1">
+                Tahrirlash uchun StockOut hujjatini qidiring.
+              </p>
+            </DialogHeader>
+ 
+            {/* Search input */}
+            <div className="relative mt-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Hujjat №, mijoz nomi..."
+                className="h-10 pl-10 rounded-xl bg-background/80 border-border/40 text-sm"
+                value={editSearchQuery}
+                onChange={e => setEditSearchQuery(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleEditSearch()}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3 text-xs font-bold rounded-lg"
+                onClick={handleEditSearch}
+                disabled={editSearchLoading}
+              >
+                {editSearchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Qidirish"}
+              </Button>
+            </div>
+ 
+            {/* Results */}
+            <div className="mt-3 space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {editSearchLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                </div>
+              ) : editSearchResults.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <p className="text-sm font-bold">Hujjatlar topilmadi</p>
+                  <p className="text-xs mt-1">Qidiruvni o'zgartiring yoki boshqa so'z kiriting</p>
+                </div>
+              ) : (
+                editSearchResults.map(result => (
+                  <motion.button
+                    key={result.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    onClick={() => handleLoadInvoiceForEdit(result.orderNumber)}
+                    className="w-full text-left p-3.5 rounded-xl border border-border/20 hover:border-amber-500/30 hover:bg-amber-500/5 transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                          <FileOutput className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="font-mono font-black text-sm text-rose-600">{result.orderNumber}</p>
+                          <p className="text-xs text-muted-foreground font-bold">{result.recipient}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-black">{formatMoney(result.total)} р.</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {new Date(result.date).toLocaleDateString("ru-RU")}
+                        </p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-amber-600 transition-colors ml-2" />
+                    </div>
+                  </motion.button>
+                ))
+              )}
+            </div>
+ 
+            <DialogFooter className="mt-4">
+              <Button variant="ghost" onClick={() => setIsEditSearchOpen(false)} className="rounded-xl h-10 font-bold px-5">
+                Bekor qilish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+ 
         {/* ===== Confirm Dialog ===== */}
         <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
             <DialogHeader>
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-3">
-                <Info className="w-7 h-7" />
+              <div className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center mb-3",
+                isEditMode ? "bg-amber-500/10 text-amber-500" : "bg-amber-500/10 text-amber-500"
+              )}>
+                {isEditMode ? <Pencil className="w-7 h-7" /> : <Info className="w-7 h-7" />}
               </div>
-              <DialogTitle className="text-xl font-black tracking-tight">Tasdiqlash</DialogTitle>
-              <p className="text-muted-foreground font-medium text-sm pt-1">Operatsiyani yakunlashdan oldin tekshiring.</p>
+              <DialogTitle className="text-xl font-black tracking-tight">
+                {isEditMode ? "Tahrirlashni tasdiqlang" : "Tasdiqlash"}
+              </DialogTitle>
+              <p className="text-muted-foreground font-medium text-sm pt-1">
+                {isEditMode
+                  ? "Eski ma'lumotlar o'chirilib, inventar qayta hisoblanadi. Davom etasizmi?"
+                  : "Operatsiyani yakunlashdan oldin tekshiring."
+                }
+              </p>
             </DialogHeader>
             <div className="py-4 space-y-3">
               <div className="p-4 rounded-2xl bg-muted/20 space-y-2.5 text-sm">
@@ -965,8 +1458,10 @@ export default function StockOutPage() {
                       "font-black",
                       label === "Hujjat №" ? "font-mono text-rose-600" : "",
                       label === "Chiqim turi"
-                        ? outgoingType === "sale" ? "bg-emerald-500/10 text-emerald-600 inline-block px-2 py-0.5 rounded-lg text-[11px]"
-                        : "bg-amber-500/10 text-amber-600 inline-block px-2 py-0.5 rounded-lg text-[11px]" : ""
+                        ? outgoingType === "sale"
+                          ? "bg-emerald-500/10 text-emerald-600 inline-block px-2 py-0.5 rounded-lg text-[11px]"
+                          : "bg-amber-500/10 text-amber-600 inline-block px-2 py-0.5 rounded-lg text-[11px]"
+                        : ""
                     )}>{val}</span>
                   </div>
                 ))}
@@ -979,6 +1474,15 @@ export default function StockOutPage() {
                   <span className="font-black text-amber-600">{formatMoney(totals.vat)} р.</span>
                 </div>
               </div>
+ 
+              {isEditMode && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs font-bold text-amber-700">
+                    Bu amalni bekor qilib bo'lmaydi. Eski stockMovements yozuvlari o'chirilib, inventar qayta hisoblanadi.
+                  </p>
+                </div>
+              )}
             </div>
             <DialogFooter className="gap-2">
               <Button variant="ghost" onClick={() => setIsConfirmOpen(false)} className="rounded-xl h-11 font-bold px-5">
@@ -987,9 +1491,19 @@ export default function StockOutPage() {
               <Button
                 onClick={handleFinalProcess}
                 disabled={loading}
-                className="rounded-xl h-11 flex-1 bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-2"
+                className={cn(
+                  "rounded-xl h-11 flex-1 font-black uppercase tracking-widest text-[10px] gap-2",
+                  isEditMode
+                    ? "bg-amber-500 text-white hover:bg-amber-600"
+                    : "bg-rose-600 text-white hover:bg-rose-700"
+                )}
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Tasdiqlash <ArrowRight className="w-4 h-4" /></>}
+                {loading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : isEditMode
+                    ? <><Pencil className="w-4 h-4" /> Yangilash</>
+                    : <>Tasdiqlash <ArrowRight className="w-4 h-4" /></>
+                }
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -998,24 +1512,38 @@ export default function StockOutPage() {
         {/* ===== Success Dialog ===== */}
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground p-8 shadow-2xl text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-4">
+            <div className={cn(
+              "mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4",
+              processedInvoice?.isEdited ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"
+            )}>
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <DialogHeader>
-              <DialogTitle className="text-xl font-black tracking-tight mb-1">Расходная накладная сохранена!</DialogTitle>
-              <p className="text-muted-foreground font-medium text-sm">Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi.</p>
+              <DialogTitle className="text-xl font-black tracking-tight mb-1">
+                {processedInvoice?.isEdited ? "Hujjat yangilandi!" : "Расходная накладная сохранена!"}
+              </DialogTitle>
+              <p className="text-muted-foreground font-medium text-sm">
+                {processedInvoice?.isEdited
+                  ? "Nakladnoy muvaffaqiyatli yangilandi va inventar qayta hisoblandi."
+                  : "Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi."
+                }
+              </p>
               <p className="text-rose-600 font-black text-2xl mt-2 font-mono">{processedInvoice?.orderNumber}</p>
               {processedInvoice && (
                 <div className="mt-3 text-xs text-muted-foreground space-y-1">
                   <p>Общая сумма: <span className="font-black text-foreground">{formatMoney(processedInvoice.totals?.net || 0)} р.</span></p>
                   <p>НДС: <span className="font-black text-amber-600">{formatMoney(processedInvoice.totals?.vat || 0)} р.</span></p>
-                  {/* ✅ YANGI: Success dialogda ham ko'rinadi */}
                   <p>Chiqim turi: <span className={cn(
                     "font-black",
                     processedInvoice.outgoingType === "sale" ? "text-emerald-600" : "text-amber-600"
                   )}>
                     {processedInvoice.outgoingType === "sale" ? "Sotuv" : "Xarajat"}
                   </span></p>
+                  {processedInvoice.isEdited && (
+                    <p className="text-amber-600 font-black flex items-center justify-center gap-1">
+                      <Pencil className="w-3 h-3" /> Tahrirlangan hujjat
+                    </p>
+                  )}
                 </div>
               )}
             </DialogHeader>
