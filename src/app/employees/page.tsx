@@ -2,7 +2,6 @@
  
 import { useState, useMemo } from "react";
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { StaffWorkerForm } from "./StaffWorkerForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +22,11 @@ import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebas
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp,
 } from "firebase/firestore";
-import {
-  getAuth, createUserWithEmailAndPassword,
-} from "firebase/auth";
+ 
+// ✅ TO'G'RI: auth ni firebase.ts dan import qilamiz, getAuth() emas
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase"; // ← sizning firebase.ts path
+ 
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
  
@@ -275,7 +276,7 @@ export default function StaffManagementPage() {
       let uid = formData.uid;
  
       if (formData.hasLogin && !editingId && formData.loginEmail && password) {
-        const auth = getAuth();
+        // ✅ TO'G'RI: import qilingan auth ishlatilmoqda, getAuth() emas
         const cred = await createUserWithEmailAndPassword(auth, formData.loginEmail, password);
         uid = cred.user.uid;
       }
@@ -291,13 +292,18 @@ export default function StaffManagementPage() {
       }
       closeModal();
     } catch (e: unknown) {
-      const err = e as { code?: string };
+      const err = e as { code?: string; message?: string };
+      console.error("Firebase xatolik:", err); // debug uchun
       const msg =
         err?.code === "auth/email-already-in-use"
           ? "Bu email allaqachon ishlatilmoqda"
           : err?.code === "auth/weak-password"
           ? "Parol kamida 6 ta belgidan iborat bo'lishi kerak"
-          : "Saqlashda xatolik yuz berdi";
+          : err?.code === "auth/invalid-email"
+          ? "Email formati noto'g'ri"
+          : err?.code === "permission-denied"
+          ? "Firestore ruxsati yo'q (Security Rules)"
+          : `Xatolik: ${err?.message ?? "Noma'lum xato"}`;
       toast({ title: "Xatolik", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
