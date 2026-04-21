@@ -51,7 +51,7 @@ const getStock = (p: Product): number => {
       if (!isNaN(n)) return n;
     }
   }
-  return 9999; // Agar stock field yo'q bo'lsa - mavjud deb hisoblaymiz
+  return 9999;
 };
  
 const getCategory = (p: Product): string =>
@@ -105,14 +105,7 @@ const generateReceiptHTML = (sale: any): string => {
 <style>
   @page { size: 80mm auto; margin: 4mm; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    color: #111;
-    background: #fff;
-    width: 72mm;
-    padding: 4mm;
-  }
+  body { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #111; background: #fff; width: 72mm; padding: 4mm; }
   .center { text-align: center; }
   .bold { font-weight: 700; }
   .dashed { border-top: 1.5px dashed #555; margin: 6px 0; }
@@ -130,10 +123,7 @@ const generateReceiptHTML = (sale: any): string => {
   .pay-row.change { font-weight: 700; font-size: 13px; color: #059669; }
   .footer { text-align: center; font-size: 9px; color: #888; margin-top: 10px; }
   .barcode { font-size: 9px; letter-spacing: 3px; color: #333; margin-top: 4px; }
-  @media print {
-    body { width: 100%; padding: 0; }
-    @page { margin: 2mm; }
-  }
+  @media print { body { width: 100%; padding: 0; } @page { margin: 2mm; } }
 </style>
 </head>
 <body>
@@ -147,36 +137,17 @@ const generateReceiptHTML = (sale: any): string => {
   </div>
   <div class="dashed"></div>
   <table>
-    <thead>
-      <tr>
-        <th>Mahsulot</th>
-        <th style="text-align:center">Dona</th>
-        <th style="text-align:right">Narx</th>
-        <th style="text-align:right">Summa</th>
-      </tr>
-    </thead>
+    <thead><tr><th>Mahsulot</th><th style="text-align:center">Dona</th><th style="text-align:right">Narx</th><th style="text-align:right">Summa</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="total-section">
-    <div class="total-row main">
-      <span>JAMI:</span>
-      <span>${new Intl.NumberFormat("uz-UZ").format(sale.total)} so'm</span>
-    </div>
+    <div class="total-row main"><span>JAMI:</span><span>${new Intl.NumberFormat("uz-UZ").format(sale.total)} so'm</span></div>
   </div>
   <div class="pay-info">
-    <div class="pay-row">
-      <span>To'lov usuli:</span>
-      <span class="bold">${PAY_LABELS[sale.paymentMethod] || sale.paymentMethod}</span>
-    </div>
+    <div class="pay-row"><span>To'lov usuli:</span><span class="bold">${PAY_LABELS[sale.paymentMethod] || sale.paymentMethod}</span></div>
     ${sale.paymentMethod === "cash" ? `
-    <div class="pay-row">
-      <span>Berildi:</span>
-      <span>${new Intl.NumberFormat("uz-UZ").format(sale.cashGiven || 0)} so'm</span>
-    </div>
-    <div class="pay-row change">
-      <span>Qaytim:</span>
-      <span>${new Intl.NumberFormat("uz-UZ").format(Math.max(0, sale.change || 0))} so'm</span>
-    </div>` : ""}
+    <div class="pay-row"><span>Berildi:</span><span>${new Intl.NumberFormat("uz-UZ").format(sale.cashGiven || 0)} so'm</span></div>
+    <div class="pay-row change"><span>Qaytim:</span><span>${new Intl.NumberFormat("uz-UZ").format(Math.max(0, sale.change || 0))} so'm</span></div>` : ""}
   </div>
   <div class="dashed"></div>
   <div class="footer">
@@ -184,38 +155,23 @@ const generateReceiptHTML = (sale: any): string => {
     <div style="margin-top:3px">www.omborchi.uz</div>
     <div class="barcode">||||| ${sale.id?.slice(-8) || "00000000"} |||||</div>
   </div>
-  <script>
-    window.onload = function() {
-      setTimeout(function() { window.print(); }, 300);
-    };
-  </script>
+  <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };</script>
 </body>
 </html>`;
 };
  
-// ============ TERMAL PRINTER (ESC/POS) ============
+// ============ TERMAL PRINTER ============
 const printThermal = async (sale: any): Promise<boolean> => {
-  // Web Serial API orqali termal printer
-  if (!("serial" in navigator)) {
-    return false;
-  }
+  if (!("serial" in navigator)) return false;
   try {
     const port = await (navigator as any).serial.requestPort();
     await port.open({ baudRate: 9600 });
     const writer = port.writable.getWriter();
- 
-    const ESC = 0x1B;
-    const GS = 0x1D;
-    const LF = 0x0A;
- 
+    const ESC = 0x1B; const GS = 0x1D; const LF = 0x0A;
     const encode = (text: string) => new TextEncoder().encode(text);
     const cmd = (...bytes: number[]) => new Uint8Array(bytes);
- 
-    // Initialize
     await writer.write(cmd(ESC, 0x40));
-    // Center align
     await writer.write(cmd(ESC, 0x61, 0x01));
-    // Bold on
     await writer.write(cmd(ESC, 0x45, 0x01));
     await writer.write(encode("OMBORCHI.UZ\n"));
     await writer.write(cmd(ESC, 0x45, 0x00));
@@ -225,42 +181,32 @@ const printThermal = async (sale: any): Promise<boolean> => {
     await writer.write(encode("Kassir: " + sale.cashierName + "\n"));
     await writer.write(encode("Chek: #" + (sale.id?.slice(-10) || "—") + "\n"));
     await writer.write(encode("--------------------------------\n"));
- 
-    // Left align
     await writer.write(cmd(ESC, 0x61, 0x00));
- 
     for (const item of (sale.items || [])) {
       const name = item.name.slice(0, 20).padEnd(20);
       const qty = String(item.quantity).padStart(3);
       const sum = new Intl.NumberFormat("uz-UZ").format(item.subtotal).padStart(9);
       await writer.write(encode(`${name}${qty}${sum}\n`));
     }
- 
     await writer.write(encode("--------------------------------\n"));
-    // Bold + double size for total
     await writer.write(cmd(ESC, 0x45, 0x01));
     await writer.write(cmd(GS, 0x21, 0x11));
     const total = new Intl.NumberFormat("uz-UZ").format(sale.total);
     await writer.write(encode(`JAMI: ${total} so'm\n`));
     await writer.write(cmd(GS, 0x21, 0x00));
     await writer.write(cmd(ESC, 0x45, 0x00));
- 
     const PAY_LABELS: Record<string, string> = { cash: "Naqd pul", card: "Karta", transfer: "O\'tkazma" };
     await writer.write(encode(`To'lov: ${PAY_LABELS[sale.paymentMethod] || sale.paymentMethod}\n`));
- 
     if (sale.paymentMethod === "cash") {
       await writer.write(encode(`Berildi: ${new Intl.NumberFormat("uz-UZ").format(sale.cashGiven || 0)} so'm\n`));
       await writer.write(encode(`Qaytim:  ${new Intl.NumberFormat("uz-UZ").format(Math.max(0, sale.change || 0))} so'm\n`));
     }
- 
     await writer.write(encode("--------------------------------\n"));
     await writer.write(cmd(ESC, 0x61, 0x01));
     await writer.write(encode("Xarid uchun rahmat!\n"));
     await writer.write(encode("www.omborchi.uz\n"));
-    // Feed and cut
     await writer.write(cmd(LF, LF, LF));
-    await writer.write(cmd(GS, 0x56, 0x00)); // Full cut
- 
+    await writer.write(cmd(GS, 0x56, 0x00));
     writer.releaseLock();
     await port.close();
     return true;
@@ -270,34 +216,24 @@ const printThermal = async (sale: any): Promise<boolean> => {
   }
 };
  
-// ============ BROWSER PRINT (chek oynasi) ============
 const printBrowser = (sale: any) => {
   const html = generateReceiptHTML(sale);
   const win = window.open("", "_blank", "width=360,height=700");
-  if (!win) {
-    alert("Pop-up bloklangan! Brauzer sozlamalarida ruxsat bering.");
-    return;
-  }
+  if (!win) { alert("Pop-up bloklangan! Brauzer sozlamalarida ruxsat bering."); return; }
   win.document.write(html);
   win.document.close();
 };
  
-// ============ PDF YUKLASH ============
 const downloadPDF = (sale: any) => {
   const html = generateReceiptHTML(sale);
-  // jsPDF o'rniga iframe + print to PDF usuli
   const iframe = document.createElement("iframe");
   iframe.style.display = "none";
   document.body.appendChild(iframe);
-  const doc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!doc) return;
-  doc.open();
-  doc.write(html);
-  doc.close();
+  const docEl = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!docEl) return;
+  docEl.open(); docEl.write(html); docEl.close();
   setTimeout(() => {
-    try {
-      iframe.contentWindow?.print();
-    } catch {}
+    try { iframe.contentWindow?.print(); } catch {}
     setTimeout(() => document.body.removeChild(iframe), 3000);
   }, 500);
 };
@@ -372,7 +308,7 @@ export default function CashPage() {
     finally { setWhLoading(false); }
   }, []);
  
-  // ============ INVENTORY ============
+  // ============ INVENTORY — XATOSIZ ============
   const fetchInventory = useCallback(async (wh: Warehouse | null) => {
     if (!wh) { setInventoryMap({}); return; }
     try {
@@ -390,15 +326,22 @@ export default function CashPage() {
             setInventoryMap(map);
             return;
           }
-        } catch {}
+        } catch {
+          // Bu collection yo'q yoki xato — davom etamiz
+        }
       }
       setInventoryMap({});
-    } catch { setInventoryMap({}); }
+    } catch {
+      // Inventory topilmadi — mahsulotlar baribir ko'rinadi
+      setInventoryMap({});
+    }
   }, []);
  
-  // ============ PRODUCTS - TO'LIQ TUZATILGAN ============
+  // ============ PRODUCTS — TO'LIQ TUZATILGAN ============
   const fetchProducts = useCallback(async (wh: Warehouse | null) => {
+    // 1. Loading boshlandi
     setProductsLoading(true);
+    
     try {
       const cols = ["products","mahsulotlar","tovarlar","items","product","Products","Mahsulotlar","goods"];
       let rawData: Product[] = [];
@@ -409,30 +352,26 @@ export default function CashPage() {
           if (!snap.empty) {
             rawData = snap.docs.map(d => {
               const r = d.data() as any;
-              // Nom - barcha variantlar
               const name =
                 r.name || r.nomi || r.nom || r.title || r.mahsulot ||
                 r.tovar || r.naimenovanie || r.productName || r.item_name ||
                 `Mahsulot #${d.id.slice(-4)}`;
-              // Narx - barcha variantlar
-              const price =
-                Number(r.salePrice || r.price || r.narx || r.baho ||
+              const price = Number(
+                r.salePrice || r.price || r.narx || r.baho ||
                 r.sotishNarxi || r.selling_price || r.sellingPrice ||
-                r.cost || r.stoimost || 0);
-              // Kategoriya
+                r.cost || r.stoimost || 0
+              );
               const category =
                 r.category || r.kategoriya || r.cat || r.tip ||
                 r.tur || r.type || r.gruppe || "";
- 
               return {
-                ...r,           // barcha maydonlar
-                id: d.id,       // id ustidan yozamiz
+                ...r,
+                id: d.id,
                 name,
                 price,
                 salePrice: price,
                 category,
                 kategoriya: category,
-                // Stock maydonlarini saqlaymiz
                 stock: r.stock,
                 qoldiq: r.qoldiq,
                 miqdor: r.miqdor,
@@ -443,7 +382,7 @@ export default function CashPage() {
             break;
           }
         } catch (e) {
-          console.warn(`"${colName}" topilmadi`);
+          console.warn(`"${colName}" topilmadi:`, e);
         }
       }
  
@@ -459,12 +398,15 @@ export default function CashPage() {
         }
       }
  
+      // 2. Ma'lumotlarni set qilamiz
       setAllProducts(rawData);
+ 
     } catch (e) {
       console.error("fetchProducts xato:", e);
       showToast("Mahsulotlarni yuklashda xato!", "err");
     } finally {
-      setProductsLoading(false); // HAR DOIM false ga o'tkazamiz
+      // 3. KAFOLATLANGAN HOLDA loading tugadi — xato bo'lsa ham, muvaffaqiyatli bo'lsa ham
+      setProductsLoading(false);
     }
   }, [showToast]);
  
@@ -509,9 +451,28 @@ export default function CashPage() {
     } catch (e) { console.error(e); }
   }, []);
  
-  useEffect(() => { fetchWarehouses(); fetchSales(); fetchReport(); }, []);
+  // ============ EFFECTS — TUZATILGAN ============
   useEffect(() => {
-    if (!whLoading) { fetchProducts(activeWh); fetchInventory(activeWh); }
+    fetchWarehouses();
+    fetchSales();
+    fetchReport();
+  }, []);
+ 
+  useEffect(() => {
+    if (whLoading) return; // Ombor hali yuklanmagan
+ 
+    // Mahsulotlar va inventory ni PARALLEL yuklaymiz
+    // fetchProducts o'zida setProductsLoading(false) ni finally da chaqiradi
+    // fetchInventory xato bersa ham mahsulotlar ko'rinadi
+    const loadData = async () => {
+      // Ikkalasini parallel ishga tushiramiz
+      // fetchProducts o'z ichida loading state ni boshqaradi
+      fetchInventory(activeWh).catch(() => setInventoryMap({}));
+      await fetchProducts(activeWh);
+      // fetchProducts finally da setProductsLoading(false) chaqiradi
+    };
+ 
+    loadData();
   }, [activeWh, whLoading]);
  
   const selectWarehouse = (wh: Warehouse) => {
@@ -548,8 +509,8 @@ export default function CashPage() {
   };
   const clearCart = () => { setCart([]); setCashGiven(0); };
  
-  const total   = cart.reduce((s, i) => s + i.customPrice * i.quantity, 0);
-  const change  = cashGiven - total;
+  const total  = cart.reduce((s, i) => s + i.customPrice * i.quantity, 0);
+  const change = cashGiven - total;
  
   const openCustomPrice = (item: CartItem) => {
     setCustomPriceItem(item);
@@ -563,7 +524,7 @@ export default function CashPage() {
     setCustomPriceItem(null); setTempPrice("");
   };
  
-  // ============ CHECKOUT + AVTOMATIK CHEK ============
+  // ============ CHECKOUT ============
   const handleCheckout = async () => {
     if (!cart.length) return;
     if (payMethod === "cash" && cashGiven < total) {
@@ -591,7 +552,6 @@ export default function CashPage() {
  
       const ref = await addDoc(collection(db, "sales"), saleData);
  
-      // Stock kamaytirish
       await Promise.all(cart.map(async (i) => {
         const stock = getEffectiveStock(i);
         if (stock < 9999) {
@@ -601,25 +561,17 @@ export default function CashPage() {
  
       const completedSale = { id: ref.id, ...saleData };
       setLastSale(completedSale as any);
- 
-      // Savat tozalash
       clearCart();
  
-      // ===== AVTOMATIK CHEK CHIQARISH =====
-      // 1. Avval termal printer ga urinib ko'ramiz
       const thermalOk = await printThermal(completedSale);
- 
       if (!thermalOk) {
-        // 2. Termal yo'q - brauzer orqali chek oynasi
         printBrowser(completedSale);
         showToast("✓ Sotuv amalga oshdi! Chek oynasi ochildi.", "ok");
       } else {
         showToast("✓ Sotuv amalga oshdi! Chek printerga yuborildi.", "ok");
       }
  
-      // 3. Receipt modal ni ko'rsatamiz
       setShowReceipt(true);
- 
       fetchProducts(activeWh);
       fetchInventory(activeWh);
       fetchSales();
@@ -632,15 +584,13 @@ export default function CashPage() {
     }
   };
  
-  // ============ FILTER - STOCK TEKSHIRUVISIZ ============
+  // ============ FILTER ============
   const categories = ["all", ...Array.from(new Set(allProducts.map(p => getCategory(p)).filter(Boolean)))];
- 
   const filtered = allProducts.filter(p => {
     const name = (p.name || "").toLowerCase();
     const ms = !search || name.includes(search.toLowerCase());
     const mc = selectedCat === "all" || getCategory(p) === selectedCat;
     return ms && mc;
-    // Stock bo'yicha FILTER YO'Q - barcha mahsulotlar ko'rinadi
   });
  
   const TABS: {key:TabType;label:string;icon:string}[] = [
@@ -677,29 +627,16 @@ export default function CashPage() {
       --mono:    'JetBrains Mono', monospace;
       --cart-w:  340px;
     }
- 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
- 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-    }
- 
-    /* scrollbar */
+    body { background: var(--bg); color: var(--text); font-family: var(--font); }
     ::-webkit-scrollbar { width: 3px; height: 3px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--bord2); border-radius: 2px; }
- 
-    /* ========== ROOT ========== */
     .root { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
- 
-    /* ========== TOPBAR ========== */
     .topbar {
       height: 56px; flex-shrink: 0;
       display: flex; align-items: center; gap: 12px; padding: 0 18px;
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      z-index: 100;
+      background: var(--surface); border-bottom: 1px solid var(--border); z-index: 100;
     }
     .logo { display: flex; align-items: center; gap: 9px; margin-right: 4px; flex-shrink: 0; }
     .logo-mark {
@@ -710,10 +647,7 @@ export default function CashPage() {
       box-shadow: 0 3px 14px rgba(99,102,241,.4);
     }
     .logo-text { font-size: 16px; font-weight: 800; letter-spacing: -.4px; }
-    .tab-nav {
-      display: flex; gap: 2px;
-      background: var(--bg2); border-radius: 9px; padding: 3px;
-    }
+    .tab-nav { display: flex; gap: 2px; background: var(--bg2); border-radius: 9px; padding: 3px; }
     .tab-btn {
       padding: 5px 16px; border-radius: 7px; border: none;
       background: transparent; color: var(--muted);
@@ -722,10 +656,7 @@ export default function CashPage() {
       display: flex; align-items: center; gap: 5px; white-space: nowrap;
     }
     .tab-btn:hover { color: var(--text2); }
-    .tab-btn.active {
-      background: var(--sur2); color: var(--text);
-      box-shadow: 0 1px 5px rgba(0,0,0,.3);
-    }
+    .tab-btn.active { background: var(--sur2); color: var(--text); box-shadow: 0 1px 5px rgba(0,0,0,.3); }
     .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 9px; }
     .wh-pill {
       display: flex; align-items: center; gap: 6px;
@@ -741,8 +672,6 @@ export default function CashPage() {
       background: var(--sur2); border: 1px solid var(--border);
       padding: 5px 11px; border-radius: 20px;
     }
- 
-    /* ========== TOAST ========== */
     .toast {
       position: fixed; top: 66px; left: 50%; transform: translateX(-50%);
       z-index: 9999; padding: 10px 22px; border-radius: 30px;
@@ -757,13 +686,8 @@ export default function CashPage() {
       from { opacity:0; transform: translateX(-50%) translateY(-10px) scale(.92); }
       to   { opacity:1; transform: translateX(-50%) translateY(0) scale(1); }
     }
- 
-    /* ========== POS LAYOUT ========== */
     .pos-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
- 
-    /* ---- Products panel ---- */
     .products-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
- 
     .prod-toolbar {
       padding: 12px 14px; flex-shrink: 0;
       display: flex; flex-direction: column; gap: 9px;
@@ -798,8 +722,6 @@ export default function CashPage() {
     }
     .cat-pill:hover { color: var(--text2); border-color: var(--bord2); }
     .cat-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(99,102,241,.35); }
- 
-    /* ---- Products grid ---- */
     .products-grid {
       flex: 1; overflow-y: auto; min-height: 0;
       padding: 12px;
@@ -812,10 +734,8 @@ export default function CashPage() {
  
     /* ========== SKELETON ========== */
     .skel-card {
-      background: var(--surface);
-      border: 1.5px solid var(--border);
-      border-radius: var(--r);
-      padding: 11px 9px 9px;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: var(--r); padding: 11px 9px 9px;
       display: flex; flex-direction: column; gap: 7px;
     }
     .skel-line {
@@ -824,139 +744,72 @@ export default function CashPage() {
       background-size: 200% 100%;
       animation: shimmer 1.3s ease infinite;
     }
-    @keyframes shimmer {
-      0%   { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
  
-    /* ========== PRODUCT CARD - TO'LIQ TUZATILGAN ========== */
+    /* ========== PRODUCT CARD ========== */
     .prod-card {
-      /* Reset button */
-      appearance: none;
-      -webkit-appearance: none;
-      border: none;
-      outline: none;
-      cursor: pointer;
-      text-align: left;
-      font-family: var(--font);
- 
-      /* Layout */
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      position: relative;
-      overflow: hidden;
- 
-      /* Visual */
+      appearance: none; -webkit-appearance: none; border: none; outline: none;
+      cursor: pointer; text-align: left; font-family: var(--font);
+      display: flex; flex-direction: column; gap: 6px;
+      position: relative; overflow: hidden;
       background: var(--surface) !important;
       border: 1.5px solid var(--border);
-      border-radius: var(--r);
-      padding: 11px 9px 9px;
- 
-      /* TEXT - MUHIM */
+      border-radius: var(--r); padding: 11px 9px 9px;
       color: var(--text) !important;
       -webkit-text-fill-color: var(--text) !important;
- 
-      /* Animation */
       animation: cardIn .28s ease both;
       transition: border-color .2s, transform .2s, box-shadow .2s;
     }
-    @keyframes cardIn {
-      from { opacity: 0; transform: translateY(8px) scale(.97); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .prod-card:hover {
-      border-color: rgba(99,102,241,.45);
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 8px 24px rgba(0,0,0,.4);
-    }
-    .prod-card:active {
-      transform: scale(.97);
-      transition-duration: .08s;
-    }
-    .prod-card:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-      transform: none !important;
-    }
- 
-    .prod-cat-bar {
-      position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      border-radius: var(--r) var(--r) 0 0;
-    }
- 
+    @keyframes cardIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .prod-card:hover { border-color: rgba(99,102,241,.45); transform: translateY(-3px) scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+    .prod-card:active { transform: scale(.97); transition-duration: .08s; }
+    .prod-card:disabled { opacity: .45; cursor: not-allowed; transform: none !important; }
+    .prod-cat-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: var(--r) var(--r) 0 0; }
     .prod-img {
-      width: 100%; aspect-ratio: 1;
-      border-radius: 9px;
-      background: var(--sur2);
-      border: 1px solid var(--border);
+      width: 100%; aspect-ratio: 1; border-radius: 9px;
+      background: var(--sur2); border: 1px solid var(--border);
       display: flex; align-items: center; justify-content: center;
-      font-size: 26px;
-      overflow: hidden;
-      transition: transform .18s;
-      flex-shrink: 0;
+      font-size: 26px; overflow: hidden; transition: transform .18s; flex-shrink: 0;
     }
     .prod-card:hover .prod-img { transform: scale(1.05); }
- 
-    /* MATN STILLARI - ANIQ BELGILANGAN */
     .prod-name {
-      font-size: 11.5px !important;
-      font-weight: 700 !important;
-      color: #f0f2ff !important;
-      -webkit-text-fill-color: #f0f2ff !important;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      display: block;
-      width: 100%;
-      line-height: 1.3;
-      opacity: 1 !important;
+      font-size: 11.5px !important; font-weight: 700 !important;
+      color: #f0f2ff !important; -webkit-text-fill-color: #f0f2ff !important;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      display: block; width: 100%; line-height: 1.3; opacity: 1 !important;
     }
     .prod-price {
-      font-family: var(--mono) !important;
-      font-size: 11.5px !important;
-      font-weight: 700 !important;
-      color: #818cf8 !important;
-      -webkit-text-fill-color: #818cf8 !important;
-      display: block;
-      opacity: 1 !important;
+      font-family: var(--mono) !important; font-size: 11.5px !important; font-weight: 700 !important;
+      color: #818cf8 !important; -webkit-text-fill-color: #818cf8 !important;
+      display: block; opacity: 1 !important;
     }
-    .prod-stock {
-      display: inline-block;
-      font-size: 9.5px; font-weight: 600;
-      padding: 2px 7px; border-radius: 20px;
-    }
+    .prod-stock { display: inline-block; font-size: 9.5px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
     .prod-stock.ok   { color: #10b981 !important; -webkit-text-fill-color: #10b981 !important; background: rgba(16,185,129,.12); }
     .prod-stock.low  { color: #f59e0b !important; -webkit-text-fill-color: #f59e0b !important; background: rgba(245,158,11,.12); }
     .prod-stock.none { color: #ef4444 !important; -webkit-text-fill-color: #ef4444 !important; background: rgba(239,68,68,.12); }
- 
     .prod-badge {
       position: absolute; top: 8px; right: 8px;
-      width: 20px; height: 20px;
-      background: var(--accent); border-radius: 50%;
-      font-size: 10px; font-weight: 800; color: #fff !important;
-      -webkit-text-fill-color: #fff !important;
+      width: 20px; height: 20px; background: var(--accent); border-radius: 50%;
+      font-size: 10px; font-weight: 800; color: #fff !important; -webkit-text-fill-color: #fff !important;
       display: flex; align-items: center; justify-content: center;
       box-shadow: 0 2px 8px rgba(99,102,241,.5);
       animation: badgePop .22s cubic-bezier(.34,1.56,.64,1);
     }
     @keyframes badgePop { from { transform: scale(0); } to { transform: scale(1); } }
- 
     .empty-state {
       grid-column: 1 / -1;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       color: var(--muted); padding: 60px 20px; text-align: center; gap: 10px;
     }
-    .empty-ico  { font-size: 40px; opacity: .45; }
-    .empty-txt  { font-size: 13px; font-weight: 600; }
+    .empty-ico { font-size: 40px; opacity: .45; }
+    .empty-txt { font-size: 13px; font-weight: 600; }
     .empty-hint { font-size: 11px; color: var(--muted); opacity: .7; }
  
-    /* ========== CART PANEL ========== */
+    /* ========== CART ========== */
     .cart-panel {
       width: var(--cart-w); flex-shrink: 0;
       background: var(--surface); border-left: 1px solid var(--border);
-      display: flex; flex-direction: column;
-      height: 100%; overflow: hidden;
+      display: flex; flex-direction: column; height: 100%; overflow: hidden;
     }
     .cart-hdr {
       padding: 14px; flex-shrink: 0;
@@ -965,133 +818,56 @@ export default function CashPage() {
     }
     .cart-title-row { display: flex; align-items: center; gap: 8px; }
     .cart-title { font-size: 14px; font-weight: 800; }
-    .cart-cnt {
-      min-width: 20px; height: 20px; padding: 0 5px;
-      background: var(--accent); border-radius: 10px;
-      font-size: 10px; font-weight: 800; color: #fff;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .cart-clear {
-      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2);
-      border-radius: 7px; padding: 4px 9px;
-      color: #f87171; font-family: var(--font); font-size: 10px; font-weight: 700;
-      cursor: pointer; transition: background .15s;
-    }
+    .cart-cnt { min-width: 20px; height: 20px; padding: 0 5px; background: var(--accent); border-radius: 10px; font-size: 10px; font-weight: 800; color: #fff; display: flex; align-items: center; justify-content: center; }
+    .cart-clear { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2); border-radius: 7px; padding: 4px 9px; color: #f87171; font-family: var(--font); font-size: 10px; font-weight: 700; cursor: pointer; transition: background .15s; }
     .cart-clear:hover { background: rgba(239,68,68,.2); }
- 
-    .cart-list {
-      flex: 1; overflow-y: auto; min-height: 0;
-      padding: 9px; display: flex; flex-direction: column; gap: 6px;
-    }
-    .cart-empty {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 10px; color: var(--muted);
-    }
+    .cart-list { flex: 1; overflow-y: auto; min-height: 0; padding: 9px; display: flex; flex-direction: column; gap: 6px; }
+    .cart-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
     .cart-empty-ico { font-size: 38px; opacity: .3; }
     .cart-empty-txt { font-size: 12px; font-weight: 600; }
- 
-    .cart-item {
-      background: var(--sur2); border: 1px solid var(--border);
-      border-radius: var(--rs); padding: 9px;
-      display: flex; flex-direction: column; gap: 7px;
-      animation: itemIn .18s ease;
-    }
+    .cart-item { background: var(--sur2); border: 1px solid var(--border); border-radius: var(--rs); padding: 9px; display: flex; flex-direction: column; gap: 7px; animation: itemIn .18s ease; }
     @keyframes itemIn { from { opacity:0; transform: translateX(10px); } to { opacity:1; transform: translateX(0); } }
     .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 7px; }
     .ci-name { font-size: 11.5px; font-weight: 700; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ci-del {
-      width: 19px; height: 19px; border: none; border-radius: 5px;
-      background: rgba(239,68,68,.1); color: #f87171;
-      font-size: 9px; cursor: pointer; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      transition: background .12s;
-    }
+    .ci-del { width: 19px; height: 19px; border: none; border-radius: 5px; background: rgba(239,68,68,.1); color: #f87171; font-size: 9px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: background .12s; }
     .ci-del:hover { background: rgba(239,68,68,.22); }
-    .ci-price-btn {
-      width: 100%; background: var(--sur3); border: 1px solid var(--border);
-      border-radius: 7px; padding: 5px 8px;
-      display: flex; align-items: center; gap: 6px; cursor: pointer; transition: border-color .15s;
-    }
+    .ci-price-btn { width: 100%; background: var(--sur3); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: border-color .15s; }
     .ci-price-btn:hover { border-color: rgba(99,102,241,.4); }
     .ci-price { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--acc2); }
     .ci-orig  { font-family: var(--mono); font-size: 9px; color: var(--muted); text-decoration: line-through; }
     .ci-edit  { margin-left: auto; font-size: 10px; color: var(--muted); }
     .ci-bottom { display: flex; align-items: center; justify-content: space-between; }
     .qty-ctrl  { display: flex; align-items: center; gap: 6px; }
-    .qty-btn {
-      width: 26px; height: 26px; border: 1px solid var(--border);
-      border-radius: 7px; background: var(--sur3); color: var(--text);
-      font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: all .12s; font-family: var(--mono);
-    }
+    .qty-btn { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 7px; background: var(--sur3); color: var(--text); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .12s; font-family: var(--mono); }
     .qty-btn:hover { background: var(--accbg); border-color: rgba(99,102,241,.4); color: var(--acc2); }
     .qty-val { font-family: var(--mono); font-size: 13px; font-weight: 700; width: 24px; text-align: center; }
     .ci-sub  { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); }
- 
-    /* ---- Pay section ---- */
-    .pay-section {
-      padding: 12px; flex-shrink: 0;
-      border-top: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 10px;
-      background: var(--surface);
-    }
+    .pay-section { padding: 12px; flex-shrink: 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
     .total-row { display: flex; align-items: baseline; justify-content: space-between; }
     .total-lbl { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
     .total-amt { font-family: var(--mono); font-size: 22px; font-weight: 800; color: var(--text); }
     .pay-methods { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
-    .pay-btn {
-      padding: 8px 3px; border-radius: 9px; border: 1.5px solid var(--border);
-      background: var(--sur2); color: var(--muted);
-      font-family: var(--font); font-size: 10.5px; font-weight: 700;
-      cursor: pointer; transition: all .18s;
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
-    }
+    .pay-btn { padding: 8px 3px; border-radius: 9px; border: 1.5px solid var(--border); background: var(--sur2); color: var(--muted); font-family: var(--font); font-size: 10.5px; font-weight: 700; cursor: pointer; transition: all .18s; display: flex; flex-direction: column; align-items: center; gap: 3px; }
     .pay-btn:hover { color: var(--text2); border-color: var(--bord2); }
     .pay-btn-ico { font-size: 14px; }
     .cash-wrap { display: flex; flex-direction: column; gap: 6px; }
-    .num-inp {
-      width: 100%; background: var(--sur2); border: 1.5px solid var(--border);
-      border-radius: 9px; padding: 10px 12px;
-      color: var(--text); font-family: var(--mono); font-size: 15px; font-weight: 700;
-      outline: none; transition: border-color .18s;
-    }
+    .num-inp { width: 100%; background: var(--sur2); border: 1.5px solid var(--border); border-radius: 9px; padding: 10px 12px; color: var(--text); font-family: var(--mono); font-size: 15px; font-weight: 700; outline: none; transition: border-color .18s; }
     .num-inp:focus { border-color: rgba(99,102,241,.5); }
     .num-inp::placeholder { color: var(--muted); font-family: var(--font); font-size: 11px; font-weight: 400; }
-    .change-row {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 6px 10px; border-radius: 8px;
-      font-family: var(--mono); font-size: 11px; font-weight: 700;
-    }
+    .change-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-radius: 8px; font-family: var(--mono); font-size: 11px; font-weight: 700; }
     .change-row.pos { background: rgba(16,185,129,.1); color: #34d399; border: 1px solid rgba(16,185,129,.2); }
     .change-row.neg { background: rgba(239,68,68,.1); color: #f87171; border: 1px solid rgba(239,68,68,.2); }
     .quick-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; }
-    .quick-btn {
-      padding: 5px 3px; background: var(--sur3); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--muted);
-      font-family: var(--mono); font-size: 10px; font-weight: 700;
-      cursor: pointer; transition: all .12s; text-align: center;
-    }
+    .quick-btn { padding: 5px 3px; background: var(--sur3); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-family: var(--mono); font-size: 10px; font-weight: 700; cursor: pointer; transition: all .12s; text-align: center; }
     .quick-btn:hover { border-color: rgba(99,102,241,.35); color: var(--acc2); background: var(--accbg); }
-    .checkout-btn {
-      width: 100%; padding: 13px; border-radius: 11px; border: none;
-      background: linear-gradient(135deg,#6366f1,#8b5cf6);
-      color: #fff; font-family: var(--font); font-size: 13px; font-weight: 800;
-      cursor: pointer; transition: all .18s; letter-spacing: -.2px;
-      box-shadow: 0 4px 18px rgba(99,102,241,.3);
-    }
+    .checkout-btn { width: 100%; padding: 13px; border-radius: 11px; border: none; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; font-family: var(--font); font-size: 13px; font-weight: 800; cursor: pointer; transition: all .18s; letter-spacing: -.2px; box-shadow: 0 4px 18px rgba(99,102,241,.3); }
     .checkout-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(99,102,241,.45); }
     .checkout-btn:active:not(:disabled) { transform: translateY(0); transition-duration: .08s; }
     .checkout-btn:disabled { background: var(--sur3); color: var(--muted); cursor: not-allowed; box-shadow: none; }
- 
-    /* ========== PAGE (tarix/hisobot) ========== */
     .page { flex: 1; overflow-y: auto; padding: 22px; max-width: 1060px; width: 100%; margin: 0 auto; }
     .page-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .page-title { font-size: 19px; font-weight: 800; letter-spacing: -.4px; }
-    .refresh-btn {
-      padding: 7px 14px; background: var(--sur2); border: 1px solid var(--bord2);
-      border-radius: var(--rs); color: var(--muted);
-      font-family: var(--font); font-size: 11px; font-weight: 700; cursor: pointer; transition: all .14s;
-    }
+    .refresh-btn { padding: 7px 14px; background: var(--sur2); border: 1px solid var(--bord2); border-radius: var(--rs); color: var(--muted); font-family: var(--font); font-size: 11px; font-weight: 700; cursor: pointer; transition: all .14s; }
     .refresh-btn:hover { color: var(--acc2); border-color: rgba(99,102,241,.4); }
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(155px,1fr)); gap: 9px; margin-bottom: 20px; }
     .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; transition: border-color .14s; }
@@ -1105,11 +881,7 @@ export default function CashPage() {
     .sc-date { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
     .sc-cashier { font-size: 10.5px; font-weight: 600; color: var(--text2); margin-top: 2px; }
     .sc-total { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--acc2); }
-    .pay-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 9px; border-radius: 20px; font-size: 9.5px; font-weight: 700;
-      border: 1px solid; font-family: var(--font); margin-top: 4px;
-    }
+    .pay-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 9.5px; font-weight: 700; border: 1px solid; font-family: var(--font); margin-top: 4px; }
     .sc-items { border-top: 1px solid var(--border); padding-top: 9px; display: flex; flex-direction: column; gap: 4px; }
     .sc-item-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); font-family: var(--mono); }
     .pay-sum-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 20px; }
@@ -1131,36 +903,15 @@ export default function CashPage() {
     .top-bar { height: 4px; background: var(--bg2); border-radius: 2px; }
     .top-bar-fill { height: 100%; background: linear-gradient(90deg,#6366f1,#8b5cf6); border-radius: 2px; transition: width .6s ease; }
     .top-revenue { font-family: var(--mono); font-size: 10px; color: var(--acc2); margin-top: 3px; }
- 
-    /* ========== MODALS ========== */
-    .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.65);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 200; padding: 14px; backdrop-filter: blur(10px);
-      animation: fadeIn .16s ease;
-    }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 14px; backdrop-filter: blur(10px); animation: fadeIn .16s ease; }
     @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-    @keyframes modalUp {
-      from { transform: translateY(18px) scale(.95); opacity:0; }
-      to   { transform: translateY(0) scale(1); opacity:1; }
-    }
- 
-    .wh-modal {
-      background: var(--surface); border: 1px solid var(--bord2);
-      border-radius: 20px; width: 100%; max-width: 460px; overflow: hidden;
-      animation: modalUp .22s cubic-bezier(.34,1.56,.64,1);
-      box-shadow: 0 24px 60px rgba(0,0,0,.55);
-    }
+    @keyframes modalUp { from { transform: translateY(18px) scale(.95); opacity:0; } to { transform: translateY(0) scale(1); opacity:1; } }
+    .wh-modal { background: var(--surface); border: 1px solid var(--bord2); border-radius: 20px; width: 100%; max-width: 460px; overflow: hidden; animation: modalUp .22s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 24px 60px rgba(0,0,0,.55); }
     .wh-modal-hdr { padding: 20px 18px 16px; border-bottom: 1px solid var(--border); }
     .wh-modal-ttl { font-size: 17px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 3px; }
     .wh-modal-sub { font-size: 11px; color: var(--muted); }
     .wh-list { padding: 10px; display: flex; flex-direction: column; gap: 5px; max-height: 360px; overflow-y: auto; }
-    .wh-item {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 14px; background: var(--sur2);
-      border: 1.5px solid var(--border); border-radius: var(--r);
-      cursor: pointer; transition: all .18s; text-align: left; width: 100%; font-family: var(--font);
-    }
+    .wh-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--sur2); border: 1.5px solid var(--border); border-radius: var(--r); cursor: pointer; transition: all .18s; text-align: left; width: 100%; font-family: var(--font); }
     .wh-item:hover { border-color: rgba(99,102,241,.4); background: var(--accbg); }
     .wh-item.sel { border-color: var(--accent); background: rgba(99,102,241,.12); }
     .wh-item-ico { width: 42px; height: 42px; border-radius: 10px; background: var(--sur3); border: 1px solid var(--bord2); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
@@ -1173,21 +924,10 @@ export default function CashPage() {
     .wh-modal-foot { padding: 10px 18px; border-top: 1px solid var(--border); }
     .cancel-btn { width: 100%; padding: 10px; background: var(--sur2); border: 1.5px solid var(--border); border-radius: 9px; color: var(--muted); font-family: var(--font); font-size: 12px; font-weight: 700; cursor: pointer; transition: all .14s; }
     .cancel-btn:hover { color: var(--text); border-color: var(--bord2); }
- 
-    .modal-box {
-      background: var(--surface); border: 1px solid var(--bord2);
-      border-radius: 18px; padding: 22px; width: 100%; max-width: 320px;
-      animation: modalUp .22s cubic-bezier(.34,1.56,.64,1);
-      box-shadow: 0 24px 60px rgba(0,0,0,.55);
-    }
+    .modal-box { background: var(--surface); border: 1px solid var(--bord2); border-radius: 18px; padding: 22px; width: 100%; max-width: 320px; animation: modalUp .22s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 24px 60px rgba(0,0,0,.55); }
     .modal-ttl { font-size: 16px; font-weight: 800; letter-spacing: -.3px; margin-bottom: 3px; }
     .modal-sub { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
-    .modal-inp {
-      width: 100%; background: var(--bg2); border: 1.5px solid var(--border);
-      border-radius: 9px; padding: 12px 13px;
-      color: var(--text); font-family: var(--mono); font-size: 18px; font-weight: 700;
-      outline: none; transition: border-color .18s;
-    }
+    .modal-inp { width: 100%; background: var(--bg2); border: 1.5px solid var(--border); border-radius: 9px; padding: 12px 13px; color: var(--text); font-family: var(--mono); font-size: 18px; font-weight: 700; outline: none; transition: border-color .18s; }
     .modal-inp:focus { border-color: rgba(99,102,241,.5); background: var(--sur2); }
     .modal-inp::placeholder { color: var(--muted); font-family: var(--font); font-size: 12px; font-weight: 400; }
     .modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 14px; }
@@ -1195,14 +935,7 @@ export default function CashPage() {
     .m-cancel:hover { color: var(--text); }
     .m-confirm { padding: 10px; background: linear-gradient(135deg,#6366f1,#8b5cf6); border: none; border-radius: 9px; color: #fff; font-family: var(--font); font-size: 12px; font-weight: 800; cursor: pointer; transition: opacity .14s; box-shadow: 0 3px 10px rgba(99,102,241,.35); }
     .m-confirm:hover { opacity: .9; }
- 
-    /* ========== RECEIPT MODAL ========== */
-    .receipt-box {
-      background: #0c0e1a; border: 1px solid rgba(255,255,255,.09);
-      border-radius: 20px; padding: 22px; width: 100%; max-width: 310px;
-      animation: modalUp .22s cubic-bezier(.34,1.56,.64,1);
-      box-shadow: 0 24px 60px rgba(0,0,0,.75);
-    }
+    .receipt-box { background: #0c0e1a; border: 1px solid rgba(255,255,255,.09); border-radius: 20px; padding: 22px; width: 100%; max-width: 310px; animation: modalUp .22s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 24px 60px rgba(0,0,0,.75); }
     .r-hdr { text-align: center; margin-bottom: 16px; }
     .r-ico  { font-size: 40px; margin-bottom: 7px; }
     .r-ttl  { font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
@@ -1214,40 +947,18 @@ export default function CashPage() {
     .r-row.bold  { font-weight: 800; font-size: 15px; color: var(--text); margin-top: 2px; }
     .r-row.muted { color: var(--muted); }
     .r-thanks { text-align: center; font-size: 10px; color: var(--muted); margin-top: 12px; }
- 
-    /* CHEK TUGMALARI - PDF + Printer + Yopish */
     .r-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
     .r-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .r-btn {
-      padding: 11px; border-radius: 10px;
-      font-family: var(--font); font-size: 12px; font-weight: 800;
-      cursor: pointer; transition: all .15s;
-      display: flex; align-items: center; justify-content: center; gap: 5px;
-    }
-    .r-btn-print {
-      background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3); color: #818cf8;
-    }
+    .r-btn { padding: 11px; border-radius: 10px; font-family: var(--font); font-size: 12px; font-weight: 800; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 5px; }
+    .r-btn-print { background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3); color: #818cf8; }
     .r-btn-print:hover { background: rgba(99,102,241,.25); }
-    .r-btn-pdf {
-      background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #f87171;
-    }
+    .r-btn-pdf { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #f87171; }
     .r-btn-pdf:hover { background: rgba(239,68,68,.22); }
-    .r-btn-thermal {
-      background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.25); color: #fbbf24;
-    }
+    .r-btn-thermal { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.25); color: #fbbf24; }
     .r-btn-thermal:hover { background: rgba(245,158,11,.22); }
-    .r-btn-close {
-      background: linear-gradient(135deg,#6366f1,#8b5cf6); border: none; color: #fff;
-      box-shadow: 0 3px 14px rgba(99,102,241,.35);
-    }
+    .r-btn-close { background: linear-gradient(135deg,#6366f1,#8b5cf6); border: none; color: #fff; box-shadow: 0 3px 14px rgba(99,102,241,.35); }
     .r-btn-close:hover { opacity: .9; transform: translateY(-1px); }
- 
-    /* Printer status indicator */
-    .printer-status {
-      display: flex; align-items: center; gap: 6px;
-      padding: 7px 10px; border-radius: 8px; margin-top: 8px;
-      font-size: 10px; font-weight: 600;
-    }
+    .printer-status { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px; margin-top: 8px; font-size: 10px; font-weight: 600; }
     .printer-status.connected { background: rgba(16,185,129,.1); color: #34d399; border: 1px solid rgba(16,185,129,.2); }
     .printer-status.disconnected { background: rgba(99,102,241,.1); color: #818cf8; border: 1px solid rgba(99,102,241,.2); }
   `;
@@ -1255,8 +966,8 @@ export default function CashPage() {
   return (
     <>
       <style>{css}</style>
- 
       <div className="root">
+ 
         {/* ===== TOPBAR ===== */}
         <header className="topbar">
           <div className="logo">
@@ -1265,11 +976,7 @@ export default function CashPage() {
           </div>
           <nav className="tab-nav">
             {TABS.map(t => (
-              <button
-                key={t.key}
-                className={`tab-btn${tab === t.key ? " active" : ""}`}
-                onClick={() => setTab(t.key)}
-              >
+              <button key={t.key} className={`tab-btn${tab === t.key ? " active" : ""}`} onClick={() => setTab(t.key)}>
                 <span>{t.icon}</span>{t.label}
               </button>
             ))}
@@ -1277,9 +984,7 @@ export default function CashPage() {
           <div className="topbar-right">
             <button className="wh-pill" onClick={() => setShowWhModal(true)}>
               <span className="wh-dot" />
-              <span className="wh-name">
-                {whLoading ? "Yuklanmoqda…" : activeWh ? activeWh.name : "Ombor tanlang"}
-              </span>
+              <span className="wh-name">{whLoading ? "Yuklanmoqda…" : activeWh ? activeWh.name : "Ombor tanlang"}</span>
               <span style={{fontSize:8, color:"var(--muted)"}}>▾</span>
             </button>
             <div className="user-chip">{user?.displayName || user?.email || "Cashier"}</div>
@@ -1291,8 +996,6 @@ export default function CashPage() {
         {/* ===== POS ===== */}
         {tab === "pos" && (
           <div className="pos-layout">
- 
-            {/* --- Products --- */}
             <div className="products-panel">
               <div className="prod-toolbar">
                 <div className="wh-bar" onClick={() => setShowWhModal(true)}>
@@ -1304,12 +1007,7 @@ export default function CashPage() {
                 </div>
                 <div className="search-wrap">
                   <span className="search-ico">🔍</span>
-                  <input
-                    className="search-inp"
-                    placeholder="Mahsulot qidirish…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                  />
+                  <input className="search-inp" placeholder="Mahsulot qidirish…" value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 {categories.length > 1 && (
                   <div className="cats">
@@ -1328,9 +1026,10 @@ export default function CashPage() {
               </div>
  
               <div className="products-grid">
+                {/* ===== SKELETON — FAQAT productsLoading TRUE DA ===== */}
                 {productsLoading ? (
                   Array.from({length: 18}).map((_, i) => (
-                    <div key={i} className="skel-card" style={{animationDelay:`${i * .03}s`}}>
+                    <div key={i} className="skel-card">
                       <div className="skel-line" style={{width:"100%", aspectRatio:"1", borderRadius:9}} />
                       <div className="skel-line" style={{height:13, borderRadius:4}} />
                       <div className="skel-line" style={{height:12, width:"60%", borderRadius:4}} />
@@ -1373,17 +1072,14 @@ export default function CashPage() {
                       >
                         <div className="prod-cat-bar" style={{background: color}} />
                         {inCart && <span className="prod-badge">{inCart.quantity}</span>}
- 
                         <div className="prod-img">
                           {p.imageUrl
                             ? <img src={p.imageUrl} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:9}} />
                             : <span>📦</span>
                           }
                         </div>
- 
                         <span className="prod-name">{p.name || "Nomi yo'q"}</span>
                         <span className="prod-price">{price > 0 ? fmt(price) : "—"}</span>
- 
                         <div>
                           {noStock  ? <span className="prod-stock none">✗ Tugagan</span>
                           : lowStock ? <span className="prod-stock low">⚠ {stock} ta</span>
@@ -1404,9 +1100,7 @@ export default function CashPage() {
                   <span className="cart-title">Savat</span>
                   {cart.length > 0 && <span className="cart-cnt">{cart.length}</span>}
                 </div>
-                {cart.length > 0 && (
-                  <button className="cart-clear" onClick={clearCart}>Tozalash</button>
-                )}
+                {cart.length > 0 && <button className="cart-clear" onClick={clearCart}>Tozalash</button>}
               </div>
  
               <div className="cart-list">
@@ -1424,9 +1118,7 @@ export default function CashPage() {
                       </div>
                       <button className="ci-price-btn" onClick={() => openCustomPrice(item)}>
                         <span className="ci-price">{fmt(item.customPrice)}</span>
-                        {item.customPrice !== getPrice(item) && (
-                          <span className="ci-orig">{fmt(getPrice(item))}</span>
-                        )}
+                        {item.customPrice !== getPrice(item) && <span className="ci-orig">{fmt(getPrice(item))}</span>}
                         <span className="ci-edit">✏</span>
                       </button>
                       <div className="ci-bottom">
@@ -1442,40 +1134,28 @@ export default function CashPage() {
                 )}
               </div>
  
-              {/* Payment */}
               <div className="pay-section">
                 <div className="total-row">
                   <span className="total-lbl">Jami to'lov</span>
                   <span className="total-amt">{fmt(total)}</span>
                 </div>
- 
                 <div className="pay-methods">
                   {(Object.entries(PAY_CONFIG) as [PayMethod, typeof PAY_CONFIG.cash][]).map(([key, cfg]) => (
-                    <button
-                      key={key}
-                      className="pay-btn"
+                    <button key={key} className="pay-btn"
                       style={payMethod === key ? {background:cfg.bg, borderColor:cfg.border, color:cfg.color} : {}}
                       onClick={() => setPayMethod(key)}
                     >
-                      <span className="pay-btn-ico">{cfg.icon}</span>
-                      {cfg.label}
+                      <span className="pay-btn-ico">{cfg.icon}</span>{cfg.label}
                     </button>
                   ))}
                 </div>
- 
                 {payMethod === "cash" && (
                   <div className="cash-wrap">
-                    <input
-                      className="num-inp"
-                      type="number"
-                      placeholder="Berilgan pul (so'm)"
-                      value={cashGiven || ""}
-                      onChange={e => setCashGiven(Number(e.target.value))}
-                    />
+                    <input className="num-inp" type="number" placeholder="Berilgan pul (so'm)"
+                      value={cashGiven || ""} onChange={e => setCashGiven(Number(e.target.value))} />
                     {cashGiven > 0 && (
                       <div className={`change-row ${change >= 0 ? "pos" : "neg"}`}>
-                        <span>Qaytim:</span>
-                        <span>{fmt(Math.max(0, change))}</span>
+                        <span>Qaytim:</span><span>{fmt(Math.max(0, change))}</span>
                       </div>
                     )}
                     <div className="quick-grid">
@@ -1487,17 +1167,10 @@ export default function CashPage() {
                     </div>
                   </div>
                 )}
- 
-                <button
-                  className="checkout-btn"
-                  onClick={handleCheckout}
+                <button className="checkout-btn" onClick={handleCheckout}
                   disabled={loading || cart.length === 0 || (payMethod === "cash" && cashGiven < total)}
                 >
-                  {loading
-                    ? "⏳ Amalga oshirilmoqda…"
-                    : cart.length === 0
-                    ? "Savat bo'sh"
-                    : `✓ To'lash — ${fmt(total)}`}
+                  {loading ? "⏳ Amalga oshirilmoqda…" : cart.length === 0 ? "Savat bo'sh" : `✓ To'lash — ${fmt(total)}`}
                 </button>
               </div>
             </div>
@@ -1538,14 +1211,8 @@ export default function CashPage() {
                     <div style={{textAlign:"right"}}>
                       <div className="sc-total">{fmt(sale.total)}</div>
                       <div style={{display:"flex",gap:5,marginTop:5,justifyContent:"flex-end"}}>
-                        <button
-                          onClick={() => printBrowser(sale)}
-                          style={{padding:"3px 9px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:10,fontWeight:700,cursor:"pointer"}}
-                        >🖨️ Chek</button>
-                        <button
-                          onClick={() => downloadPDF(sale)}
-                          style={{padding:"3px 9px",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",borderRadius:6,color:"#f87171",fontSize:10,fontWeight:700,cursor:"pointer"}}
-                        >📄 PDF</button>
+                        <button onClick={() => printBrowser(sale)} style={{padding:"3px 9px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:10,fontWeight:700,cursor:"pointer"}}>🖨️ Chek</button>
+                        <button onClick={() => downloadPDF(sale)} style={{padding:"3px 9px",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",borderRadius:6,color:"#f87171",fontSize:10,fontWeight:700,cursor:"pointer"}}>📄 PDF</button>
                       </div>
                     </div>
                   </div>
@@ -1587,13 +1254,9 @@ export default function CashPage() {
                   <div className="sc-id">#{sale.id.slice(-10)}</div>
                   <div className="sc-date">{fmtDate(sale.createdAt)}</div>
                   <div style={{fontSize:10.5,color:"var(--text2)",marginTop:2}}>{sale.items?.length} ta mahsulot</div>
-                  {sale.warehouseName && (
-                    <div style={{fontSize:9.5,color:"#818cf8",marginTop:3,fontWeight:700}}>🏪 {sale.warehouseName}</div>
-                  )}
+                  {sale.warehouseName && <div style={{fontSize:9.5,color:"#818cf8",marginTop:3,fontWeight:700}}>🏪 {sale.warehouseName}</div>}
                   {sale.paymentMethod === "cash" && sale.change !== undefined && (
-                    <div style={{fontSize:9.5,color:"var(--muted)",marginTop:2,fontFamily:"var(--mono)"}}>
-                      Qaytim: {fmt(sale.change)}
-                    </div>
+                    <div style={{fontSize:9.5,color:"var(--muted)",marginTop:2,fontFamily:"var(--mono)"}}>Qaytim: {fmt(sale.change)}</div>
                   )}
                 </div>
                 <div style={{textAlign:"right"}}>
@@ -1602,14 +1265,8 @@ export default function CashPage() {
                     {PAY_CONFIG[sale.paymentMethod]?.icon} {PAY_CONFIG[sale.paymentMethod]?.label}
                   </div>
                   <div style={{display:"flex",gap:4,marginTop:5,justifyContent:"flex-end"}}>
-                    <button
-                      onClick={() => printBrowser(sale)}
-                      style={{padding:"3px 9px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:10,fontWeight:700,cursor:"pointer"}}
-                    >🖨️</button>
-                    <button
-                      onClick={() => downloadPDF(sale)}
-                      style={{padding:"3px 9px",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",borderRadius:6,color:"#f87171",fontSize:10,fontWeight:700,cursor:"pointer"}}
-                    >📄</button>
+                    <button onClick={() => printBrowser(sale)} style={{padding:"3px 9px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:10,fontWeight:700,cursor:"pointer"}}>🖨️</button>
+                    <button onClick={() => downloadPDF(sale)} style={{padding:"3px 9px",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",borderRadius:6,color:"#f87171",fontSize:10,fontWeight:700,cursor:"pointer"}}>📄</button>
                   </div>
                 </div>
               </div>
@@ -1649,9 +1306,7 @@ export default function CashPage() {
                 </div>
                 <div className="bar-legend">
                   {[["#10b981","Naqd"],["#6366f1","Karta"],["#f59e0b","O'tkazma"]].map(([c,l]) => (
-                    <div key={l} className="bar-legend-item">
-                      <div className="bar-dot" style={{background:c}}/>{l}
-                    </div>
+                    <div key={l} className="bar-legend-item"><div className="bar-dot" style={{background:c}}/>{l}</div>
                   ))}
                 </div>
               </div>
@@ -1663,13 +1318,8 @@ export default function CashPage() {
                   <div key={i} className="top-row">
                     <span className="top-rank">#{i+1}</span>
                     <div className="top-info">
-                      <div className="top-name-row">
-                        <span>{p.name}</span>
-                        <span className="top-qty">{p.qty} dona</span>
-                      </div>
-                      <div className="top-bar">
-                        <div className="top-bar-fill" style={{width:`${(p.revenue/report.topProducts[0].revenue)*100}%`}}/>
-                      </div>
+                      <div className="top-name-row"><span>{p.name}</span><span className="top-qty">{p.qty} dona</span></div>
+                      <div className="top-bar"><div className="top-bar-fill" style={{width:`${(p.revenue/report.topProducts[0].revenue)*100}%`}}/></div>
                       <div className="top-revenue">{fmt(p.revenue)}</div>
                     </div>
                   </div>
@@ -1729,15 +1379,10 @@ export default function CashPage() {
             <div className="modal-box">
               <div className="modal-ttl">Narxni o'zgartirish</div>
               <div className="modal-sub">{customPriceItem.name} · Asl narx: {fmt(getPrice(customPriceItem))}</div>
-              <input
-                className="modal-inp"
-                type="number"
-                value={tempPrice}
+              <input className="modal-inp" type="number" value={tempPrice}
                 onChange={e => setTempPrice(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && applyCustomPrice()}
-                placeholder="Yangi narx"
-                autoFocus
-              />
+                placeholder="Yangi narx" autoFocus />
               <div className="modal-btns">
                 <button className="m-cancel" onClick={() => { setCustomPriceItem(null); setTempPrice(""); }}>Bekor</button>
                 <button className="m-confirm" onClick={applyCustomPrice}>Saqlash</button>
@@ -1757,87 +1402,46 @@ export default function CashPage() {
                 <div className="r-cashier">{lastSale.cashierName}</div>
                 {lastSale.warehouseName && <div className="r-wh">🏪 {lastSale.warehouseName}</div>}
               </div>
- 
               <hr className="r-div" />
- 
               {lastSale.items?.map((it: any, i: number) => (
                 <div key={i} className="r-row">
                   <span>{it.name} × {it.quantity}</span>
                   <span>{fmt(it.subtotal)}</span>
                 </div>
               ))}
- 
               <hr className="r-div" />
- 
               <div className="r-row bold"><span>Jami:</span><span>{fmt(lastSale.total)}</span></div>
               <div className="r-row muted">
                 <span>To'lov:</span>
                 <span>{PAY_CONFIG[lastSale.paymentMethod]?.icon} {PAY_CONFIG[lastSale.paymentMethod]?.label}</span>
               </div>
- 
               {lastSale.paymentMethod === "cash" && (
                 <>
-                  <div className="r-row muted">
-                    <span>Berildi:</span><span>{fmt((lastSale as any).cashGiven)}</span>
-                  </div>
-                  <div className="r-row bold">
-                    <span>Qaytim:</span><span>{fmt((lastSale as any).change)}</span>
-                  </div>
+                  <div className="r-row muted"><span>Berildi:</span><span>{fmt((lastSale as any).cashGiven)}</span></div>
+                  <div className="r-row bold"><span>Qaytim:</span><span>{fmt((lastSale as any).change)}</span></div>
                 </>
               )}
- 
               <div className="r-thanks">Xarid uchun rahmat! 🙏</div>
- 
-              {/* Printer status */}
               {"serial" in navigator ? (
-                <div className="printer-status connected">
-                  <span>🖨️</span> Termal printer ulash mumkin
-                </div>
+                <div className="printer-status connected"><span>🖨️</span> Termal printer ulash mumkin</div>
               ) : (
-                <div className="printer-status disconnected">
-                  <span>ℹ️</span> Brauzer chop etish orqali ishlaydi
-                </div>
+                <div className="printer-status disconnected"><span>ℹ️</span> Brauzer chop etish orqali ishlaydi</div>
               )}
- 
               <div className="r-btns">
                 <div className="r-btn-row">
-                  {/* Brauzer chek oynasi */}
-                  <button
-                    className="r-btn r-btn-print"
-                    onClick={() => printBrowser(lastSale)}
-                  >
-                    🖨️ Chek
-                  </button>
- 
-                  {/* PDF chiqarish */}
-                  <button
-                    className="r-btn r-btn-pdf"
-                    onClick={() => downloadPDF(lastSale)}
-                  >
-                    📄 PDF
-                  </button>
+                  <button className="r-btn r-btn-print" onClick={() => printBrowser(lastSale)}>🖨️ Chek</button>
+                  <button className="r-btn r-btn-pdf" onClick={() => downloadPDF(lastSale)}>📄 PDF</button>
                 </div>
- 
-                {/* Termal printer */}
                 {"serial" in navigator && (
-                  <button
-                    className="r-btn r-btn-thermal"
-                    onClick={async () => {
-                      const ok = await printThermal(lastSale as any);
-                      if (ok) showToast("✓ Termal printerga yuborildi!", "ok");
-                      else showToast("Printer ulanmadi. Chek oynasini ishlating.", "info");
-                    }}
-                  >
+                  <button className="r-btn r-btn-thermal" onClick={async () => {
+                    const ok = await printThermal(lastSale as any);
+                    if (ok) showToast("✓ Termal printerga yuborildi!", "ok");
+                    else showToast("Printer ulanmadi. Chek oynasini ishlating.", "info");
+                  }}>
                     🏷️ Termal printer (ESC/POS)
                   </button>
                 )}
- 
-                <button
-                  className="r-btn r-btn-close"
-                  onClick={() => setShowReceipt(false)}
-                >
-                  ✓ Yopish
-                </button>
+                <button className="r-btn r-btn-close" onClick={() => setShowReceipt(false)}>✓ Yopish</button>
               </div>
             </div>
           </div>
