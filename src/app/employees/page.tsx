@@ -20,12 +20,11 @@ import {
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp,
+  collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, setDoc,
 } from "firebase/firestore";
  
-// ✅ TO'G'RI: auth ni firebase.ts dan import qilamiz, getAuth() emas
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase"; // ← sizning firebase.ts path
+import { auth } from "@/lib/firebase";
  
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -85,37 +84,45 @@ const DEFAULT_PERMISSIONS: Record<Role, Permissions> = {
  
 interface StaffMember {
   id: string;
-  surname:    string;
-  name:       string;
-  patronymic: string;
-  dob:        string;
-  gender:     string;
-  position:   string;
-  phone:      string;
+  // Firestore "users" collection fieldlari
+  firstName:  string;
+  lastName:   string;
+  fullName?:  string;
   email:      string;
-  address:    string;
   role:       Role;
-  hasLogin:   boolean;
-  loginEmail: string;
-  uid?:       string;
   permissions: Permissions;
-  isEmployee: boolean;
-  isSupplier: boolean;
-  isGuest:    boolean;
-  status:     "active" | "inactive";
   createdAt?: unknown;
   updatedAt?: unknown;
+  // Qo'shimcha fieldlar (yangi qo'shiladiganlar uchun)
+  phone?:     string;
+  position?:  string;
+  status?:    "active" | "inactive";
+  hasLogin?:  boolean;
+  uid?:       string;
 }
  
-type FormData = Omit<StaffMember, "id" | "createdAt" | "updatedAt">;
+type FormData = {
+  firstName:   string;
+  lastName:    string;
+  email:       string;
+  phone:       string;
+  position:    string;
+  role:        Role;
+  hasLogin:    boolean;
+  status:      "active" | "inactive";
+  permissions: Permissions;
+};
  
 const initialForm: FormData = {
-  surname: "", name: "", patronymic: "", dob: "", gender: "Male",
-  position: "Sotuvchi", phone: "", email: "", address: "",
-  role: "Sotuvchi", hasLogin: false, loginEmail: "",
+  firstName:   "",
+  lastName:    "",
+  email:       "",
+  phone:       "",
+  position:    "",
+  role:        "Sotuvchi",
+  hasLogin:    false,
+  status:      "active",
   permissions: DEFAULT_PERMISSIONS["Sotuvchi"],
-  isEmployee: true, isSupplier: false, isGuest: false,
-  status: "active",
 };
  
 // ─── RoleBadge ────────────────────────────────────────────────────
@@ -131,7 +138,7 @@ function RoleBadge({ role }: { role: Role }) {
     "Ishchi":          "bg-slate-100 text-slate-700 border-slate-200",
   };
   return (
-    <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-tight", styles[role])}>
+    <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-tight", styles[role] ?? "bg-slate-100 text-slate-700 border-slate-200")}>
       {role}
     </span>
   );
@@ -146,49 +153,50 @@ export default function StaffManagementPage() {
  
   const isSuperAdmin = currentUserRole === "Super Admin";
  
-  const [searchQuery, setSearchQuery]       = useState("");
-  const [filterRole, setFilterRole]         = useState<"all" | Role>("all");
-  const [filterStatus, setFilterStatus]     = useState<"all" | "active" | "inactive">("all");
-  const [isModalOpen, setIsModalOpen]       = useState(false);
-  const [editingId, setEditingId]           = useState<string | null>(null);
-  const [loading, setLoading]               = useState(false);
-  const [deleteConfirm, setDeleteConfirm]   = useState<string | null>(null);
-  const [showPass, setShowPass]             = useState(false);
-  const [password, setPassword]             = useState("");
-  const [formData, setFormData]             = useState<FormData>(initialForm);
-  const [activeTab, setActiveTab]           = useState("main");
+  const [searchQuery, setSearchQuery]         = useState("");
+  const [filterRole, setFilterRole]           = useState<"all" | Role>("all");
+  const [filterStatus, setFilterStatus]       = useState<"all" | "active" | "inactive">("all");
+  const [isModalOpen, setIsModalOpen]         = useState(false);
+  const [editingId, setEditingId]             = useState<string | null>(null);
+  const [loading, setLoading]                 = useState(false);
+  const [deleteConfirm, setDeleteConfirm]     = useState<string | null>(null);
+  const [showPass, setShowPass]               = useState(false);
+  const [password, setPassword]               = useState("");
+  const [formData, setFormData]               = useState<FormData>(initialForm);
+  const [activeTab, setActiveTab]             = useState("main");
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
  
-  // ── Firebase ──
-  const staffQuery = useMemoFirebase(() => db ? collection(db, "staff") : null, [db]);
-  const { data: staffList, isLoading } = useCollection(staffQuery);
+  // ── Firebase: "users" collection dan o'qish ──
+  // ⚠️ ASOSIY TUZATISH: "staff" → "users"
+  const usersQuery = useMemoFirebase(() => db ? collection(db, "users") : null, [db]);
+  const { data: usersList, isLoading } = useCollection(usersQuery);
  
   // ── Filtrlangan ro'yxat ──
   const filtered = useMemo(() => {
-    if (!staffList) return [];
-    let list = staffList as unknown as StaffMember[];
+    if (!usersList) return [];
+    let list = usersList as unknown as StaffMember[];
     if (filterRole !== "all")   list = list.filter(s => s.role === filterRole);
-    if (filterStatus !== "all") list = list.filter(s => s.status === filterStatus);
+    if (filterStatus !== "all") list = list.filter(s => (s.status ?? "active") === filterStatus);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(s =>
-        `${s.surname} ${s.name} ${s.patronymic}`.toLowerCase().includes(q) ||
-        s.loginEmail?.toLowerCase().includes(q) ||
+        `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
+        s.email?.toLowerCase().includes(q) ||
         s.phone?.includes(q)
       );
     }
     return list;
-  }, [staffList, searchQuery, filterRole, filterStatus]);
+  }, [usersList, searchQuery, filterRole, filterStatus]);
  
   // ── Statistika ──
   const stats = useMemo(() => {
-    const list = (staffList as unknown as StaffMember[]) ?? [];
+    const list = (usersList as unknown as StaffMember[]) ?? [];
     return {
       total:     list.length,
-      active:    list.filter(s => s.status === "active").length,
-      withLogin: list.filter(s => s.hasLogin).length,
+      active:    list.filter(s => (s.status ?? "active") === "active").length,
+      withLogin: list.filter(s => s.hasLogin !== false).length, // email bor = logini bor
     };
-  }, [staffList]);
+  }, [usersList]);
  
   // ── Modal ochish ──
   const openCreate = () => {
@@ -196,32 +204,26 @@ export default function StaffManagementPage() {
     setPassword("");
     setEditingId(null);
     setActiveTab("main");
+    setExpandedModules({});
     setIsModalOpen(true);
   };
  
   const openEdit = (member: StaffMember) => {
     setFormData({
-      surname:     member.surname     ?? "",
-      name:        member.name        ?? "",
-      patronymic:  member.patronymic  ?? "",
-      dob:         member.dob         ?? "",
-      gender:      member.gender      ?? "Male",
-      position:    member.position    ?? "",
-      phone:       member.phone       ?? "",
-      email:       member.email       ?? "",
-      address:     member.address     ?? "",
-      role:        member.role        ?? "Sotuvchi",
-      hasLogin:    member.hasLogin    ?? false,
-      loginEmail:  member.loginEmail  ?? "",
+      firstName:   member.firstName  ?? "",
+      lastName:    member.lastName   ?? "",
+      email:       member.email      ?? "",
+      phone:       member.phone      ?? "",
+      position:    member.position   ?? "",
+      role:        member.role       ?? "Sotuvchi",
+      hasLogin:    member.hasLogin   ?? true, // users collection'da bor = logini bor
+      status:      member.status     ?? "active",
       permissions: member.permissions ?? DEFAULT_PERMISSIONS[member.role ?? "Sotuvchi"],
-      isEmployee:  member.isEmployee  ?? true,
-      isSupplier:  member.isSupplier  ?? false,
-      isGuest:     member.isGuest     ?? false,
-      status:      member.status      ?? "active",
     });
     setPassword("");
     setEditingId(member.id);
     setActiveTab("main");
+    setExpandedModules({});
     setIsModalOpen(true);
   };
  
@@ -244,7 +246,7 @@ export default function StaffManagementPage() {
   // ── Ruxsat toggle ──
   const toggleAction = (moduleKey: ModuleKey, action: Action) => {
     setFormData(prev => {
-      const current: Action[] = prev.permissions[moduleKey] ?? [];
+      const current: Action[] = (prev.permissions[moduleKey] ?? []) as Action[];
       const has = current.includes(action);
       const updated = has ? current.filter(a => a !== action) : [...current, action];
       return { ...prev, permissions: { ...prev.permissions, [moduleKey]: updated } };
@@ -263,37 +265,59 @@ export default function StaffManagementPage() {
  
   // ── Saqlash ──
   const handleSubmit = async () => {
-    if (!formData.name || !formData.surname) {
+    if (!formData.firstName || !formData.lastName) {
       toast({ title: "Xatolik", description: "Ism va Familiya majburiy!", variant: "destructive" });
       return;
     }
-    if (formData.hasLogin && !editingId && (!formData.loginEmail || !password)) {
-      toast({ title: "Xatolik", description: "Login va parol majburiy!", variant: "destructive" });
+    if (!editingId && (!formData.email || !password)) {
+      toast({ title: "Xatolik", description: "Email va parol majburiy!", variant: "destructive" });
       return;
     }
     setLoading(true);
     try {
-      let uid = formData.uid;
- 
-      if (formData.hasLogin && !editingId && formData.loginEmail && password) {
-        // ✅ TO'G'RI: import qilingan auth ishlatilmoqda, getAuth() emas
-        const cred = await createUserWithEmailAndPassword(auth, formData.loginEmail, password);
-        uid = cred.user.uid;
-      }
- 
-      const payload = { ...formData, uid, updatedAt: serverTimestamp() };
- 
       if (editingId) {
-        await updateDoc(doc(db!, "staff", editingId), payload);
-        toast({ title: "Yangilandi ✓" });
+        // ── EDIT: faqat ma'lumotlarni yangilash (email/parol o'zgarmaydi) ──
+        const payload = {
+          firstName:   formData.firstName,
+          lastName:    formData.lastName,
+          fullName:    `${formData.firstName} ${formData.lastName}`,
+          phone:       formData.phone,
+          position:    formData.position,
+          role:        formData.role,
+          status:      formData.status,
+          permissions: formData.permissions,
+          updatedAt:   serverTimestamp(),
+        };
+        await updateDoc(doc(db!, "users", editingId), payload);
+        toast({ title: "Yangilandi ✓", description: `${formData.firstName} ma'lumotlari saqlandi` });
       } else {
-        await addDoc(collection(db!, "staff"), { ...payload, createdAt: serverTimestamp() });
-        toast({ title: "Qo'shildi ✓" });
+        // ── CREATE: Firebase Auth + Firestore users ──
+        const cred = await createUserWithEmailAndPassword(auth, formData.email, password);
+        const uid = cred.user.uid;
+ 
+        // users collection'ga UID bilan yozish (Firestore'dagi mavjud struktura bilan mos)
+        await setDoc(doc(db!, "users", uid), {
+          id:          uid,
+          firstName:   formData.firstName,
+          lastName:    formData.lastName,
+          fullName:    `${formData.firstName} ${formData.lastName}`,
+          email:       formData.email,
+          phone:       formData.phone,
+          position:    formData.position,
+          role:        formData.role,
+          status:      formData.status,
+          permissions: formData.permissions,
+          hasLogin:    true,
+          uid:         uid,
+          createdAt:   serverTimestamp(),
+          updatedAt:   serverTimestamp(),
+        });
+        toast({ title: "Qo'shildi ✓", description: `${formData.firstName} tizimga qo'shildi` });
       }
       closeModal();
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
-      console.error("Firebase xatolik:", err); // debug uchun
+      console.error("Firebase xatolik:", err);
       const msg =
         err?.code === "auth/email-already-in-use"
           ? "Bu email allaqachon ishlatilmoqda"
@@ -310,12 +334,12 @@ export default function StaffManagementPage() {
     }
   };
  
-  // ── O'chirish ──
+  // ── O'chirish (faqat Firestore'dan, Auth'dan admin SDK kerak) ──
   const handleDelete = async (id: string) => {
     if (!db) return;
     try {
-      await deleteDoc(doc(db, "staff", id));
-      toast({ title: "O'chirildi" });
+      await deleteDoc(doc(db, "users", id));
+      toast({ title: "O'chirildi", description: "Foydalanuvchi ma'lumotlari o'chirildi" });
       setDeleteConfirm(null);
     } catch {
       toast({ title: "Xatolik", variant: "destructive" });
@@ -409,9 +433,9 @@ export default function StaffManagementPage() {
                   <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Xodim</th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-32">Lavozim</th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-32">Rol</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-40">Login (email)</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-44">Email</th>
                   <th className="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-20">Holat</th>
-                  <th className="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-20">Login</th>
+                  <th className="px-4 py-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-24">Ruxsatlar</th>
                   {isSuperAdmin && (
                     <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wide w-24">Amallar</th>
                   )}
@@ -421,39 +445,40 @@ export default function StaffManagementPage() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={isSuperAdmin ? 7 : 6} className="text-center py-12 text-slate-400 text-sm">
-                      Xodimlar topilmadi
+                      Foydalanuvchilar topilmadi
                     </td>
                   </tr>
                 ) : (
                   filtered.map((member) => {
                     const m = member as StaffMember;
+                    const permCount = Object.values(m.permissions ?? {}).filter(v => Array.isArray(v) && v.length > 0).length;
                     return (
                       <tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800 text-sm">
-                            {m.surname} {m.name} {m.patronymic}
+                            {m.firstName} {m.lastName}
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{m.phone}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{m.phone ?? ""}</p>
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600">{m.position}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{m.position ?? "—"}</td>
                         <td className="px-4 py-3"><RoleBadge role={m.role} /></td>
                         <td className="px-4 py-3 text-xs text-slate-500 truncate">
-                          {m.loginEmail || <span className="text-slate-300">—</span>}
+                          {m.email || <span className="text-slate-300">—</span>}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={cn(
                             "text-[11px] px-2 py-0.5 rounded-full font-medium",
-                            m.status === "active"
+                            (m.status ?? "active") === "active"
                               ? "bg-emerald-50 text-emerald-700"
                               : "bg-slate-100 text-slate-400"
                           )}>
-                            {m.status === "active" ? "Faol" : "Nofaol"}
+                            {(m.status ?? "active") === "active" ? "Faol" : "Nofaol"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {m.hasLogin
-                            ? <Lock className="w-4 h-4 text-blue-500 mx-auto" />
-                            : <span className="text-slate-300 text-xs">—</span>}
+                          <span className="text-[11px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
+                            {permCount}/{ALL_MODULES.length} modul
+                          </span>
                         </td>
                         {isSuperAdmin && (
                           <td className="px-4 py-3 text-right">
@@ -462,6 +487,7 @@ export default function StaffManagementPage() {
                                 variant="ghost" size="icon"
                                 onClick={() => openEdit(m)}
                                 className="w-7 h-7 text-slate-400 hover:text-blue-600"
+                                title="Tahrirlash"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </Button>
@@ -469,6 +495,7 @@ export default function StaffManagementPage() {
                                 variant="ghost" size="icon"
                                 onClick={() => setDeleteConfirm(m.id)}
                                 className="w-7 h-7 text-slate-400 hover:text-rose-600"
+                                title="O'chirish"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
@@ -482,7 +509,7 @@ export default function StaffManagementPage() {
               </tbody>
             </table>
             <div className="border-t border-slate-100 px-4 py-2 bg-slate-50 flex items-center gap-4 text-xs text-slate-500">
-              Jami: {filtered.length} ta yozuv ko&apos;rsatilmoqda
+              Jami: {filtered.length} ta foydalanuvchi ko&apos;rsatilmoqda
             </div>
           </div>
         </div>
@@ -515,24 +542,51 @@ export default function StaffManagementPage() {
                   <h3 className="text-sm font-semibold text-slate-800">Shaxsiy ma&apos;lumotlar</h3>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-slate-500">Familiya *</Label>
-                  <Input value={formData.surname} onChange={e => setFormData(p => ({ ...p, surname: e.target.value }))} placeholder="Usmonov" className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Ism *</Label>
-                  <Input value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="Anvar" className="h-9 text-sm" />
+                  <Input
+                    value={formData.firstName}
+                    onChange={e => setFormData(p => ({ ...p, firstName: e.target.value }))}
+                    placeholder="Anvar"
+                    className="h-9 text-sm"
+                  />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-slate-500">Otasining ismi</Label>
-                  <Input value={formData.patronymic} onChange={e => setFormData(p => ({ ...p, patronymic: e.target.value }))} placeholder="Akmalovich" className="h-9 text-sm" />
+                  <Label className="text-xs text-slate-500">Familiya *</Label>
+                  <Input
+                    value={formData.lastName}
+                    onChange={e => setFormData(p => ({ ...p, lastName: e.target.value }))}
+                    placeholder="Usmonov"
+                    className="h-9 text-sm"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Telefon</Label>
-                  <Input value={formData.phone} onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))} placeholder="+998 90 ..." className="h-9 text-sm" />
+                  <Input
+                    value={formData.phone}
+                    onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="+998 90 ..."
+                    className="h-9 text-sm"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Lavozim</Label>
-                  <Input value={formData.position} onChange={e => setFormData(p => ({ ...p, position: e.target.value }))} placeholder="Katta sotuvchi" className="h-9 text-sm" />
+                  <Input
+                    value={formData.position}
+                    onChange={e => setFormData(p => ({ ...p, position: e.target.value }))}
+                    placeholder="Katta sotuvchi"
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Rol *</Label>
+                  <Select value={formData.role} onValueChange={handleRoleChange}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map(r => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Holat</Label>
@@ -545,169 +599,135 @@ export default function StaffManagementPage() {
                   </Select>
                 </div>
  
-                {/* Login bo'limi */}
-                <div className="col-span-3 mt-4 pb-1 border-b flex items-center gap-3">
-                  <h3 className="text-sm font-semibold text-slate-800">Tizimga kirish (Login)</h3>
-                  <div className="flex items-center gap-1.5">
-                    <Checkbox
-                      id="hasLogin"
-                      checked={formData.hasLogin}
-                      onCheckedChange={checked => setFormData(p => ({ ...p, hasLogin: !!checked }))}
-                    />
-                    <Label htmlFor="hasLogin" className="text-xs font-medium text-blue-700 cursor-pointer">
-                      Login ruxsatini yoqish
-                    </Label>
-                  </div>
-                </div>
- 
-                {formData.hasLogin && (
+                {/* Login bo'limi - faqat yangi user uchun */}
+                {!editingId && (
                   <>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">Rol *</Label>
-                      <Select value={formData.role} onValueChange={handleRoleChange}>
-                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {ROLES.filter(r => r !== "Ishchi").map(r => (
-                            <SelectItem key={r} value={r}>{r}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="col-span-3 mt-4 pb-1 border-b">
+                      <h3 className="text-sm font-semibold text-slate-800">Tizimga kirish ma&apos;lumotlari</h3>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">Login (Email) *</Label>
+                      <Label className="text-xs text-slate-500">Email (Login) *</Label>
                       <Input
                         type="email"
-                        value={formData.loginEmail}
-                        onChange={e => setFormData(p => ({ ...p, loginEmail: e.target.value }))}
+                        value={formData.email}
+                        onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
                         placeholder="anvar@ombor.uz"
                         className="h-9 text-sm"
-                        disabled={!!editingId}
                       />
                     </div>
-                    {!editingId && (
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">Parol *</Label>
-                        <div className="relative">
-                          <Input
-                            type={showPass ? "text" : "password"}
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            placeholder="******"
-                            className="h-9 text-sm pr-8"
-                          />
-                          <Button
-                            variant="ghost" size="icon"
-                            onClick={() => setShowPass(!showPass)}
-                            className="absolute right-0 top-0 h-9 w-8 text-slate-400"
-                          >
-                            {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </Button>
-                        </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">Parol *</Label>
+                      <div className="relative">
+                        <Input
+                          type={showPass ? "text" : "password"}
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                          placeholder="******"
+                          className="h-9 text-sm pr-8"
+                        />
+                        <Button
+                          variant="ghost" size="icon"
+                          onClick={() => setShowPass(!showPass)}
+                          className="absolute right-0 top-0 h-9 w-8 text-slate-400"
+                        >
+                          {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
                       </div>
-                    )}
-                    {editingId && (
-                      <div className="col-span-3 flex items-center gap-2 bg-blue-50 border border-blue-100 p-3 rounded-lg text-blue-700 mt-1">
-                        <KeyRound className="w-5 h-5 shrink-0" />
-                        <div className="text-xs">
-                          <p className="font-semibold">Parolni yangilash</p>
-                          <p className="opacity-90">Foydalanuvchi parolini faqat o&apos;zi profil sozlamalaridan yoki &quot;Parolni unutdingizmi?&quot; orqali tiklashi mumkin.</p>
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </>
                 )}
  
-                {/* Tizimdagi turi */}
-                <div className="col-span-3 mt-4 pb-1 border-b flex items-center gap-6">
-                  <h3 className="text-sm font-semibold text-slate-800">Tizimdagi turi</h3>
-                  <div className="flex items-center gap-4">
-                    {[
-                      { key: "isEmployee", label: "Xodim" },
-                      { key: "isSupplier", label: "Ta'minotchi xodimi" },
-                      { key: "isGuest",    label: "Mehmon" },
-                    ].map(type => (
-                      <label key={type.key} className="flex items-center gap-2 text-xs cursor-pointer">
-                        <Checkbox
-                          checked={(formData as Record<string, unknown>)[type.key] as boolean}
-                          onCheckedChange={v => setFormData(p => ({ ...p, [type.key]: !!v }))}
-                        />
-                        {type.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                {/* Edit paytida email ko'rsatish (o'zgarmaydi) */}
+                {editingId && (
+                  <>
+                    <div className="col-span-3 mt-4 pb-1 border-b">
+                      <h3 className="text-sm font-semibold text-slate-800">Login ma&apos;lumotlari</h3>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs text-slate-500">Email (Login)</Label>
+                      <Input
+                        value={formData.email}
+                        disabled
+                        className="h-9 text-sm bg-slate-50 text-slate-400"
+                      />
+                    </div>
+                    <div className="col-span-3 flex items-center gap-2 bg-blue-50 border border-blue-100 p-3 rounded-lg text-blue-700 mt-1">
+                      <KeyRound className="w-5 h-5 shrink-0" />
+                      <div className="text-xs">
+                        <p className="font-semibold">Parolni yangilash</p>
+                        <p className="opacity-90">Foydalanuvchi parolini faqat o&apos;zi profil sozlamalaridan yoki &quot;Parolni unutdingizmi?&quot; orqali tiklashi mumkin.</p>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </TabsContent>
  
             {/* Ruxsatlar */}
             <TabsContent value="permissions" className="flex-1 overflow-y-auto p-0 m-0 bg-slate-50">
-              {!formData.hasLogin ? (
-                <div className="flex flex-col h-full items-center justify-center gap-3 text-slate-400 border-t bg-white">
-                  <Lock className="w-10 h-10 opacity-50" />
-                  <p className="text-sm">Ruxsatlarni belgilash uchun avval &quot;Login ruxsatini yoqish&quot;ni belgilang.</p>
-                </div>
-              ) : (
-                <div className="p-6 space-y-3">
-                  <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg flex gap-3 text-amber-800 mb-4">
-                    <LayoutGrid className="w-5 h-5 shrink-0 mt-0.5" />
-                    <div className="text-xs">
-                      <p className="font-semibold">Standart ruxsatlar yuklangan</p>
-                      <p className="opacity-90">&quot;{formData.role}&quot; roli uchun standart ruxsatlar o&apos;rnatildi.</p>
-                    </div>
+              <div className="p-6 space-y-3">
+                <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg flex gap-3 text-amber-800 mb-4">
+                  <LayoutGrid className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-semibold">Ruxsatlarni sozlang</p>
+                    <p className="opacity-90">&quot;{formData.role}&quot; roli uchun ruxsatlar. Har bir modulni alohida sozlashingiz mumkin.</p>
                   </div>
- 
-                  {ALL_MODULES.map((module) => {
-                    const modulePermissions = formData.permissions[module.key] ?? [];
-                    const allChecked  = MODULE_ACTIONS.every(a => modulePermissions.includes(a));
-                    const someChecked = MODULE_ACTIONS.some(a => modulePermissions.includes(a)) && !allChecked;
-                    const isExpanded  = expandedModules[module.key];
- 
-                    return (
-                      <div key={module.key} className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                        <div className={cn("px-4 py-2.5 flex items-center gap-3 border-b border-slate-100", isExpanded ? "bg-slate-50/50" : "")}>
-                          <Checkbox
-                            id={`mod-${module.key}`}
-                            checked={allChecked ? true : someChecked ? "indeterminate" : false}
-                            onCheckedChange={(checked) => toggleModule(module.key, !!checked)}
-                          />
-                          <Label htmlFor={`mod-${module.key}`} className="text-sm font-medium text-slate-800 flex-1 cursor-pointer">
-                            {module.label}
-                          </Label>
-                          <div className="text-[11px] text-slate-400 mr-2">
-                            {modulePermissions.length} / {MODULE_ACTIONS.length} ruxsat
-                          </div>
-                          <Button
-                            variant="ghost" size="icon"
-                            onClick={() => setExpandedModules(p => ({ ...p, [module.key]: !isExpanded }))}
-                            className="w-8 h-8 text-slate-400"
-                          >
-                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </Button>
-                        </div>
-                        {isExpanded && (
-                          <div className="px-4 py-3 grid grid-cols-4 gap-4 bg-white">
-                            {MODULE_ACTIONS.map((action) => {
-                              const id = `perm-${module.key}-${action}`;
-                              return (
-                                <div key={action} className="flex items-center gap-2.5">
-                                  <Checkbox
-                                    id={id}
-                                    checked={modulePermissions.includes(action)}
-                                    onCheckedChange={() => toggleAction(module.key, action)}
-                                  />
-                                  <Label htmlFor={id} className="text-xs text-slate-600 cursor-pointer">
-                                    {ACTION_LABELS[action]}
-                                  </Label>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
                 </div>
-              )}
+ 
+                {ALL_MODULES.map((module) => {
+                  const modulePermissions = (formData.permissions[module.key] ?? []) as Action[];
+                  const allChecked  = MODULE_ACTIONS.every(a => modulePermissions.includes(a));
+                  const someChecked = MODULE_ACTIONS.some(a => modulePermissions.includes(a)) && !allChecked;
+                  const isExpanded  = expandedModules[module.key];
+ 
+                  return (
+                    <div key={module.key} className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                      <div className={cn("px-4 py-2.5 flex items-center gap-3 border-b border-slate-100", isExpanded ? "bg-slate-50/50" : "")}>
+                        <Checkbox
+                          id={`mod-${module.key}`}
+                          checked={allChecked ? true : someChecked ? "indeterminate" : false}
+                          onCheckedChange={(checked) => toggleModule(module.key, !!checked)}
+                        />
+                        <Label htmlFor={`mod-${module.key}`} className="text-sm font-medium text-slate-800 flex-1 cursor-pointer">
+                          {module.label}
+                        </Label>
+                        <div className={cn(
+                          "text-[11px] px-2 py-0.5 rounded-full font-medium mr-2",
+                          modulePermissions.length > 0 ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"
+                        )}>
+                          {modulePermissions.length} / {MODULE_ACTIONS.length} ruxsat
+                        </div>
+                        <Button
+                          variant="ghost" size="icon"
+                          onClick={() => setExpandedModules(p => ({ ...p, [module.key]: !isExpanded }))}
+                          className="w-8 h-8 text-slate-400"
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-4 py-3 grid grid-cols-4 gap-4 bg-white">
+                          {MODULE_ACTIONS.map((action) => {
+                            const id = `perm-${module.key}-${action}`;
+                            return (
+                              <div key={action} className="flex items-center gap-2.5">
+                                <Checkbox
+                                  id={id}
+                                  checked={modulePermissions.includes(action)}
+                                  onCheckedChange={() => toggleAction(module.key, action)}
+                                />
+                                <Label htmlFor={id} className="text-xs text-slate-600 cursor-pointer">
+                                  {ACTION_LABELS[action]}
+                                </Label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </TabsContent>
           </Tabs>
  
@@ -738,7 +758,7 @@ export default function StaffManagementPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="py-2 text-sm text-slate-600">
-            Haqiqatan ham ushbu xodimni tizimdan o&apos;chirib tashlamoqchimisiz? Bu amalni ortga qaytarib bo&apos;lmaydi.
+            Haqiqatan ham ushbu foydalanuvchini tizimdan o&apos;chirib tashlamoqchimisiz? Bu amalni ortga qaytarib bo&apos;lmaydi.
           </div>
           <DialogFooter className="mt-4 gap-2">
             <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(null)}>Bekor qilish</Button>
