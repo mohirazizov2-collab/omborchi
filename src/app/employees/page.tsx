@@ -70,6 +70,46 @@ const ACTION_LABELS: Record<Action, string> = {
  
 type Permissions = Partial<Record<ModuleKey, Action[]>>;
  
+// ─── Eski format konvertori ────────────────────────────────────────
+// Firestore'da eski permissions format: { analitika: { dashboard: true } }
+// Yangi format: { dashboard: ["view", "create"] }
+// Bu funksiya ikkalasini ham qabul qiladi
+function normalizePermissions(raw: unknown): Permissions {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Permissions = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(value)) {
+      // Yangi format: ["view", "create", ...]
+      result[key as ModuleKey] = value.filter(v => MODULE_ACTIONS.includes(v as Action)) as Action[];
+    } else if (typeof value === "boolean") {
+      // Eski format: true/false
+      result[key as ModuleKey] = value ? [...MODULE_ACTIONS] : [];
+    } else if (typeof value === "object" && value !== null) {
+      // Eski nested format: { dashboard: true, harakatlar: true }
+      // Bu holda key = modul nomi, va ichidagi keylar action nomi
+      const actions: Action[] = [];
+      for (const [subKey, subVal] of Object.entries(value as Record<string, unknown>)) {
+        if (subVal === true && MODULE_ACTIONS.includes(subKey as Action)) {
+          actions.push(subKey as Action);
+        }
+      }
+      // Agar subkey action emas, modul nomi bo'lsa — butun modulni view sifatida qo'shamiz
+      if (actions.length === 0 && Object.values(value as Record<string, unknown>).some(v => v === true)) {
+        result[key as ModuleKey] = ["view"] as Action[];
+      } else {
+        result[key as ModuleKey] = actions;
+      }
+    }
+  }
+  return result;
+}
+ 
+// Xavfsiz array olish (crash oldini olish)
+function safeArray(val: unknown): Action[] {
+  if (Array.isArray(val)) return val as Action[];
+  return [];
+}
+ 
 const DEFAULT_PERMISSIONS: Record<Role, Permissions> = {
   "Super Admin":      Object.fromEntries(ALL_MODULES.map(m => [m.key, [...MODULE_ACTIONS]])) as Permissions,
   "Admin":            Object.fromEntries(ALL_MODULES.map(m => [m.key, ["view","create","edit"] as Action[]])) as Permissions,
@@ -209,16 +249,21 @@ export default function StaffManagementPage() {
   };
  
   const openEdit = (member: StaffMember) => {
+    const role = member.role ?? "Sotuvchi";
+    // ⚠️ ASOSIY TUZATISH: eski format permissions ni normalize qilamiz
+    const permissions = Object.keys(normalizePermissions(member.permissions)).length > 0
+      ? normalizePermissions(member.permissions)
+      : DEFAULT_PERMISSIONS[role];
     setFormData({
       firstName:   member.firstName  ?? "",
       lastName:    member.lastName   ?? "",
       email:       member.email      ?? "",
       phone:       member.phone      ?? "",
       position:    member.position   ?? "",
-      role:        member.role       ?? "Sotuvchi",
-      hasLogin:    member.hasLogin   ?? true, // users collection'da bor = logini bor
+      role,
+      hasLogin:    member.hasLogin   ?? true,
       status:      member.status     ?? "active",
-      permissions: member.permissions ?? DEFAULT_PERMISSIONS[member.role ?? "Sotuvchi"],
+      permissions,
     });
     setPassword("");
     setEditingId(member.id);
@@ -246,7 +291,7 @@ export default function StaffManagementPage() {
   // ── Ruxsat toggle ──
   const toggleAction = (moduleKey: ModuleKey, action: Action) => {
     setFormData(prev => {
-      const current: Action[] = (prev.permissions[moduleKey] ?? []) as Action[];
+      const current: Action[] = safeArray(prev.permissions[moduleKey]);
       const has = current.includes(action);
       const updated = has ? current.filter(a => a !== action) : [...current, action];
       return { ...prev, permissions: { ...prev.permissions, [moduleKey]: updated } };
@@ -675,7 +720,7 @@ export default function StaffManagementPage() {
                 </div>
  
                 {ALL_MODULES.map((module) => {
-                  const modulePermissions = (formData.permissions[module.key] ?? []) as Action[];
+                  const modulePermissions = safeArray(formData.permissions[module.key]);
                   const allChecked  = MODULE_ACTIONS.every(a => modulePermissions.includes(a));
                   const someChecked = MODULE_ACTIONS.some(a => modulePermissions.includes(a)) && !allChecked;
                   const isExpanded  = expandedModules[module.key];
