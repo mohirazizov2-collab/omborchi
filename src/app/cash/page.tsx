@@ -43,15 +43,25 @@ const getPrice = (p: Product): number => {
 };
  
 const getStock = (p: Product): number => {
-  const candidates = [p.stock, p.qoldiq, p.miqdor];
+  // Barcha mumkin bo'lgan field nomlarini tekshiramiz
+  const candidates = [
+    p.stock, p.qoldiq, p.miqdor,
+    (p as any).quantity, (p as any).balance,
+    (p as any).remainder, (p as any).count,
+    (p as any).amount, (p as any).total_stock,
+    (p as any).stockCount, (p as any).inventoryCount,
+  ];
   for (const c of candidates) {
-    const n = Number(c);
-    if (!isNaN(n)) return n;
+    if (c !== undefined && c !== null) {
+      const n = Number(c);
+      if (!isNaN(n)) return n;
+    }
   }
-  return 0;
+  // Agar hech qanday stock field topilmasa, 999 qaytaramiz (mavjud deb hisoblaymiz)
+  return 999;
 };
  
-const getCategory = (p: Product) => p.category || p.kategoriya || "Boshqa";
+const getCategory = (p: Product) => p.category || p.kategoriya || (p as any).cat || (p as any).tip || "Boshqa";
  
 const fmt = (n: number) =>
   isNaN(n) ? "0 so'm" : new Intl.NumberFormat("uz-UZ").format(Math.round(n)) + " so'm";
@@ -171,17 +181,19 @@ export default function CashPage() {
   const fetchWarehouses = useCallback(async () => {
     setWhLoading(true);
     try {
-      const names = ["warehouses", "skladlar", "omborlar"];
+      const names = ["warehouses", "skladlar", "omborlar", "warehouse", "sklad", "ombor"];
       let data: Warehouse[] = [];
       for (const name of names) {
-        const snap = await getDocs(collection(db, name));
-        if (!snap.empty) {
-          data = snap.docs.map(d => {
-            const r = d.data() as any;
-            return { id: d.id, name: r.name||r.nomi||r.nom||d.id, address: r.address||r.manzil||"", phone: r.phone||r.telefon||"" };
-          });
-          break;
-        }
+        try {
+          const snap = await getDocs(collection(db, name));
+          if (!snap.empty) {
+            data = snap.docs.map(d => {
+              const r = d.data() as any;
+              return { id: d.id, name: r.name||r.nomi||r.nom||r.title||d.id, address: r.address||r.manzil||"", phone: r.phone||r.telefon||"" };
+            });
+            break;
+          }
+        } catch {}
       }
       setWarehouses(data);
       if (data.length > 0) setActiveWh(data[0]);
@@ -192,41 +204,107 @@ export default function CashPage() {
   const fetchInventory = useCallback(async (wh: Warehouse | null) => {
     if (!wh) { setInventoryMap({}); return; }
     try {
-      const invSnap = await getDocs(query(collection(db, "inventory"), where("warehouseId", "==", wh.id)));
-      if (!invSnap.empty) {
-        const map: Record<string, number> = {};
-        invSnap.docs.forEach(d => {
-          const data = d.data() as any;
-          map[data.productId] = Number(data.stock||data.qoldiq||data.miqdor||0);
-        });
-        setInventoryMap(map);
-        return;
+      // Bir nechta inventory collection nomlarini tekshiramiz
+      const invCollections = ["inventory", "inventories", "stock", "stocks"];
+      for (const collName of invCollections) {
+        try {
+          const invSnap = await getDocs(query(
+            collection(db, collName),
+            where("warehouseId", "==", wh.id)
+          ));
+          if (!invSnap.empty) {
+            const map: Record<string, number> = {};
+            invSnap.docs.forEach(d => {
+              const data = d.data() as any;
+              const pid = data.productId || data.product_id || data.mahsulotId;
+              if (pid) {
+                map[pid] = Number(data.stock||data.qoldiq||data.miqdor||data.quantity||data.amount||0);
+              }
+            });
+            setInventoryMap(map);
+            return;
+          }
+        } catch {}
       }
       setInventoryMap({});
     } catch (e) { setInventoryMap({}); }
   }, []);
  
+  // ============ TUZATILGAN fetchProducts ============
   const fetchProducts = useCallback(async (wh: Warehouse | null) => {
     setProductsLoading(true);
     try {
-      const snap = await getDocs(collection(db, "products"));
-      let data: Product[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-      if (wh && data.length > 0) {
-        const fields = ["warehouseId","skladId","omborId","warehouse_id","sklad_id"];
-        for (const field of fields) {
-          const filtered = data.filter((p: any) => p[field] === wh.id);
-          if (filtered.length > 0) { data = filtered; break; }
+      // Bir nechta collection nomlarini tekshiramiz
+      const productCollections = ["products", "mahsulotlar", "tovarlar", "items", "product"];
+      let data: Product[] = [];
+ 
+      for (const collName of productCollections) {
+        try {
+          const snap = await getDocs(collection(db, collName));
+          if (!snap.empty) {
+            data = snap.docs.map(d => {
+              const raw = d.data() as any;
+              return {
+                id: d.id,
+                // Barcha mumkin field nomlarini normalize qilamiz
+                name: raw.name || raw.nomi || raw.nom || raw.title || raw.mahsulot || raw.tovar || `Mahsulot ${d.id.slice(-4)}`,
+                price: raw.price || raw.narx || raw.baho || raw.cost || raw.sotishNarxi || raw.selling_price || 0,
+                salePrice: raw.salePrice || raw.sotishNarxi || raw.sale_price || raw.narx || 0,
+                cost: raw.cost || raw.tanNarx || raw.tan_narx || 0,
+                narx: raw.narx || raw.price || 0,
+                baho: raw.baho || raw.price || 0,
+                // Stock fieldlarini barcha variantlarda olamiz
+                stock: raw.stock ?? raw.qoldiq ?? raw.miqdor ?? raw.quantity ?? raw.balance ?? raw.remainder ?? raw.count ?? undefined,
+                qoldiq: raw.qoldiq ?? raw.stock ?? raw.miqdor ?? undefined,
+                miqdor: raw.miqdor ?? raw.stock ?? raw.qoldiq ?? undefined,
+                category: raw.category || raw.kategoriya || raw.cat || raw.tip || raw.tur || "",
+                kategoriya: raw.kategoriya || raw.category || "",
+                warehouseId: raw.warehouseId || raw.skladId || raw.omborId || raw.warehouse_id || "",
+                skladId: raw.skladId || raw.warehouseId || "",
+                omborId: raw.omborId || raw.warehouseId || "",
+                imageUrl: raw.imageUrl || raw.image || raw.img || raw.rasm || "",
+                // Raw datani ham saqlaymiz
+                ...raw,
+                id: d.id,
+              } as Product;
+            });
+            console.log(`✅ ${collName} dan ${data.length} ta mahsulot yuklandi`);
+            console.log("Birinchi mahsulot:", data[0]);
+            break;
+          }
+        } catch (e) {
+          console.warn(`${collName} collection topilmadi:`, e);
         }
       }
+ 
+      // Ombor bo'yicha filter (agar warehouseId mavjud bo'lsa)
+      if (wh && data.length > 0) {
+        const whFields = ["warehouseId","skladId","omborId","warehouse_id","sklad_id","ombor_id","whId"];
+        for (const field of whFields) {
+          const filtered = data.filter((p: any) => p[field] === wh.id);
+          if (filtered.length > 0) {
+            console.log(`Ombor filter (${field}): ${filtered.length} ta mahsulot`);
+            data = filtered;
+            break;
+          }
+        }
+        // Agar hech qanday field bo'yicha filter ishlamasa, barchasini ko'rsatamiz
+      }
+ 
       setAllProducts(data);
     } catch (e) {
-      console.error(e);
+      console.error("fetchProducts xato:", e);
       showToast("Mahsulotlarni yuklashda xato", "err");
-    } finally { setProductsLoading(false); }
+    } finally {
+      setProductsLoading(false);
+    }
   }, []);
  
+  // ============ TUZATILGAN getEffectiveStock ============
   const getEffectiveStock = useCallback((p: Product): number => {
+    // Avval inventory map dan tekshiramiz
     if (inventoryMap[p.id] !== undefined) return inventoryMap[p.id];
+    // Keyin mahsulotning o'zidan
     return getStock(p);
   }, [inventoryMap]);
  
@@ -274,12 +352,15 @@ export default function CashPage() {
  
   const addToCart = (p: Product) => {
     const stock = getEffectiveStock(p);
-    if (stock <= 0) return;
     const price = getPrice(p);
     setCart(prev => {
       const ex = prev.find(i => i.id === p.id);
       if (ex) {
-        if (ex.quantity >= stock) { showToast("Omborda yetarli emas!", "err"); return prev; }
+        // Stock cheksiz (999) yoki haqiqiy stock bor
+        if (stock !== 999 && ex.quantity >= stock) {
+          showToast("Omborda yetarli emas!", "err");
+          return prev;
+        }
         return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
       return [...prev, { ...p, quantity: 1, customPrice: price }];
@@ -292,7 +373,8 @@ export default function CashPage() {
     setCart(p => p.map(i => {
       if (i.id !== id) return i;
       const stock = getEffectiveStock(i);
-      return { ...i, quantity: Math.min(qty, stock) };
+      const maxQty = stock === 999 ? qty : Math.min(qty, stock);
+      return { ...i, quantity: maxQty };
     }));
   };
   const clearCart = () => { setCart([]); setCashGiven(0); };
@@ -326,7 +408,17 @@ export default function CashPage() {
         createdAt: serverTimestamp(),
       };
       const ref = await addDoc(collection(db, "sales"), saleData);
-      await Promise.all(cart.map(i => updateDoc(doc(db, "products", i.id), { stock: increment(-i.quantity) })));
+ 
+      // Stock ni kamaytirish - faqat haqiqiy stock bor mahsulotlarda
+      await Promise.all(cart.map(async (i) => {
+        const stock = getEffectiveStock(i);
+        if (stock !== 999) {
+          try {
+            await updateDoc(doc(db, "products", i.id), { stock: increment(-i.quantity) });
+          } catch {}
+        }
+      }));
+ 
       const completedSale = { id: ref.id, ...saleData };
       setLastSale(completedSale as any);
       setShowReceipt(true);
@@ -340,12 +432,13 @@ export default function CashPage() {
     finally { setLoading(false); }
   };
  
+  // ============ TUZATILGAN filter - stock tekshiruvi olib tashlandi ============
   const categories = ["all", ...Array.from(new Set(allProducts.map(p => getCategory(p)).filter(Boolean)))];
  
   const filtered = allProducts.filter(p => {
-    const stock = getEffectiveStock(p);
-    if (stock <= 0) return false;
-    const ms = p.name?.toLowerCase().includes(search.toLowerCase());
+    // Faqat nom va kategoriya bo'yicha filter - stock bo'yicha FILTER YO'Q
+    const name = p.name || "";
+    const ms = !search || name.toLowerCase().includes(search.toLowerCase());
     const mc = selectedCat === "all" || getCategory(p) === selectedCat;
     return ms && mc;
   });
@@ -400,22 +493,11 @@ export default function CashPage() {
         .toast.err{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.25)}
         @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.9)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
  
-        /* ══ POS LAYOUT - ASOSIY TUZATISH ══ */
-        .pos-layout{
-          display:flex;
-          flex:1;
-          min-height:0; /* muhim */
-          overflow:hidden;
-        }
+        /* POS LAYOUT */
+        .pos-layout{display:flex;flex:1;min-height:0;overflow:hidden}
  
         /* Products panel */
-        .products-panel{
-          flex:1;
-          display:flex;
-          flex-direction:column;
-          overflow:hidden;
-          min-width:0;
-        }
+        .products-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
         .prod-toolbar{padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
         .wh-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--accentbg);border:1px solid rgba(99,102,241,.2);border-radius:var(--rs);cursor:pointer;transition:all .2s}
         .wh-bar:hover{border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.16)}
@@ -433,73 +515,105 @@ export default function CashPage() {
         .cat-pill:hover{color:var(--text2);border-color:var(--border2)}
         .cat-pill.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 12px rgba(99,102,241,.35)}
  
-        /* Products grid - scroll faqat shu yerda */
-        .products-grid{
-          flex:1;
-          overflow-y:auto;
-          min-height:0; /* muhim */
-          padding:14px;
-          display:grid;
-          grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
-          gap:10px;
-          align-content:start;
-          background:var(--bg);
-        }
+        /* Products grid */
+        .products-grid{flex:1;overflow-y:auto;min-height:0;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;align-content:start;background:var(--bg)}
  
-        .prod-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 10px 10px;cursor:pointer;transition:all .22s cubic-bezier(.34,1.56,.64,1);text-align:left;display:flex;flex-direction:column;gap:7px;position:relative;overflow:hidden;animation:cardIn .3s ease both}
+        /* ============ TUZATILGAN SKELETON ============ */
+        .skeleton{
+          background:linear-gradient(90deg,var(--surface2) 25%,var(--surface3) 50%,var(--surface2) 75%);
+          background-size:200% 100%;
+          animation:shimmer 1.4s ease infinite;
+          border-radius:8px;
+        }
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+ 
+        /* ============ TUZATILGAN PROD CARD ============ */
+        .prod-card{
+          background:var(--surface);
+          border:1.5px solid var(--border);
+          border-radius:var(--r);
+          padding:12px 10px 10px;
+          cursor:pointer;
+          transition:all .22s cubic-bezier(.34,1.56,.64,1);
+          text-align:left;
+          display:flex;
+          flex-direction:column;
+          gap:7px;
+          position:relative;
+          overflow:hidden;
+          animation:cardIn .3s ease both;
+          /* Matn ko'rinishi uchun muhim */
+          color:var(--text);
+        }
         @keyframes cardIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
         .prod-card:hover{border-color:rgba(99,102,241,.4);transform:translateY(-3px) scale(1.02);box-shadow:0 8px 28px rgba(0,0,0,.35)}
         .prod-card:active{transform:scale(.97);transition-duration:.1s}
+ 
         .prod-cat-bar{position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r) var(--r) 0 0}
-        .prod-img{width:100%;aspect-ratio:1;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;transition:transform .2s;flex-shrink:0}
+ 
+        .prod-img{
+          width:100%;
+          aspect-ratio:1;
+          border-radius:10px;
+          background:var(--surface2);
+          border:1px solid var(--border);
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-size:28px;
+          transition:transform .2s;
+          flex-shrink:0;
+          overflow:hidden;
+        }
         .prod-card:hover .prod-img{transform:scale(1.06)}
-        .prod-name{font-size:11.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .prod-price{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent2)}
+ 
+        /* ============ MATN KO'RINISHI TUZATILDI ============ */
+        .prod-name{
+          font-size:12px;
+          font-weight:700;
+          color:var(--text); /* #f0f2ff - aniq oq */
+          overflow:hidden;
+          text-overflow:ellipsis;
+          white-space:nowrap;
+          line-height:1.3;
+          display:block;
+          /* Matn truncation uchun to'liq kengliq */
+          width:100%;
+          max-width:100%;
+        }
+        .prod-price{
+          font-family:var(--mono);
+          font-size:12px;
+          font-weight:700;
+          color:var(--accent2); /* #818cf8 - ko'k-binafsha */
+          display:block;
+        }
         .prod-stock-row{display:flex;align-items:center;justify-content:space-between}
         .prod-stock{font-size:10px;font-weight:600;color:var(--success);background:rgba(16,185,129,.1);padding:2px 7px;border-radius:20px}
         .prod-stock.low{color:var(--warn);background:rgba(245,158,11,.1)}
+        .prod-stock.none{color:var(--danger);background:rgba(239,68,68,.1)}
         .prod-cart-badge{position:absolute;top:8px;right:8px;width:20px;height:20px;background:var(--accent);border-radius:50%;font-size:10px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(99,102,241,.5);animation:badgePop .25s cubic-bezier(.34,1.56,.64,1)}
         @keyframes badgePop{from{transform:scale(0)}to{transform:scale(1)}}
-        .skeleton{background:linear-gradient(90deg,var(--surface2) 25%,var(--surface3) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s ease infinite;border-radius:8px}
-        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+ 
+        /* Skeleton card */
+        .skel-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 10px 10px;display:flex;flex-direction:column;gap:7px;animation:cardIn .3s ease both}
+ 
         .empty-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);padding:80px 20px;text-align:center;gap:10px}
         .empty-icon{font-size:44px;opacity:.5}
         .empty-text{font-size:14px;font-weight:600}
  
-        /* ══ CART PANEL - ASOSIY TUZATISH ══ */
-        .cart-panel{
-          width:var(--cart-w);
-          background:var(--surface);
-          display:flex;
-          flex-direction:column;
-          flex-shrink:0;
-          border-left:1px solid var(--border);
-          height:100%; /* to'liq balandlik */
-          overflow:hidden; /* tashqariga chiqmasin */
-        }
- 
+        /* CART PANEL */
+        .cart-panel{width:var(--cart-w);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;border-left:1px solid var(--border);height:100%;overflow:hidden}
         .cart-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
         .cart-title-row{display:flex;align-items:center;gap:9px}
         .cart-title{font-size:15px;font-weight:800;color:var(--text)}
         .cart-count{min-width:22px;height:22px;padding:0 6px;background:var(--accent);border-radius:11px;font-size:11px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(99,102,241,.4)}
         .cart-clear{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:7px;padding:5px 10px;color:#f87171;font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
         .cart-clear:hover{background:rgba(239,68,68,.2)}
- 
-        /* Cart list - faqat shu joy scroll */
-        .cart-list{
-          flex:1;
-          overflow-y:auto;
-          min-height:0; /* muhim */
-          padding:10px;
-          display:flex;
-          flex-direction:column;
-          gap:7px;
-        }
- 
+        .cart-list{flex:1;overflow-y:auto;min-height:0;padding:10px;display:flex;flex-direction:column;gap:7px}
         .cart-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
         .cart-empty-icon{font-size:42px;opacity:.35}
         .cart-empty-text{font-size:13px;font-weight:600}
- 
         .cart-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:10px;display:flex;flex-direction:column;gap:8px;animation:itemIn .2s ease;transition:border-color .15s}
         .cart-item:hover{border-color:var(--border2)}
         @keyframes itemIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
@@ -519,17 +633,8 @@ export default function CashPage() {
         .qty-val{font-family:var(--mono);font-size:14px;font-weight:700;width:26px;text-align:center}
         .ci-subtotal{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text)}
  
-        /* Pay section - pastda qotib tursin */
-        .pay-section{
-          padding:14px;
-          border-top:1px solid var(--border);
-          display:flex;
-          flex-direction:column;
-          gap:11px;
-          flex-shrink:0; /* kichraymaydi */
-          background:var(--surface);
-        }
- 
+        /* Pay section */
+        .pay-section{padding:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px;flex-shrink:0;background:var(--surface)}
         .total-row{display:flex;align-items:baseline;justify-content:space-between}
         .total-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}
         .total-amount{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--text)}
@@ -552,7 +657,7 @@ export default function CashPage() {
         .checkout-btn:active:not(:disabled){transform:translateY(0);transition-duration:.1s}
         .checkout-btn:disabled{background:var(--surface3);color:var(--muted);cursor:not-allowed;box-shadow:none}
  
-        /* PAGE (history/payments/report) */
+        /* PAGE */
         .page{flex:1;overflow-y:auto;padding:24px;max-width:1060px;width:100%;margin:0 auto}
         .page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
         .page-title{font-size:20px;font-weight:800;letter-spacing:-.5px}
@@ -673,7 +778,7 @@ export default function CashPage() {
  
         {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
  
-        {/* ══ POS ══ */}
+        {/* POS */}
         {tab==="pos" && (
           <div className="pos-layout">
             {/* Products */}
@@ -705,38 +810,73 @@ export default function CashPage() {
               <div className="products-grid">
                 {productsLoading
                   ? Array.from({length:16}).map((_,i)=>(
-                      <div key={i} className="prod-card" style={{cursor:"default",animationDelay:`${i*.03}s`}}>
+                      <div key={i} className="skel-card" style={{animationDelay:`${i*.03}s`}}>
                         <div className="skeleton" style={{width:"100%",aspectRatio:"1",borderRadius:10}}/>
-                        <div className="skeleton" style={{height:12,borderRadius:4,marginTop:2}}/>
-                        <div className="skeleton" style={{height:11,width:"55%",borderRadius:4}}/>
+                        <div className="skeleton" style={{height:13,borderRadius:4,marginTop:2}}/>
+                        <div className="skeleton" style={{height:12,width:"60%",borderRadius:4}}/>
+                        <div className="skeleton" style={{height:10,width:"40%",borderRadius:4}}/>
                       </div>
                     ))
                   : filtered.length===0
                   ? (
                     <div className="empty-state">
                       <div className="empty-icon">📦</div>
-                      <div className="empty-text">{activeWh?`${activeWh.name}da mavjud mahsulot topilmadi`:"Ombor tanlanmagan"}</div>
+                      <div className="empty-text">
+                        {allProducts.length === 0
+                          ? "Mahsulotlar topilmadi"
+                          : search
+                          ? `"${search}" bo'yicha natija yo'q`
+                          : activeWh
+                          ? `${activeWh.name}da mahsulot yo'q`
+                          : "Ombor tanlanmagan"
+                        }
+                      </div>
+                      {allProducts.length === 0 && (
+                        <div style={{fontSize:11,color:"var(--muted)",marginTop:6}}>
+                          Firebase'da mahsulotlar mavjudligini tekshiring
+                        </div>
+                      )}
                     </div>
                   )
                   : filtered.map((p,idx)=>{
-                      const stock=getEffectiveStock(p);
-                      const price=getPrice(p);
-                      const inCart=cart.find(i=>i.id===p.id);
-                      const cat=getCategory(p);
-                      const color=catColor(cat);
+                      const stock = getEffectiveStock(p);
+                      const price = getPrice(p);
+                      const inCart = cart.find(i=>i.id===p.id);
+                      const cat = getCategory(p);
+                      const color = catColor(cat);
+                      // Stock holati
+                      const stockUnknown = stock === 999;
+                      const stockLow = !stockUnknown && stock <= 5 && stock > 0;
+                      const stockOut = !stockUnknown && stock <= 0;
+ 
                       return (
-                        <button key={p.id} className="prod-card" style={{animationDelay:`${Math.min(idx*.025,.4)}s`}} onClick={()=>addToCart(p)}>
+                        <button
+                          key={p.id}
+                          className="prod-card"
+                          style={{animationDelay:`${Math.min(idx*.025,.4)}s`}}
+                          onClick={()=>addToCart(p)}
+                          disabled={stockOut}
+                        >
                           <div className="prod-cat-bar" style={{background:color}}/>
                           {inCart&&<span className="prod-cart-badge">{inCart.quantity}</span>}
                           <div className="prod-img">
-                            {p.imageUrl?<img src={p.imageUrl} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:10}}/>:"📦"}
+                            {p.imageUrl
+                              ? <img src={p.imageUrl} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:10}}/>
+                              : <span style={{fontSize:28}}>📦</span>
+                            }
                           </div>
-                          <div className="prod-name">{p.name}</div>
-                          <div className="prod-price">{fmt(price)}</div>
+                          {/* MATN - aniq ko'rinishi uchun */}
+                          <span className="prod-name" title={p.name}>{p.name || "Nomi yo'q"}</span>
+                          <span className="prod-price">{price > 0 ? fmt(price) : "Narx yo'q"}</span>
                           <div className="prod-stock-row">
-                            <div className={`prod-stock${stock<=5?" low":""}`}>
-                              {stock<=5?`⚠ ${stock} qoldi`:`✓ ${stock} ta`}
-                            </div>
+                            {stockUnknown
+                              ? <span className="prod-stock">✓ Mavjud</span>
+                              : stockOut
+                              ? <span className="prod-stock none">✗ Tugagan</span>
+                              : stockLow
+                              ? <span className="prod-stock low">⚠ {stock} ta qoldi</span>
+                              : <span className="prod-stock">✓ {stock} ta</span>
+                            }
                           </div>
                         </button>
                       );
@@ -745,7 +885,7 @@ export default function CashPage() {
               </div>
             </div>
  
-            {/* ══ CART ══ */}
+            {/* CART */}
             <div className="cart-panel">
               <div className="cart-header">
                 <div className="cart-title-row">
@@ -830,7 +970,7 @@ export default function CashPage() {
           </div>
         )}
  
-        {/* ══ HISTORY ══ */}
+        {/* HISTORY */}
         {tab==="history"&&(
           <div className="page">
             <div className="page-hdr">
@@ -855,10 +995,7 @@ export default function CashPage() {
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div className="sc-total">{fmt(sale.total)}</div>
-                      <button
-                        onClick={()=>printReceipt(sale)}
-                        style={{marginTop:6,padding:"4px 10px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:11,fontWeight:700,cursor:"pointer"}}
-                      >
+                      <button onClick={()=>printReceipt(sale)} style={{marginTop:6,padding:"4px 10px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                         🖨️ Chek
                       </button>
                     </div>
@@ -874,7 +1011,7 @@ export default function CashPage() {
           </div>
         )}
  
-        {/* ══ PAYMENTS ══ */}
+        {/* PAYMENTS */}
         {tab==="payments"&&(
           <div className="page">
             <div className="page-hdr">
@@ -908,10 +1045,7 @@ export default function CashPage() {
                   <div className="pay-badge" style={{color:PAY_CONFIG[sale.paymentMethod]?.color,background:PAY_CONFIG[sale.paymentMethod]?.bg,borderColor:PAY_CONFIG[sale.paymentMethod]?.border}}>
                     {PAY_CONFIG[sale.paymentMethod]?.icon} {PAY_CONFIG[sale.paymentMethod]?.label}
                   </div>
-                  <button
-                    onClick={()=>printReceipt(sale)}
-                    style={{display:"block",marginTop:6,padding:"4px 10px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:11,fontWeight:700,cursor:"pointer"}}
-                  >
+                  <button onClick={()=>printReceipt(sale)} style={{display:"block",marginTop:6,padding:"4px 10px",background:"rgba(99,102,241,.1)",border:"1px solid rgba(99,102,241,.25)",borderRadius:6,color:"#818cf8",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                     🖨️ Chek
                   </button>
                 </div>
@@ -920,7 +1054,7 @@ export default function CashPage() {
           </div>
         )}
  
-        {/* ══ REPORT ══ */}
+        {/* REPORT */}
         {tab==="report"&&(
           <div className="page">
             <div className="page-hdr">
@@ -976,7 +1110,7 @@ export default function CashPage() {
           </div>
         )}
  
-        {/* ══ WAREHOUSE MODAL ══ */}
+        {/* WAREHOUSE MODAL */}
         {showWhModal&&(
           <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setShowWhModal(false)}}>
             <div className="wh-modal">
@@ -1010,7 +1144,7 @@ export default function CashPage() {
           </div>
         )}
  
-        {/* ══ CUSTOM PRICE MODAL ══ */}
+        {/* CUSTOM PRICE MODAL */}
         {customPriceItem&&(
           <div className="overlay" onClick={e=>{if(e.target===e.currentTarget){setCustomPriceItem(null);setTempPrice("")}}}>
             <div className="modal-box">
@@ -1028,7 +1162,7 @@ export default function CashPage() {
           </div>
         )}
  
-        {/* ══ RECEIPT MODAL ══ */}
+        {/* RECEIPT MODAL */}
         {showReceipt&&lastSale&&(
           <div className="overlay">
             <div className="receipt-box">
@@ -1057,12 +1191,8 @@ export default function CashPage() {
               )}
               <div className="r-thanks">Xarid uchun rahmat! 🙏</div>
               <div className="r-btns">
-                <button className="r-print" onClick={()=>printReceipt(lastSale)}>
-                  🖨️ Chek chiqarish
-                </button>
-                <button className="r-close" onClick={()=>setShowReceipt(false)}>
-                  Yopish
-                </button>
+                <button className="r-print" onClick={()=>printReceipt(lastSale)}>🖨️ Chek chiqarish</button>
+                <button className="r-close" onClick={()=>setShowReceipt(false)}>Yopish</button>
               </div>
             </div>
           </div>
