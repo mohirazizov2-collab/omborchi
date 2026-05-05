@@ -1,14 +1,9 @@
-
-Copy
-
 'use client';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
  
-// MUAMMO: initializeApp() — config siz chaqirilganda "app/no-options" xatosi beradi
-// YECHIM: har doim firebaseConfig bilan ishga tushurish
 export function initializeFirebase() {
   if (getApps().length > 0) {
     return getSdks(getApp());
@@ -33,4 +28,3 @@ export * from './non-blocking-updates';
 export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';
- 
