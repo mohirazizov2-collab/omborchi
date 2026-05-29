@@ -1,7 +1,7 @@
 "use client";
  
 import { OmniSidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,17 +10,17 @@ import {
   SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Trash2, FileText, Loader2, Search, PackageSearch,
+  Plus, Trash2, FileText, Loader2, Search,
   CheckCircle2, Calendar, Warehouse, FileInput, Download,
-  Save, X, RefreshCw, ChevronDown,
+  Save, X, RefreshCw,
 } from "lucide-react";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
+import { useUser } from "@/firebase";
 import {
-  useCollection, useFirestore, useMemoFirebase, useUser,
-} from "@/firebase";
-import {
+  getFirestore,
   collection, doc, getDoc, setDoc, runTransaction,
+  onSnapshot, query, QuerySnapshot,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -34,13 +34,269 @@ import {
   Dialog, DialogContent, DialogHeader,
   DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { generateInvoicePDF } from "@/services/pdf-service";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
  
-// ─── helpers ───────────────────────────────────────────────────────────────
+// ─── PDF (inline) ───────────────────────────────────────────────────────────
+ 
+const fmtMoney = (val: number, currency = "сум") =>
+  val.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
+  " " + currency;
+ 
+async function generateStockInPDF(params: {
+  dnNumber: string;
+  supplier: string;
+  warehouse: string;
+  date: string;
+  responsible: string;
+  items: Array<{
+    name: string; sku?: string; quantity: number;
+    price: number; vatRate: number; vatAmount: number; unit?: string;
+  }>;
+  totals: { gross: number; vatTotal: number; net: number };
+  currency?: string;
+}): Promise<void> {
+  const { dnNumber, supplier, warehouse, date, responsible, items, totals, currency = "сум" } = params;
+ 
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 12;
+ 
+  const colorAccent: [number, number, number] = [22, 163, 74];
+  const colorDark: [number, number, number] = [18, 18, 24];
+  const colorGray: [number, number, number] = [110, 110, 120];
+  const colorLightBg: [number, number, number] = [248, 248, 250];
+  const colorWhite: [number, number, number] = [255, 255, 255];
+  const colorAmber: [number, number, number] = [217, 119, 6];
+ 
+  // Header
+  doc.setFillColor(...colorDark);
+  doc.rect(0, 0, pageW, 24, "F");
+  doc.setFillColor(...colorAccent);
+  doc.rect(0, 24, pageW, 2, "F");
+ 
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...colorWhite);
+  doc.text("OMBORCHI.UZ", margin, 15);
+ 
+  doc.setFontSize(8);
+  doc.setTextColor(180, 180, 195);
+  doc.text("KIRIM NAKЛАДНОЙ", pageW / 2, 10, { align: "center" });
+ 
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...colorAccent);
+  doc.text("№ " + dnNumber, pageW / 2, 20, { align: "center" });
+ 
+  const dateStr = (() => {
+    try {
+      return new Date(date).toLocaleString("ru-RU", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+      });
+    } catch { return date; }
+  })();
+ 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(160, 160, 175);
+  doc.text(dateStr, pageW - margin, 15, { align: "right" });
+ 
+  // Info panel
+  const infoY = 30;
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(margin, infoY, pageW - margin * 2, 26, 2, 2, "F");
+ 
+  const drawInfo = (x: number, y: number, label: string, value: string) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...colorGray);
+    doc.text(label + ":", x, y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...colorDark);
+    const safe = (value || "—").length > 50
+      ? (value || "—").substring(0, 47) + "..."
+      : (value || "—");
+    doc.text(safe, x + 36, y);
+  };
+ 
+  const col1X = margin + 4;
+  const col2X = pageW / 2 + 4;
+ 
+  drawInfo(col1X, infoY + 7, "Hujjat №", dnNumber);
+  drawInfo(col1X, infoY + 14, "Ombor", warehouse || "—");
+  drawInfo(col1X, infoY + 21, "Mas'ul shaxs", responsible || "—");
+  drawInfo(col2X, infoY + 7, "Yetkazuvchi", supplier);
+  drawInfo(col2X, infoY + 14, "Sana", dateStr);
+ 
+  // Table
+  const tableStartY = infoY + 30;
+ 
+  const tableHead = [[
+    { content: "№", styles: { halign: "center" as const } },
+    { content: "Mahsulot nomi", styles: { halign: "left" as const } },
+    { content: "SKU", styles: { halign: "center" as const } },
+    { content: "Miqdor", styles: { halign: "center" as const } },
+    { content: "Birlik", styles: { halign: "center" as const } },
+    { content: "Narx", styles: { halign: "right" as const } },
+    { content: "QQS %", styles: { halign: "center" as const } },
+    { content: "QQS summa", styles: { halign: "right" as const } },
+    { content: "Summa (QQSsiz)", styles: { halign: "right" as const } },
+    { content: "Jami summa", styles: { halign: "right" as const } },
+  ]];
+ 
+  const tableBody = items.map((item, i) => {
+    const gross = item.quantity * item.price;
+    const net = gross - item.vatAmount;
+    return [
+      { content: String(i + 1), styles: { halign: "center" as const } },
+      { content: item.name || "—" },
+      { content: item.sku || "—", styles: { halign: "center" as const } },
+      { content: Number(item.quantity || 0).toLocaleString("ru-RU"), styles: { halign: "center" as const } },
+      { content: item.unit || "шт", styles: { halign: "center" as const } },
+      { content: fmtMoney(item.price || 0, currency), styles: { halign: "right" as const } },
+      { content: `${item.vatRate}%`, styles: { halign: "center" as const } },
+      { content: fmtMoney(item.vatAmount || 0, currency), styles: { halign: "right" as const } },
+      { content: fmtMoney(net, currency), styles: { halign: "right" as const } },
+      {
+        content: fmtMoney(gross, currency),
+        styles: { halign: "right" as const, fontStyle: "bold" as const, textColor: colorAccent },
+      },
+    ];
+  });
+ 
+  autoTable(doc, {
+    head: tableHead,
+    body: tableBody,
+    startY: tableStartY,
+    margin: { left: margin, right: margin },
+    styles: {
+      fontSize: 7.5,
+      cellPadding: { top: 3, bottom: 3, left: 2.5, right: 2.5 },
+      font: "helvetica",
+      textColor: colorDark,
+      lineColor: [225, 225, 232],
+      lineWidth: 0.25,
+      overflow: "ellipsize",
+    },
+    headStyles: {
+      fillColor: colorDark,
+      textColor: colorWhite,
+      fontStyle: "bold",
+      fontSize: 7,
+    },
+    alternateRowStyles: { fillColor: colorLightBg },
+    columnStyles: {
+      0: { cellWidth: 8 },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 16 },
+      5: { cellWidth: 34 },
+      6: { cellWidth: 16 },
+      7: { cellWidth: 28 },
+      8: { cellWidth: 30 },
+      9: { cellWidth: 34 },
+    },
+  });
+ 
+  // Totals
+  const finalY: number = (doc as any).lastAutoTable.finalY;
+  const summaryX = pageW - margin - 100;
+  const summaryW = 100;
+  const summaryY = finalY + 5;
+ 
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(summaryX, summaryY, summaryW, 32, 2, 2, "F");
+  doc.setFillColor(...colorDark);
+  doc.roundedRect(summaryX, summaryY, summaryW, 9, 2, 2, "F");
+  doc.rect(summaryX, summaryY + 5, summaryW, 4, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorWhite);
+  doc.text("JAMI HISOB", summaryX + summaryW / 2, summaryY + 6, { align: "center" });
+ 
+  const summaryRows: [string, string, [number, number, number]][] = [
+    ["QQS sofsiz summa:", fmtMoney(totals.net, currency), colorDark],
+    ["QQS miqdori:", fmtMoney(totals.vatTotal, currency), colorAmber],
+  ];
+  summaryRows.forEach(([label, val, col], i) => {
+    const ry = summaryY + 15 + i * 7;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...colorGray);
+    doc.text(label, summaryX + 4, ry);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...col);
+    doc.text(val, summaryX + summaryW - 4, ry, { align: "right" });
+  });
+ 
+  const netBoxY = summaryY + 34;
+  doc.setFillColor(...colorAccent);
+  doc.roundedRect(summaryX, netBoxY, summaryW, 13, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorWhite);
+  doc.text("UMUMIY SUMMA (QQS bilan):", summaryX + 4, netBoxY + 5);
+  doc.setFontSize(9);
+  doc.text(fmtMoney(totals.gross, currency), summaryX + summaryW - 4, netBoxY + 9, { align: "right" });
+ 
+  // Signatures
+  const signY = finalY + 5;
+  const signW = 82;
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(margin, signY, signW, 30, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorGray);
+  doc.text("YETKAZDI / ОТГРУЗИЛ", margin + 4, signY + 6);
+  doc.setDrawColor(...colorGray);
+  doc.setLineWidth(0.3);
+  doc.line(margin + 4, signY + 20, margin + signW - 4, signY + 20);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text(supplier || "________________", margin + 4, signY + 26);
+ 
+  const sign2X = margin + signW + 6;
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(sign2X, signY, signW, 30, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorGray);
+  doc.text("QABUL QILDI / ПОЛУЧИЛ", sign2X + 4, signY + 6);
+  doc.setDrawColor(...colorGray);
+  doc.line(sign2X + 4, signY + 20, sign2X + signW - 4, signY + 20);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text(responsible || "________________", sign2X + 4, signY + 26);
+ 
+  // Footer
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  for (let pg = 1; pg <= pageCount; pg++) {
+    doc.setPage(pg);
+    const footerY = doc.internal.pageSize.getHeight() - 5;
+    doc.setFillColor(...colorDark);
+    doc.rect(0, footerY - 4, pageW, 10, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(130, 130, 145);
+    doc.text(
+      `OMBORCHI.UZ · Kirim nakładnoyi · ${dnNumber} · ${dateStr}`,
+      margin, footerY + 1
+    );
+    doc.text(`Sahifa ${pg} / ${pageCount}`, pageW - margin, footerY + 1, { align: "right" });
+  }
+ 
+  doc.save(`kirim-${dnNumber}-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+ 
+// ─── helpers ────────────────────────────────────────────────────────────────
+ 
 const generateId = () =>
   Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
  
-async function getNextDnNumber(db: any): Promise<string> {
+async function getNextDnNumber(db: ReturnType<typeof getFirestore>): Promise<string> {
   const counterRef = doc(db, "counters", "stockIn");
   try {
     const next = await runTransaction(db, async (tx) => {
@@ -67,24 +323,25 @@ interface LineItem {
   id: string;
   productId: string;
   searchQuery: string;
-  // iiko-style quantity
-  containerQty: number;   // В таре (qadoqdagi)
-  unitQty: number;        // В ед. (birlikda)
-  actualQty: number;      // Фактич. (faktik)
-  containerSize: number;  // 1 qadoq = N birlik
-  price: number;          // narx (per unit)
-  vatRate: number;        // QQS %
-  // read-only computed
+  containerQty: number;
+  unitQty: number;
+  actualQty: number;
+  containerSize: number;
+  price: number;
+  vatRate: number;
   stockBefore: number;
   tab: ProductTab;
 }
  
-// ─── component ─────────────────────────────────────────────────────────────
+// ─── component ──────────────────────────────────────────────────────────────
+ 
 export default function StockInPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const db = useFirestore();
   const { user, role, assignedWarehouseId } = useUser();
+ 
+  // Get db once, stably
+  const db = useMemo(() => getFirestore(), []);
  
   // form state
   const [loading, setLoading] = useState(false);
@@ -95,47 +352,70 @@ export default function StockInPage() {
   const [movementDateStr, setMovementDateStr] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [incomingDocNo, setIncomingDocNo] = useState(""); // Kiruvchi hujjat №
-  const [invoiceNo, setInvoiceNo] = useState("");         // Hisob-faktura
+  const [incomingDocNo, setIncomingDocNo] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [comment, setComment] = useState("");
   const [concept, setConcept] = useState("");
   const [activeTab, setActiveTab] = useState<ProductTab>("all");
  
   // items
-  const [items, setItems] = useState<LineItem[]>([
-    {
-      id: generateId(), productId: "", searchQuery: "",
-      containerQty: 1, unitQty: 1, actualQty: 1,
-      containerSize: 1, price: 0, vatRate: 0,
-      stockBefore: 0, tab: "goods",
-    },
-  ]);
+  const [items, setItems] = useState<LineItem[]>([{
+    id: generateId(), productId: "", searchQuery: "",
+    containerQty: 1, unitQty: 1, actualQty: 1,
+    containerSize: 1, price: 0, vatRate: 0,
+    stockBefore: 0, tab: "goods",
+  }]);
  
   // success dialog
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [processedInvoice, setProcessedInvoice] = useState<any>(null);
  
+  // Firestore data — manual onSnapshot to avoid hook re-subscription issues
+  const [products, setProducts] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+ 
   const isAdmin = role === "Super Admin" || role === "Admin";
  
-  // ── firebase queries ──────────────────────────────────────────────────
-  const productsQuery = useMemoFirebase(
-    () => (db ? collection(db, "products") : null), [db]
-  );
-  const { data: products } = useCollection(productsQuery);
+  // ── Stable Firestore subscriptions ────────────────────────────────────
+  useEffect(() => {
+    if (!db) return;
  
-  const warehousesQuery = useMemoFirebase(
-    () => (db ? collection(db, "warehouses") : null), [db]
-  );
-  const { data: warehouses } = useCollection(warehousesQuery);
+    const unsubs: (() => void)[] = [];
  
-  // inventory snapshot for stockBefore
-  const inventoryQuery = useMemoFirebase(
-    () => (db ? collection(db, "inventory") : null), [db]
-  );
-  const { data: inventory } = useCollection(inventoryQuery);
+    const snap = <T extends { id: string }>(
+      col: string,
+      setter: React.Dispatch<React.SetStateAction<T[]>>
+    ) => {
+      const q = collection(db, col);
+      const unsub = onSnapshot(
+        q,
+        (snapshot: QuerySnapshot) => {
+          setter(
+            snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T))
+          );
+        },
+        (err) => {
+          // Silently ignore channel-closed errors (they self-recover)
+          if (err.code !== "unavailable") {
+            console.error(`[${col}] snapshot error:`, err.code);
+          }
+        }
+      );
+      unsubs.push(unsub);
+    };
  
-  // ── init ─────────────────────────────────────────────────────────────
+    snap("products", setProducts);
+    snap("warehouses", setWarehouses);
+    snap("inventory", setInventory);
+ 
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }, [db]);
+ 
+  // ── init DN number ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!db) return;
     setDnLoading(true);
@@ -148,10 +428,10 @@ export default function StockInPage() {
     if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
   }, [isAdmin, assignedWarehouseId]);
  
-  // update stockBefore when warehouse/productId changes
+  // stockBefore helper
   const getStock = useCallback(
     (productId: string) => {
-      if (!inventory || !warehouseId) return 0;
+      if (!inventory.length || !warehouseId) return 0;
       const inv = inventory.find(
         (i) => i.warehouseId === warehouseId && i.productId === productId
       );
@@ -160,7 +440,7 @@ export default function StockInPage() {
     [inventory, warehouseId]
   );
  
-  // ── item helpers ──────────────────────────────────────────────────────
+  // ── item helpers ───────────────────────────────────────────────────────
   const addItem = () =>
     setItems((prev) => [
       ...prev,
@@ -183,20 +463,20 @@ export default function StockInPage() {
         const upd: any = { ...item, [field]: value };
  
         if (field === "productId" && value) {
-          const p = products?.find((pr) => pr.id === value);
+          const p = products.find((pr) => pr.id === value);
           if (p) {
             upd.price = p.purchasePrice || p.salePrice || 0;
             upd.vatRate = p.vatRate || 0;
             upd.containerSize = p.containerSize || 1;
             upd.stockBefore = getStock(value);
-            upd.tab = p.category === "dish" ? "dishes"
+            upd.tab =
+              p.category === "dish" ? "dishes"
               : p.category === "prep" ? "prep"
               : p.category === "service" ? "services"
               : "goods";
           }
         }
  
-        // sync qty fields
         if (field === "containerQty") {
           upd.unitQty = parseFloat(value) * upd.containerSize;
           upd.actualQty = upd.unitQty;
@@ -219,13 +499,13 @@ export default function StockInPage() {
     );
   };
  
-  // ── filtered items by tab ─────────────────────────────────────────────
+  // ── filtered items by tab ──────────────────────────────────────────────
   const visibleItems = useMemo(() => {
     if (activeTab === "all") return items;
     return items.filter((i) => i.tab === activeTab);
   }, [items, activeTab]);
  
-  // ── totals ────────────────────────────────────────────────────────────
+  // ── totals ─────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
     let gross = 0, vatTotal = 0;
     items.forEach((item) => {
@@ -238,7 +518,23 @@ export default function StockInPage() {
     return { gross, vatTotal, net: gross - vatTotal };
   }, [items]);
  
-  // ── process ───────────────────────────────────────────────────────────
+  // ── reset form helper ──────────────────────────────────────────────────
+  const resetForm = async () => {
+    setItems([{
+      id: generateId(), productId: "", searchQuery: "",
+      containerQty: 1, unitQty: 1, actualQty: 1,
+      containerSize: 1, price: 0, vatRate: 0,
+      stockBefore: 0, tab: "goods",
+    }]);
+    setSupplier(""); setIncomingDocNo(""); setInvoiceNo("");
+    setInvoiceDate(""); setComment(""); setConcept("");
+    setMovementDateStr(new Date().toISOString().split("T")[0]);
+    if (isAdmin) setWarehouseId("");
+    const next = await getNextDnNumber(db);
+    setDnNumber(next);
+  };
+ 
+  // ── process ────────────────────────────────────────────────────────────
   const handleProcess = async (closeAfter = false) => {
     if (!dnNumber || !supplier || !warehouseId) {
       toast({
@@ -264,7 +560,7 @@ export default function StockInPage() {
         : new Date().toISOString();
  
       for (const item of items) {
-        const product = products?.find((p) => p.id === item.productId);
+        const product = products.find((p) => p.id === item.productId);
         const qty = item.actualQty || 0;
         const unitLabel = product?.unit
           ? t.units[product.unit as keyof typeof t.units] || product.unit
@@ -287,7 +583,7 @@ export default function StockInPage() {
           productName: product?.name || "Noma'lum",
           warehouseId,
           warehouseName:
-            warehouses?.find((w) => w.id === warehouseId)?.name || "Noma'lum",
+            warehouses.find((w) => w.id === warehouseId)?.name || "Noma'lum",
           quantityChange: qty,
           movementType: "StockIn",
           movementDate: movDate,
@@ -329,7 +625,7 @@ export default function StockInPage() {
  
       const savedInvoice = {
         dnNumber, supplier, incomingDocNo, invoiceNo,
-        warehouse: warehouses?.find((w) => w.id === warehouseId)?.name,
+        warehouse: warehouses.find((w) => w.id === warehouseId)?.name,
         date: new Date(movDate).toLocaleString(),
         items: invoiceItems, responsible: userName,
         totals,
@@ -337,26 +633,11 @@ export default function StockInPage() {
       setProcessedInvoice(savedInvoice);
       toast({
         title: "Muvaffaqiyatli saqlandi!",
-        description: `${dnNumber} — kirim nakладной rasmiylashtirildi.`,
+        description: `${dnNumber} — kirim nakładnoyi rasmiylashtirildi.`,
       });
  
-      // reset form
-      setItems([{
-        id: generateId(), productId: "", searchQuery: "",
-        containerQty: 1, unitQty: 1, actualQty: 1,
-        containerSize: 1, price: 0, vatRate: 0,
-        stockBefore: 0, tab: "goods",
-      }]);
-      setSupplier(""); setIncomingDocNo(""); setInvoiceNo("");
-      setInvoiceDate(""); setComment(""); setConcept("");
-      setMovementDateStr(new Date().toISOString().split("T")[0]);
-      if (isAdmin) setWarehouseId("");
- 
-      const next = await getNextDnNumber(db);
-      setDnNumber(next);
- 
-      if (closeAfter) setIsSuccessOpen(false);
-      else setIsSuccessOpen(true);
+      await resetForm();
+      if (!closeAfter) setIsSuccessOpen(true);
     } catch (err: any) {
       toast({
         variant: "destructive", title: "Xatolik",
@@ -373,44 +654,34 @@ export default function StockInPage() {
   const handleDownloadPDF = async () => {
     if (!processedInvoice) return;
     const currencyStr = t.settings.currency.split(" ")[0];
-    await generateInvoicePDF({
-      title: t.nav.stockIn, type: "in",
-      docNumber: processedInvoice.dnNumber,
+    await generateStockInPDF({
+      dnNumber: processedInvoice.dnNumber,
+      supplier: processedInvoice.supplier,
+      warehouse: processedInvoice.warehouse || "—",
       date: processedInvoice.date,
-      partyName: processedInvoice.supplier,
-      partyTypeLabel: t.pdf.supplier,
-      warehouseName: processedInvoice.warehouse,
-      responsibleName: processedInvoice.responsible,
+      responsible: processedInvoice.responsible,
       items: processedInvoice.items,
+      totals: processedInvoice.totals,
       currency: currencyStr,
-      labels: {
-        number: t.stockIn.dnNumber, date: t.common.date,
-        warehouse: t.common.warehouse,
-        product: t.products.productInfo,
-        qty: t.common.quantity, unit: t.units.label,
-        price: t.common.price, total: t.common.summary,
-        grandTotal: t.expenses.total,
-        shippedBy: t.pdf.shippedBy, receivedBy: t.pdf.receivedBy,
-      },
     });
   };
  
-  // ── tabs ──────────────────────────────────────────────────────────────
+  // ── tabs ───────────────────────────────────────────────────────────────
   const TABS: { key: ProductTab; label: string }[] = [
-    { key: "all",      label: "Barcha" },
-    { key: "goods",    label: "Tovarlar" },
-    { key: "dishes",   label: "Taomlar" },
-    { key: "prep",     label: "Yarim tayyor" },
+    { key: "all", label: "Barcha" },
+    { key: "goods", label: "Tovarlar" },
+    { key: "dishes", label: "Taomlar" },
+    { key: "prep", label: "Yarim tayyor" },
     { key: "services", label: "Xizmatlar" },
   ];
  
-  // ── render ────────────────────────────────────────────────────────────
+  // ── render ─────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
  
       <main className="flex-1 overflow-y-auto">
-        {/* ── page title bar ── */}
+        {/* Page title bar */}
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b border-border/30 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <FileInput className="w-5 h-5 text-primary" />
@@ -427,11 +698,9 @@ export default function StockInPage() {
             </h1>
           </div>
  
-          {/* action buttons — iiko style */}
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
-              size="sm"
+              variant="outline" size="sm"
               className="h-9 rounded-lg font-bold text-xs gap-2"
               onClick={() => handleProcess(false)}
               disabled={loading}
@@ -450,12 +719,7 @@ export default function StockInPage() {
               <Save className="w-3.5 h-3.5" />
               Сохранить
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 rounded-lg font-bold text-xs gap-2"
-              asChild
-            >
+            <Button variant="ghost" size="sm" className="h-9 rounded-lg font-bold text-xs gap-2" asChild>
               <Link href="/products">
                 <X className="w-3.5 h-3.5" />
                 Выйти
@@ -475,7 +739,7 @@ export default function StockInPage() {
  
         <div className="p-6 space-y-4">
  
-          {/* ── HEADER CARD — Основные свойства ── */}
+          {/* HEADER CARD */}
           <Card className="border border-border/40 rounded-2xl shadow-sm">
             <div className="px-5 py-2.5 border-b border-border/20 flex gap-4 text-sm">
               <button className="font-bold text-primary border-b-2 border-primary pb-1">
@@ -487,11 +751,9 @@ export default function StockInPage() {
             </div>
  
             <CardContent className="p-5">
-              {/* Row 1 */}
               <div className="grid grid-cols-2 gap-x-10 gap-y-4">
                 {/* left column */}
                 <div className="space-y-3">
-                  {/* DN raqam */}
                   <div className="flex items-center gap-3">
                     <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       {t.stockIn.dnNumber}:
@@ -509,7 +771,6 @@ export default function StockInPage() {
                     </div>
                   </div>
  
-                  {/* Sana */}
                   <div className="flex items-center gap-3">
                     <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       Дата и время получения:
@@ -525,7 +786,6 @@ export default function StockInPage() {
                     </div>
                   </div>
  
-                  {/* Konsepsiya */}
                   <div className="flex items-center gap-3">
                     <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       Концепция:
@@ -538,7 +798,6 @@ export default function StockInPage() {
                     />
                   </div>
  
-                  {/* Kiruvchi hujjat */}
                   <div className="flex items-center gap-3">
                     <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       Вход. документ №:
@@ -551,7 +810,6 @@ export default function StockInPage() {
                     />
                   </div>
  
-                  {/* Izoh */}
                   <div className="flex items-center gap-3">
                     <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       Комментарий:
@@ -567,7 +825,6 @@ export default function StockInPage() {
  
                 {/* right column */}
                 <div className="space-y-3">
-                  {/* Yetkazuvchi */}
                   <div className="flex items-center gap-3">
                     <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       {t.stockIn.supplier}:
@@ -580,7 +837,6 @@ export default function StockInPage() {
                     />
                   </div>
  
-                  {/* Ombor */}
                   <div className="flex items-center gap-3">
                     <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       {t.stockIn.targetWarehouse}:
@@ -597,14 +853,13 @@ export default function StockInPage() {
                         </div>
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        {warehouses?.map((w) => (
+                        {warehouses.map((w) => (
                           <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
  
-                  {/* Hisob-faktura № */}
                   <div className="flex items-center gap-3">
                     <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       Счёт-фактура:
@@ -617,7 +872,6 @@ export default function StockInPage() {
                     />
                   </div>
  
-                  {/* Hisob-faktura sanasi */}
                   <div className="flex items-center gap-3">
                     <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
                       От:
@@ -634,7 +888,7 @@ export default function StockInPage() {
             </CardContent>
           </Card>
  
-          {/* ── ITEMS TABLE ── */}
+          {/* ITEMS TABLE */}
           <Card className="border border-border/40 rounded-2xl shadow-sm overflow-hidden">
             {/* Tab bar */}
             <div className="flex items-center border-b border-border/20 bg-muted/10 px-4 gap-1">
@@ -657,19 +911,14 @@ export default function StockInPage() {
                         ? "bg-primary/10 text-primary"
                         : "bg-muted text-muted-foreground"
                     )}>
-                      {items.filter(
-                        (i) => i.tab === tab.key && i.productId
-                      ).length}
+                      {items.filter((i) => i.tab === tab.key && i.productId).length}
                     </span>
                   )}
                 </button>
               ))}
- 
-              {/* add button on right */}
               <div className="ml-auto py-2">
                 <Button
-                  size="sm"
-                  onClick={addItem}
+                  size="sm" onClick={addItem}
                   className="h-8 rounded-lg font-bold text-[10px] uppercase tracking-wide bg-primary text-white gap-1.5"
                 >
                   <Plus className="w-3 h-3" />
@@ -686,7 +935,6 @@ export default function StockInPage() {
                     <th className="px-3 py-3 w-10 text-center">№</th>
                     <th className="px-3 py-3 w-20 text-center">Kod</th>
                     <th className="px-3 py-3 min-w-[220px]">Mahsulot nomi</th>
-                    {/* iiko: 3 quantity columns */}
                     <th className="px-2 py-3 w-24 text-right">Qadoqda</th>
                     <th className="px-2 py-3 w-24 text-right">Birlikda</th>
                     <th className="px-2 py-3 w-24 text-right bg-amber-50/50 dark:bg-amber-900/10">Faktik</th>
@@ -704,7 +952,7 @@ export default function StockInPage() {
                 <tbody className="divide-y divide-border/10">
                   <AnimatePresence mode="popLayout">
                     {visibleItems.map((item, index) => {
-                      const sel = products?.find((p) => p.id === item.productId);
+                      const sel = products.find((p) => p.id === item.productId);
                       const qty = item.actualQty || 0;
                       const rowGross = qty * (item.price || 0);
                       const rowVat = (rowGross * item.vatRate) / 100;
@@ -726,14 +974,12 @@ export default function StockInPage() {
                             {index + 1}
                           </td>
  
-                          {/* SKU */}
                           <td className="px-3 py-2 text-center">
                             <span className="text-[10px] font-mono text-muted-foreground">
                               {sel?.sku || "—"}
                             </span>
                           </td>
  
-                          {/* Product select with search */}
                           <td className="px-3 py-2">
                             <Select
                               onValueChange={(v) => updateItem(item.id, "productId", v)}
@@ -750,15 +996,13 @@ export default function StockInPage() {
                                       placeholder="Qidirish..."
                                       className="h-8 pl-8 text-xs rounded-lg"
                                       value={item.searchQuery}
-                                      onChange={(e) =>
-                                        updateItem(item.id, "searchQuery", e.target.value)
-                                      }
+                                      onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
                                       onClick={(e) => e.stopPropagation()}
                                     />
                                   </div>
                                 </div>
                                 {products
-                                  ?.filter(
+                                  .filter(
                                     (p) =>
                                       p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) ||
                                       (p.sku && p.sku.toLowerCase().includes(item.searchQuery.toLowerCase()))
@@ -777,28 +1021,22 @@ export default function StockInPage() {
                             </Select>
                           </td>
  
-                          {/* Qadoqda (В таре) */}
                           <td className="px-2 py-2">
                             <Input
                               type="number" min={0}
                               className="h-9 rounded-lg text-right text-xs font-black bg-background/50 border-border/40 w-full"
                               value={item.containerQty}
-                              onChange={(e) =>
-                                updateItem(item.id, "containerQty", parseFloat(e.target.value) || 0)
-                              }
+                              onChange={(e) => updateItem(item.id, "containerQty", parseFloat(e.target.value) || 0)}
                             />
                           </td>
  
-                          {/* Birlikda (В ед.) */}
                           <td className="px-2 py-2">
                             <div className="space-y-0.5">
                               <Input
                                 type="number" min={0}
                                 className="h-9 rounded-lg text-right text-xs font-black bg-background/50 border-border/40 w-full"
                                 value={item.unitQty}
-                                onChange={(e) =>
-                                  updateItem(item.id, "unitQty", parseFloat(e.target.value) || 0)
-                                }
+                                onChange={(e) => updateItem(item.id, "unitQty", parseFloat(e.target.value) || 0)}
                               />
                               {unitLabel && (
                                 <p className="text-[9px] text-center text-primary/60 font-bold uppercase">
@@ -808,42 +1046,32 @@ export default function StockInPage() {
                             </div>
                           </td>
  
-                          {/* Faktik (Фактич.) — highlighted */}
                           <td className="px-2 py-2 bg-amber-50/30 dark:bg-amber-900/5">
                             <Input
                               type="number" min={0}
                               className="h-9 rounded-lg text-right text-xs font-black bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40 w-full"
                               value={item.actualQty}
-                              onChange={(e) =>
-                                updateItem(item.id, "actualQty", parseFloat(e.target.value) || 0)
-                              }
+                              onChange={(e) => updateItem(item.id, "actualQty", parseFloat(e.target.value) || 0)}
                             />
                           </td>
  
-                          {/* Narx (Price) */}
                           <td className="px-2 py-2">
                             <Input
                               type="number" min={0}
                               className="h-9 rounded-lg text-right text-xs font-black bg-background/50 border-border/40 w-full"
                               value={item.price}
-                              onChange={(e) =>
-                                updateItem(item.id, "price", parseFloat(e.target.value) || 0)
-                              }
+                              onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
                             />
                           </td>
  
-                          {/* Summa */}
                           <td className="px-2 py-2 text-right font-black text-sm text-primary">
                             {fmt(rowGross)}
                           </td>
  
-                          {/* QQS % */}
                           <td className="px-2 py-2">
                             <Select
                               value={String(item.vatRate)}
-                              onValueChange={(v) =>
-                                updateItem(item.id, "vatRate", parseFloat(v))
-                              }
+                              onValueChange={(v) => updateItem(item.id, "vatRate", parseFloat(v))}
                             >
                               <SelectTrigger className="h-9 rounded-lg text-xs font-bold bg-background/50 border-border/40 w-full">
                                 <SelectValue />
@@ -858,22 +1086,18 @@ export default function StockInPage() {
                             </Select>
                           </td>
  
-                          {/* QQS summa */}
                           <td className="px-2 py-2 text-right text-xs font-semibold text-muted-foreground">
                             {fmt(rowVat)}
                           </td>
  
-                          {/* Net (without VAT) */}
                           <td className="px-2 py-2 text-right text-xs font-semibold text-muted-foreground">
                             {fmt(rowNet)}
                           </td>
  
-                          {/* Stock before */}
                           <td className="px-2 py-2 text-right text-xs text-muted-foreground">
                             {fmt(item.stockBefore)}
                           </td>
  
-                          {/* Stock after */}
                           <td className={cn(
                             "px-2 py-2 text-right text-xs font-bold",
                             stockAfter >= 0 ? "text-emerald-600" : "text-rose-500"
@@ -881,7 +1105,6 @@ export default function StockInPage() {
                             {fmt(stockAfter)}
                           </td>
  
-                          {/* Delete */}
                           <td className="px-3 py-2">
                             <Button
                               variant="ghost" size="icon"
@@ -896,7 +1119,6 @@ export default function StockInPage() {
                     })}
                   </AnimatePresence>
  
-                  {/* empty row hint */}
                   {visibleItems.length === 0 && (
                     <tr>
                       <td colSpan={14} className="py-10 text-center text-muted-foreground text-sm">
@@ -908,21 +1130,15 @@ export default function StockInPage() {
               </table>
             </div>
  
-            {/* ── Footer: totals ── */}
+            {/* Footer totals */}
             <div className="border-t border-border/20 bg-muted/10 px-6 py-4 flex items-center justify-between">
-              {/* left: item counts */}
               <div className="flex items-center gap-8 text-sm">
                 <div>
-                  <span className="text-muted-foreground text-xs font-semibold mr-2">
-                    Позиций:
-                  </span>
-                  <span className="font-black">
-                    {items.filter((i) => i.productId).length}
-                  </span>
+                  <span className="text-muted-foreground text-xs font-semibold mr-2">Позиций:</span>
+                  <span className="font-black">{items.filter((i) => i.productId).length}</span>
                 </div>
               </div>
  
-              {/* right: financial summary — iiko style */}
               <div className="flex items-center gap-8 text-sm font-bold">
                 <div className="text-right">
                   <p className="text-[10px] uppercase text-muted-foreground font-semibold mb-0.5">
@@ -957,7 +1173,7 @@ export default function StockInPage() {
           </Card>
         </div>
  
-        {/* ── Success Dialog ── */}
+        {/* Success Dialog */}
         <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/50 backdrop-blur-2xl p-8 shadow-2xl text-center">
             <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-4">
@@ -975,12 +1191,27 @@ export default function StockInPage() {
               </p>
               {processedInvoice && (
                 <div className="mt-3 text-left bg-muted/20 rounded-xl p-4 space-y-1 text-xs">
-                  <p><span className="text-muted-foreground w-28 inline-block">Yetkazuvchi:</span> <strong>{processedInvoice.supplier}</strong></p>
-                  <p><span className="text-muted-foreground w-28 inline-block">Ombor:</span> <strong>{processedInvoice.warehouse}</strong></p>
-                  <p><span className="text-muted-foreground w-28 inline-block">Sana:</span> <strong>{processedInvoice.date}</strong></p>
-                  <p><span className="text-muted-foreground w-28 inline-block">Jami summa:</span> <strong className="text-primary">{fmt(processedInvoice.totals.gross)}</strong></p>
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Yetkazuvchi:</span>
+                    <strong>{processedInvoice.supplier}</strong>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Ombor:</span>
+                    <strong>{processedInvoice.warehouse}</strong>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Sana:</span>
+                    <strong>{processedInvoice.date}</strong>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Jami summa:</span>
+                    <strong className="text-primary">{fmt(processedInvoice.totals.gross)}</strong>
+                  </p>
                   {processedInvoice.totals.vatTotal > 0 && (
-                    <p><span className="text-muted-foreground w-28 inline-block">QQS:</span> <strong>{fmt(processedInvoice.totals.vatTotal)}</strong></p>
+                    <p>
+                      <span className="text-muted-foreground w-28 inline-block">QQS:</span>
+                      <strong>{fmt(processedInvoice.totals.vatTotal)}</strong>
+                    </p>
                   )}
                 </div>
               )}
@@ -1007,4 +1238,3 @@ export default function StockInPage() {
     </div>
   );
 }
- 
