@@ -1,5 +1,5 @@
 "use client";
-
+ 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   ChevronUp,
   ChevronDown,
+  FileDown,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -45,7 +46,8 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
+import * as XLSX from "xlsx";
+ 
 // iiko warehouse types
 const WAREHOUSE_TYPES = [
   "Производственный",
@@ -55,32 +57,33 @@ const WAREHOUSE_TYPES = [
   "Промежуточный",
   "Другое",
 ];
-
+ 
 type SortField = "name" | "type" | "managerName" | "address" | "totalStock";
 type SortDir = "asc" | "desc";
-
+ 
 export default function WarehousesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, isUserLoading: authLoading } = useUser();
-
+ 
   const isAdmin = role === "Super Admin" || role === "Admin";
-
+ 
   // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
   const [viewStockWarehouse, setViewStockWarehouse] = useState<any>(null);
   const [stockSearch, setStockSearch] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
+ 
   // Table controls
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
+ 
   const [formData, setFormData] = useState({
     name: "",
     type: "Производственный",
@@ -89,17 +92,17 @@ export default function WarehousesPage() {
     managerName: "",
     comment: "",
   });
-
+ 
   // Firebase queries
   const warehousesQuery = useMemoFirebase(() => (db && user ? collection(db, "warehouses") : null), [db, user]);
   const { data: warehouses, isLoading } = useCollection(warehousesQuery);
-
+ 
   const inventoryQuery = useMemoFirebase(() => (db && user ? collection(db, "inventory") : null), [db, user]);
   const { data: inventory } = useCollection(inventoryQuery);
-
+ 
   const productsQuery = useMemoFirebase(() => (db && user ? collection(db, "products") : null), [db, user]);
   const { data: products } = useCollection(productsQuery);
-
+ 
   // Stats per warehouse
   const warehouseStats = useMemo(() => {
     if (!warehouses || !inventory) return {} as Record<string, { totalStock: number; productCount: number; totalValue: number }>;
@@ -118,7 +121,7 @@ export default function WarehousesPage() {
     });
     return stats;
   }, [warehouses, inventory, products]);
-
+ 
   // Filtered + sorted warehouses
   const displayedWarehouses = useMemo(() => {
     if (!warehouses) return [];
@@ -140,7 +143,7 @@ export default function WarehousesPage() {
     });
     return list;
   }, [warehouses, search, sortField, sortDir, warehouseStats]);
-
+ 
   // Stock dialog items
   const filteredWarehouseStock = useMemo(() => {
     if (!viewStockWarehouse || !inventory || !products) return [];
@@ -167,20 +170,206 @@ export default function WarehousesPage() {
         return a.productName.localeCompare(b.productName);
       });
   }, [viewStockWarehouse, inventory, products, stockSearch]);
-
+ 
+  // ── EXCEL EXPORT ──
+  const handleExportExcel = () => {
+    if (!warehouses || !inventory || !products) return;
+    setIsExporting(true);
+ 
+    try {
+      const wb = XLSX.utils.book_new();
+      const today = new Date().toLocaleDateString("ru-RU");
+      const todayDash = today.replace(/\./g, "-");
+ 
+      // ── SHEET 1: Umumiy hisobot ──
+      const summaryData: any[][] = [
+        ["OMBORXONA HISOBOTI — OYLIK ATCHOT"],
+        [`Sana: ${today}   |   omborchi.uz   |   Barcha omborlar bo'yicha`],
+        [],
+        ["№", "Ombor nomi", "Turi", "Menejer", "Manzil", "Telefon", "Jami qoldiq", "SKU turlari", "Balans qiymati (so'm)", "Holat"],
+      ];
+ 
+      displayedWarehouses.forEach((w, idx) => {
+        const s = warehouseStats[w.id] || { totalStock: 0, productCount: 0, totalValue: 0 };
+        const status = s.totalStock === 0 ? "Bo'sh" : s.totalStock < 10 ? "Kam" : "Yetarli";
+        summaryData.push([
+          idx + 1,
+          w.name || "",
+          w.type || "",
+          w.managerName || "",
+          w.address || "",
+          w.phoneNumber || "",
+          s.totalStock,
+          s.productCount,
+          s.totalValue,
+          status,
+        ]);
+      });
+ 
+      summaryData.push([]);
+      summaryData.push([
+        "",
+        `JAMI: ${displayedWarehouses.length} ta ombor`,
+        "", "", "", "",
+        Object.values(warehouseStats).reduce((a, s) => a + s.totalStock, 0),
+        Object.values(warehouseStats).reduce((a, s) => a + s.productCount, 0),
+        Object.values(warehouseStats).reduce((a, s) => a + s.totalValue, 0),
+        "",
+      ]);
+ 
+      const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+      ws1["!cols"] = [
+        { wch: 4 }, { wch: 28 }, { wch: 18 }, { wch: 20 }, { wch: 22 },
+        { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 12 },
+      ];
+      ws1["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws1, "Umumiy hisobot");
+ 
+      // ── SHEET 2+: Har bir ombor uchun alohida varaq ──
+      warehouses.forEach((w) => {
+        const items = inventory
+          .filter((inv) => inv.warehouseId === w.id)
+          .map((inv) => {
+            const product = products.find((p) => p.id === inv.productId);
+            return {
+              sku: product?.sku || "---",
+              name: product?.name || "Noma'lum",
+              unit: product?.unit || "dona",
+              stock: inv.stock || 0,
+              price: product?.salePrice || 0,
+              total: (inv.stock || 0) * (product?.salePrice || 0),
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+ 
+        if (items.length === 0) return;
+ 
+        const sheetData: any[][] = [
+          [`${w.name} — Tovar qoldiqlari`],
+          [`Sana: ${today}  |  Menejer: ${w.managerName || "—"}  |  Manzil: ${w.address || "—"}`],
+          [],
+          ["№", "SKU", "Mahsulot nomi", "O'lchov", "Qoldiq", "Narxi (so'm)", "Umumiy qiymat (so'm)", "Holat"],
+        ];
+ 
+        items.forEach((item, idx) => {
+          const status =
+            item.stock <= 0 ? "Tugagan" :
+            item.stock <= 5 ? "Kritik" :
+            item.stock <= 10 ? "Kam" : "Yetarli";
+          sheetData.push([
+            idx + 1,
+            item.sku,
+            item.name,
+            item.unit,
+            item.stock,
+            item.price,
+            item.total,
+            status,
+          ]);
+        });
+ 
+        sheetData.push([]);
+        sheetData.push([
+          "",
+          `JAMI: ${items.length} ta mahsulot`,
+          "", "",
+          items.reduce((a, i) => a + i.stock, 0),
+          "",
+          items.reduce((a, i) => a + i.total, 0),
+          "",
+        ]);
+ 
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+        ws["!cols"] = [
+          { wch: 4 }, { wch: 14 }, { wch: 36 }, { wch: 10 },
+          { wch: 10 }, { wch: 16 }, { wch: 22 }, { wch: 12 },
+        ];
+        ws["!merges"] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
+        ];
+ 
+        const safeName = (w.name || "Ombor")
+          .replace(/[\\\/\?\*\[\]:]/g, "")
+          .substring(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, safeName);
+      });
+ 
+      // ── OXIRGI SHEET: Kam va tugagan mahsulotlar ──
+      const alertData: any[][] = [
+        ["KAM QOLDIQLAR — ZUDLIK BILAN TO'LDIRISH KERAK"],
+        [`Sana: ${today}  |  Qoldiq <= 10 ta bo'lgan mahsulotlar`],
+        [],
+        ["№", "SKU", "Mahsulot nomi", "Ombor", "O'lchov", "Qoldiq", "Holat"],
+      ];
+ 
+      let alertIdx = 1;
+      warehouses.forEach((w) => {
+        inventory
+          .filter((inv) => inv.warehouseId === w.id && (inv.stock || 0) <= 10)
+          .forEach((inv) => {
+            const product = products.find((p) => p.id === inv.productId);
+            const stock = inv.stock || 0;
+            alertData.push([
+              alertIdx++,
+              product?.sku || "---",
+              product?.name || "Noma'lum",
+              w.name,
+              product?.unit || "dona",
+              stock,
+              stock <= 0 ? "Tugagan" : stock <= 5 ? "Kritik" : "Kam",
+            ]);
+          });
+      });
+ 
+      if (alertIdx > 1) {
+        alertData.push([]);
+        alertData.push([`Jami ${alertIdx - 1} ta mahsulot diqqat talab qiladi`]);
+      }
+ 
+      const ws3 = XLSX.utils.aoa_to_sheet(alertData);
+      ws3["!cols"] = [
+        { wch: 4 }, { wch: 14 }, { wch: 36 }, { wch: 22 },
+        { wch: 10 }, { wch: 10 }, { wch: 12 },
+      ];
+      ws3["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws3, "Kam qoldiqlar");
+ 
+      // ── Yuklab olish ──
+      const fileName = `omborxona_hisobot_${todayDash}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+ 
+      toast({
+        title: "Excel muvaffaqiyatli yuklandi",
+        description: `${fileName} — ${warehouses.length} ta ombor, ${inventory.length} ta pozitsiya`,
+      });
+    } catch (err) {
+      toast({ title: "Xatolik", description: "Excel yaratishda muammo yuz berdi." });
+      console.error(err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+ 
   // Handlers
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortField(field); setSortDir("asc"); }
   };
-
+ 
   const SortIcon = ({ field }: { field: SortField }) =>
     sortField === field ? (
       sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
     ) : (
       <ChevronUp className="w-3 h-3 opacity-20" />
     );
-
+ 
   const handleSave = () => {
     if (!db || !user || !formData.name) return;
     setIsSaving(true);
@@ -199,7 +388,7 @@ export default function WarehousesPage() {
       updatedAt: new Date().toISOString(),
     };
     if (!editingWarehouse) warehouseData.createdAt = new Date().toISOString();
-
+ 
     setDoc(warehouseRef, warehouseData, { merge: true })
       .then(() => {
         handleCloseDialog();
@@ -210,26 +399,26 @@ export default function WarehousesPage() {
       })
       .finally(() => setIsSaving(false));
   };
-
+ 
   const handleEditClick = (w: any) => {
     setEditingWarehouse(w);
     setFormData({ name: w.name || "", type: w.type || "Производственный", address: w.address || "", phoneNumber: w.phoneNumber || "", managerName: w.managerName || "", comment: w.comment || "" });
     setIsDialogOpen(true);
   };
-
+ 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingWarehouse(null);
     setFormData({ name: "", type: "Производственный", address: "", phoneNumber: "", managerName: "", comment: "" });
   };
-
+ 
   const handleDelete = (id: string) => {
     if (!db) return;
     deleteDocumentNonBlocking(doc(db, "warehouses", id));
     setDeleteConfirmId(null);
     toast({ title: "O'chirildi", description: "Ombor o'chirildi." });
   };
-
+ 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -237,15 +426,15 @@ export default function WarehousesPage() {
       return next;
     });
   };
-
+ 
   const toggleSelectAll = () => {
     if (selectedIds.size === displayedWarehouses.length) setSelectedIds(new Set());
     else setSelectedIds(new Set(displayedWarehouses.map((w) => w.id)));
   };
-
+ 
   const formatMoney = (val: number) =>
     val.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
+ 
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -253,13 +442,13 @@ export default function WarehousesPage() {
       </div>
     );
   }
-
+ 
   return (
     <div className="flex min-h-screen bg-background font-body">
       <OmniSidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
-
-        {/* ── iiko-style header ── */}
+ 
+        {/* ── Header ── */}
         <div className="px-6 pt-5 pb-4 border-b border-border/20 bg-card/30 flex items-center justify-between gap-4 flex-wrap">
           <h1 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
             <WarehouseIcon className="w-5 h-5 text-primary" />
@@ -271,9 +460,32 @@ export default function WarehousesPage() {
               <span className="font-bold">Jami omborlar: <span className="text-foreground font-black">{warehouses?.length || 0}</span></span>
               <span className="font-bold">Jami SKU: <span className="text-foreground font-black">{Object.values(warehouseStats).reduce((a, s) => a + s.productCount, 0)}</span></span>
             </div>
-            <Button variant="outline" size="sm" className="h-8 px-3 text-xs rounded-lg gap-1.5" onClick={() => window.location.reload()}>
+ 
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs rounded-lg gap-1.5 border-border/40"
+              onClick={() => window.location.reload()}
+            >
               <RefreshCw className="w-3.5 h-3.5" /> Yangilash
             </Button>
+ 
+            {/* ── Excel Export tugmasi ── */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs rounded-lg gap-1.5 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/5 hover:border-emerald-500/50"
+              onClick={handleExportExcel}
+              disabled={isExporting || !warehouses || !inventory || !products}
+            >
+              {isExporting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileDown className="w-3.5 h-3.5" />
+              )}
+              Excel
+            </Button>
+ 
             {isAdmin && (
               <Button
                 size="sm"
@@ -285,7 +497,7 @@ export default function WarehousesPage() {
             )}
           </div>
         </div>
-
+ 
         {/* ── Toolbar ── */}
         <div className="px-6 py-3 border-b border-border/10 flex items-center gap-3 bg-muted/5 flex-wrap">
           <div className="relative flex-1 max-w-xs">
@@ -300,14 +512,18 @@ export default function WarehousesPage() {
           {selectedIds.size > 0 && isAdmin && (
             <div className="flex items-center gap-2 ml-2">
               <span className="text-xs text-muted-foreground font-bold">{selectedIds.size} ta tanlandi</span>
-              <Button variant="outline" size="sm" className="h-8 px-3 text-xs rounded-lg text-rose-600 border-rose-600/20 hover:bg-rose-600/5 gap-1.5"
-                onClick={() => { selectedIds.forEach(id => handleDelete(id)); setSelectedIds(new Set()); }}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs rounded-lg text-rose-600 border-rose-600/20 hover:bg-rose-600/5 gap-1.5"
+                onClick={() => { selectedIds.forEach(id => handleDelete(id)); setSelectedIds(new Set()); }}
+              >
                 <Trash2 className="w-3.5 h-3.5" /> O'chirish
               </Button>
             </div>
           )}
         </div>
-
+ 
         {/* ── Table ── */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
@@ -357,7 +573,7 @@ export default function WarehousesPage() {
                     const isSelected = selectedIds.has(w.id);
                     const isLowStock = stats.totalStock < 10 && stats.totalStock > 0;
                     const isEmpty = stats.totalStock === 0;
-
+ 
                     return (
                       <motion.tr
                         key={w.id}
@@ -380,25 +596,21 @@ export default function WarehousesPage() {
                             />
                           </td>
                         )}
-                        {/* № */}
                         <td className="px-2 py-3 text-center text-xs font-bold text-muted-foreground">{idx + 1}</td>
-
-                        {/* Ombor nomi */}
+ 
                         <td className="px-3 py-3">
                           <span className="font-black text-foreground text-sm">{w.name}</span>
                           {w.comment && (
                             <p className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[180px]">{w.comment}</p>
                           )}
                         </td>
-
-                        {/* Turi */}
+ 
                         <td className="px-3 py-3">
                           <Badge variant="outline" className="text-[10px] font-black px-2 rounded-md border-primary/20 text-primary bg-primary/5">
                             {w.type || "Производственный"}
                           </Badge>
                         </td>
-
-                        {/* Menejer */}
+ 
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-black text-primary shrink-0">
@@ -409,21 +621,18 @@ export default function WarehousesPage() {
                             </span>
                           </div>
                         </td>
-
-                        {/* Manzil */}
+ 
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <MapPin className="w-3 h-3 shrink-0 opacity-40" />
                             <span className="truncate max-w-[140px]">{w.address || "—"}</span>
                           </div>
                         </td>
-
-                        {/* Telefon */}
+ 
                         <td className="px-3 py-3 text-xs text-muted-foreground font-mono">
                           {w.phoneNumber || "—"}
                         </td>
-
-                        {/* Jami qoldiq */}
+ 
                         <td className="px-3 py-3 text-center">
                           <span className={cn(
                             "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black",
@@ -435,22 +644,19 @@ export default function WarehousesPage() {
                             {stats.totalStock}
                           </span>
                         </td>
-
-                        {/* SKU */}
+ 
                         <td className="px-3 py-3 text-center">
                           <span className="text-xs font-black text-muted-foreground">
                             {stats.productCount} та
                           </span>
                         </td>
-
-                        {/* Balans */}
+ 
                         <td className="px-3 py-3 text-right">
                           <span className="text-xs font-black text-foreground font-mono">
                             {formatMoney(stats.totalValue)} so'm
                           </span>
                         </td>
-
-                        {/* Actions */}
+ 
                         <td className="px-3 py-3">
                           <div className="flex items-center justify-center gap-1">
                             <Button
@@ -488,8 +694,8 @@ export default function WarehousesPage() {
                   })}
                 </AnimatePresence>
               </tbody>
-
-              {/* Footer row — totals */}
+ 
+              {/* Footer totals */}
               {displayedWarehouses.length > 0 && (
                 <tfoot className="bg-muted/20 border-t-2 border-border/30">
                   <tr>
@@ -519,7 +725,7 @@ export default function WarehousesPage() {
               )}
             </table>
           )}
-
+ 
           {!isLoading && displayedWarehouses.length === 0 && (
             <div className="flex flex-col items-center justify-center py-32 text-muted-foreground/30">
               <WarehouseIcon className="w-16 h-16 mb-4" />
@@ -529,11 +735,10 @@ export default function WarehousesPage() {
             </div>
           )}
         </div>
-
+ 
         {/* ── Add/Edit Dialog ── */}
         <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-0 shadow-2xl overflow-hidden">
-            {/* Header */}
             <div className="px-8 py-6 border-b border-border/20 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                 <WarehouseIcon className="w-5 h-5" />
@@ -542,8 +747,7 @@ export default function WarehousesPage() {
                 {editingWarehouse ? "Omborni tahrirlash" : "Yangi ombor qo'shish"}
               </DialogTitle>
             </div>
-
-            {/* iiko-style form */}
+ 
             <div className="px-8 py-6 space-y-4">
               {[
                 { label: "Ombor nomi *", field: "name", placeholder: "Masalan: Asosiy ombor" },
@@ -562,7 +766,6 @@ export default function WarehousesPage() {
                   />
                 </div>
               ))}
-              {/* Type */}
               <div className="flex items-center gap-4">
                 <Label className="w-40 text-xs text-right text-muted-foreground shrink-0">Ombor turi:</Label>
                 <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
@@ -577,7 +780,7 @@ export default function WarehousesPage() {
                 </Select>
               </div>
             </div>
-
+ 
             <DialogFooter className="px-8 pb-6 gap-2">
               <Button variant="ghost" className="h-10 rounded-xl font-bold px-5" onClick={handleCloseDialog}>
                 <X className="w-3.5 h-3.5 mr-1.5" /> Bekor qilish
@@ -593,7 +796,7 @@ export default function WarehousesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
+ 
         {/* ── Delete Confirm Dialog ── */}
         <Dialog open={!!deleteConfirmId} onOpenChange={(o) => !o && setDeleteConfirmId(null)}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-sm p-8 shadow-2xl text-center">
@@ -617,12 +820,11 @@ export default function WarehousesPage() {
             </div>
           </DialogContent>
         </Dialog>
-
+ 
         {/* ── Stock View Dialog ── */}
         <Dialog open={!!viewStockWarehouse} onOpenChange={(open) => !open && setViewStockWarehouse(null)}>
           <DialogContent className="rounded-[2rem] border-white/5 bg-background/70 backdrop-blur-[40px] text-foreground max-w-4xl p-0 shadow-2xl overflow-hidden">
             <div className="flex flex-col h-[80vh]">
-              {/* Header */}
               <div className="px-8 py-6 border-b border-border/20 bg-primary/[0.02]">
                 <div className="flex items-center justify-between gap-4 mb-5">
                   <div>
@@ -658,8 +860,7 @@ export default function WarehousesPage() {
                   />
                 </div>
               </div>
-
-              {/* Table */}
+ 
               <div className="flex-1 overflow-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-muted/20 border-b border-border/20 sticky top-0 z-10">
@@ -681,7 +882,7 @@ export default function WarehousesPage() {
                         const isOut = item.stock <= 0;
                         const unitLabel = t.units[item.unit as keyof typeof t.units] || item.unit;
                         const totalVal = item.stock * item.price;
-
+ 
                         return (
                           <motion.tr
                             key={item.id}
@@ -741,7 +942,7 @@ export default function WarehousesPage() {
                     </tfoot>
                   )}
                 </table>
-
+ 
                 {filteredWarehouseStock.length === 0 && (
                   <div className="py-24 text-center text-muted-foreground/30 flex flex-col items-center">
                     <Package className="w-14 h-14 mb-3" />
@@ -751,8 +952,7 @@ export default function WarehousesPage() {
                   </div>
                 )}
               </div>
-
-              {/* Footer */}
+ 
               <div className="px-8 py-4 border-t border-border/20 bg-primary/[0.02] flex justify-end">
                 <Button
                   className="h-10 px-8 rounded-xl font-black text-xs uppercase tracking-widest bg-primary text-white border-none"
@@ -764,6 +964,7 @@ export default function WarehousesPage() {
             </div>
           </DialogContent>
         </Dialog>
+ 
       </main>
     </div>
   );
