@@ -14,8 +14,12 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLanguage } from "@/lib/i18n/context";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, getDoc, setDoc, runTransaction, updateDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { useUser } from "@/firebase";
+import {
+  getFirestore,
+  collection, doc, getDoc, setDoc, runTransaction,
+  onSnapshot, getDocs, query, where, orderBy, limit, QuerySnapshot,
+} from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,7 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
  
-// ─── PDF SERVICE (inline) ─────────────────────────────────────────────────────
+// ─── PDF SERVICE (inline) ────────────────────────────────────────────────────
  
 interface InvoiceItem {
   name: string;
@@ -40,47 +44,24 @@ interface InvoiceItem {
   costTotal?: number;
 }
  
-interface GenerateInvoicePDFParams {
-  title: string;
-  type: "in" | "out";
-  docNumber: string;
-  date: string;
-  partyName: string;
-  partyTypeLabel: string;
-  warehouseName?: string;
-  responsibleName?: string;
-  items: InvoiceItem[];
-  currency?: string;
-  labels?: {
-    number?: string;
-    date?: string;
-    warehouse?: string;
-    product?: string;
-    qty?: string;
-    unit?: string;
-    price?: string;
-    total?: string;
-    grandTotal?: string;
-    shippedBy?: string;
-    receivedBy?: string;
-  };
-  companyName?: string;
-  companyInn?: string;
-  companyAddress?: string;
-}
- 
 const fmtMoney = (val: number, currency = "сум") =>
   val.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
  
-async function generateInvoicePDF(params: GenerateInvoicePDFParams): Promise<void> {
+async function generateInvoicePDF(params: {
+  title: string; type: "in" | "out"; docNumber: string; date: string;
+  partyName: string; partyTypeLabel: string; warehouseName?: string;
+  responsibleName?: string; items: InvoiceItem[]; currency?: string;
+  labels?: Record<string, string>;
+  companyName?: string; companyInn?: string; companyAddress?: string;
+}): Promise<void> {
   const {
     title, type, docNumber, date, partyName, partyTypeLabel,
     warehouseName, responsibleName, items, currency = "сум", labels = {},
     companyName = "OMBORCHI.UZ", companyInn = "", companyAddress = "",
   } = params;
  
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageW = pdf.internal.pageSize.getWidth();
   const margin = 12;
  
   const colorAccent: [number, number, number] = type === "out" ? [220, 38, 38] : [22, 163, 74];
@@ -90,25 +71,24 @@ async function generateInvoicePDF(params: GenerateInvoicePDFParams): Promise<voi
   const colorWhite: [number, number, number] = [255, 255, 255];
   const colorAmber: [number, number, number] = [217, 119, 6];
  
-  // ── HEADER ──
-  doc.setFillColor(...colorDark);
-  doc.rect(0, 0, pageW, 24, "F");
-  doc.setFillColor(...colorAccent);
-  doc.rect(0, 24, pageW, 2, "F");
+  pdf.setFillColor(...colorDark);
+  pdf.rect(0, 0, pageW, 24, "F");
+  pdf.setFillColor(...colorAccent);
+  pdf.rect(0, 24, pageW, 2, "F");
  
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(...colorWhite);
-  doc.text(companyName, margin, 15);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(14);
+  pdf.setTextColor(...colorWhite);
+  pdf.text(companyName, margin, 15);
  
-  doc.setFontSize(8);
-  doc.setTextColor(180, 180, 195);
-  doc.text(title.toUpperCase(), pageW / 2, 10, { align: "center" });
+  pdf.setFontSize(8);
+  pdf.setTextColor(180, 180, 195);
+  pdf.text(title.toUpperCase(), pageW / 2, 10, { align: "center" });
  
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...colorAccent);
-  doc.text("№ " + docNumber, pageW / 2, 20, { align: "center" });
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(13);
+  pdf.setTextColor(...colorAccent);
+  pdf.text("№ " + docNumber, pageW / 2, 20, { align: "center" });
  
   const dateStr = (() => {
     try {
@@ -119,40 +99,36 @@ async function generateInvoicePDF(params: GenerateInvoicePDFParams): Promise<voi
     } catch { return date; }
   })();
  
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(160, 160, 175);
-  doc.text(dateStr, pageW - margin, 15, { align: "right" });
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(8);
+  pdf.setTextColor(160, 160, 175);
+  pdf.text(dateStr, pageW - margin, 15, { align: "right" });
  
-  // ── INFO PANEL ──
   const infoY = 30;
-  doc.setFillColor(...colorLightBg);
-  doc.roundedRect(margin, infoY, pageW - margin * 2, 26, 2, 2, "F");
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(margin, infoY, pageW - margin * 2, 26, 2, 2, "F");
  
   const drawInfo = (x: number, y: number, label: string, value: string) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...colorGray);
-    doc.text(label + ":", x, y);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(...colorDark);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...colorGray);
+    pdf.text(label + ":", x, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...colorDark);
     const safe = (value || "—").length > 50 ? (value || "—").substring(0, 47) + "..." : (value || "—");
-    doc.text(safe, x + 36, y);
+    pdf.text(safe, x + 36, y);
   };
  
   const col1X = margin + 4;
   const col2X = pageW / 2 + 4;
- 
   drawInfo(col1X, infoY + 7, labels.number || "Hujjat №", docNumber);
   drawInfo(col1X, infoY + 14, labels.warehouse || "Ombor", warehouseName || "—");
   drawInfo(col1X, infoY + 21, "Mas'ul shaxs", responsibleName || "—");
   drawInfo(col2X, infoY + 7, partyTypeLabel || "Tomon", partyName);
   drawInfo(col2X, infoY + 14, labels.date || "Sana", dateStr);
   if (companyInn) drawInfo(col2X, infoY + 21, "INN", companyInn);
-  else if (companyAddress) drawInfo(col2X, infoY + 21, "Manzil", companyAddress);
  
-  // ── JADVAL ──
   const tableStartY = infoY + 30;
  
   const tableHead = [[
@@ -184,145 +160,106 @@ async function generateInvoicePDF(params: GenerateInvoicePDFParams): Promise<voi
     },
   ]);
  
-  autoTable(doc, {
-    head: tableHead,
-    body: tableBody,
-    startY: tableStartY,
+  autoTable(pdf, {
+    head: tableHead, body: tableBody, startY: tableStartY,
     margin: { left: margin, right: margin },
     styles: {
       fontSize: 7.5,
       cellPadding: { top: 3, bottom: 3, left: 2.5, right: 2.5 },
-      font: "helvetica",
-      textColor: colorDark,
-      lineColor: [225, 225, 232],
-      lineWidth: 0.25,
-      overflow: "ellipsize",
+      font: "helvetica", textColor: colorDark,
+      lineColor: [225, 225, 232], lineWidth: 0.25, overflow: "ellipsize",
     },
-    headStyles: {
-      fillColor: colorDark,
-      textColor: colorWhite,
-      fontStyle: "bold",
-      fontSize: 7,
-    },
+    headStyles: { fillColor: colorDark, textColor: colorWhite, fontStyle: "bold", fontSize: 7 },
     alternateRowStyles: { fillColor: colorLightBg },
     columnStyles: {
-      0: { cellWidth: 8 },
-      1: { cellWidth: 64 },
-      2: { cellWidth: 22 },
-      3: { cellWidth: 18 },
-      4: { cellWidth: 16 },
-      5: { cellWidth: 34 },
-      6: { cellWidth: 20 },
-      7: { cellWidth: 18 },
-      8: { cellWidth: 30 },
-      9: { cellWidth: 38 },
+      0: { cellWidth: 8 }, 1: { cellWidth: 64 }, 2: { cellWidth: 22 },
+      3: { cellWidth: 18 }, 4: { cellWidth: 16 }, 5: { cellWidth: 34 },
+      6: { cellWidth: 20 }, 7: { cellWidth: 18 }, 8: { cellWidth: 30 }, 9: { cellWidth: 38 },
     },
   });
  
-  // ── JAMI ──
-  const finalY: number = (doc as any).lastAutoTable.finalY;
- 
+  const finalY: number = (pdf as any).lastAutoTable.finalY;
   const gross = items.reduce((s, it) => s + (it.quantity || 0) * (it.price || 0), 0);
-  const totalDiscount = items.reduce(
-    (s, it) => s + ((it.quantity || 0) * (it.price || 0) * (it.discount || 0)) / 100, 0
-  );
+  const totalDiscount = items.reduce((s, it) => s + ((it.quantity || 0) * (it.price || 0) * (it.discount || 0)) / 100, 0);
   const net = gross - totalDiscount;
   const totalVat = items.reduce((s, it) => s + (it.vatAmount || 0), 0);
-  const totalCost = items.reduce((s, it) => s + (it.costTotal || 0), 0);
  
   const summaryX = pageW - margin - 100;
   const summaryW = 100;
   const summaryY = finalY + 5;
  
-  doc.setFillColor(...colorLightBg);
-  doc.roundedRect(summaryX, summaryY, summaryW, 38, 2, 2, "F");
-  doc.setFillColor(...colorDark);
-  doc.roundedRect(summaryX, summaryY, summaryW, 9, 2, 2, "F");
-  doc.rect(summaryX, summaryY + 5, summaryW, 4, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...colorWhite);
-  doc.text((labels.grandTotal || "JAMI HISOB").toUpperCase(), summaryX + summaryW / 2, summaryY + 6, { align: "center" });
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(summaryX, summaryY, summaryW, 38, 2, 2, "F");
+  pdf.setFillColor(...colorDark);
+  pdf.roundedRect(summaryX, summaryY, summaryW, 9, 2, 2, "F");
+  pdf.rect(summaryX, summaryY + 5, summaryW, 4, "F");
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(7);
+  pdf.setTextColor(...colorWhite);
+  pdf.text((labels.grandTotal || "JAMI HISOB").toUpperCase(), summaryX + summaryW / 2, summaryY + 6, { align: "center" });
  
   const summaryRows: [string, string, [number, number, number]][] = [
     ["Umumiy summa:", fmtMoney(gross, currency), colorDark],
     ["Chegirma:", fmtMoney(totalDiscount, currency), colorAmber],
     ["НДС:", fmtMoney(totalVat, currency), colorAmber],
-    ["Tannarxi:", fmtMoney(totalCost, currency), colorGray],
   ];
   summaryRows.forEach(([label, val, col], i) => {
     const ry = summaryY + 15 + i * 6;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...colorGray);
-    doc.text(label, summaryX + 4, ry);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...col);
-    doc.text(val, summaryX + summaryW - 4, ry, { align: "right" });
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...colorGray);
+    pdf.text(label, summaryX + 4, ry);
+    pdf.setFont("helvetica", "bold"); pdf.setTextColor(...col);
+    pdf.text(val, summaryX + summaryW - 4, ry, { align: "right" });
   });
  
   const netBoxY = summaryY + 40;
-  doc.setFillColor(...colorAccent);
-  doc.roundedRect(summaryX, netBoxY, summaryW, 13, 2, 2, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...colorWhite);
-  doc.text("TO'LOV SUMMASI:", summaryX + 4, netBoxY + 5);
-  doc.setFontSize(9);
-  doc.text(fmtMoney(net, currency), summaryX + summaryW - 4, netBoxY + 9, { align: "right" });
+  pdf.setFillColor(...colorAccent);
+  pdf.roundedRect(summaryX, netBoxY, summaryW, 13, 2, 2, "F");
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(7); pdf.setTextColor(...colorWhite);
+  pdf.text("TO'LOV SUMMASI:", summaryX + 4, netBoxY + 5);
+  pdf.setFontSize(9);
+  pdf.text(fmtMoney(net, currency), summaryX + summaryW - 4, netBoxY + 9, { align: "right" });
  
-  // ── IMZO ──
   const signY = finalY + 5;
   const signW = 82;
  
-  doc.setFillColor(...colorLightBg);
-  doc.roundedRect(margin, signY, signW, 30, 2, 2, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...colorGray);
-  doc.text((labels.shippedBy || "OTPUSTIL / CHIQARGAN").toUpperCase(), margin + 4, signY + 6);
-  doc.setDrawColor(...colorGray);
-  doc.setLineWidth(0.3);
-  doc.line(margin + 4, signY + 20, margin + signW - 4, signY + 20);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.text(responsibleName || "________________", margin + 4, signY + 26);
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(margin, signY, signW, 30, 2, 2, "F");
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(7); pdf.setTextColor(...colorGray);
+  pdf.text((labels.shippedBy || "OTPUSTIL / CHIQARGAN").toUpperCase(), margin + 4, signY + 6);
+  pdf.setDrawColor(...colorGray); pdf.setLineWidth(0.3);
+  pdf.line(margin + 4, signY + 20, margin + signW - 4, signY + 20);
+  pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
+  pdf.text(responsibleName || "________________", margin + 4, signY + 26);
  
   const sign2X = margin + signW + 6;
-  doc.setFillColor(...colorLightBg);
-  doc.roundedRect(sign2X, signY, signW, 30, 2, 2, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...colorGray);
-  doc.text((labels.receivedBy || "POLUCHIL / QABUL QILDI").toUpperCase(), sign2X + 4, signY + 6);
-  doc.setDrawColor(...colorGray);
-  doc.line(sign2X + 4, signY + 20, sign2X + signW - 4, signY + 20);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.text(partyName || "________________", sign2X + 4, signY + 26);
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(sign2X, signY, signW, 30, 2, 2, "F");
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(7); pdf.setTextColor(...colorGray);
+  pdf.text((labels.receivedBy || "POLUCHIL / QABUL QILDI").toUpperCase(), sign2X + 4, signY + 6);
+  pdf.setDrawColor(...colorGray);
+  pdf.line(sign2X + 4, signY + 20, sign2X + signW - 4, signY + 20);
+  pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
+  pdf.text(partyName || "________________", sign2X + 4, signY + 26);
  
-  // ── FOOTER ──
-  const pageCount = (doc as any).internal.getNumberOfPages();
+  const pageCount = (pdf as any).internal.getNumberOfPages();
   for (let pg = 1; pg <= pageCount; pg++) {
-    doc.setPage(pg);
-    const footerY = doc.internal.pageSize.getHeight() - 5;
-    doc.setFillColor(...colorDark);
-    doc.rect(0, footerY - 4, pageW, 10, "F");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
-    doc.setTextColor(130, 130, 145);
-    doc.text(companyName + " · " + title + " · " + docNumber + " · " + dateStr, margin, footerY + 1);
-    doc.text("Sahifa " + pg + " / " + pageCount, pageW - margin, footerY + 1, { align: "right" });
+    pdf.setPage(pg);
+    const footerY = pdf.internal.pageSize.getHeight() - 5;
+    pdf.setFillColor(...colorDark);
+    pdf.rect(0, footerY - 4, pageW, 10, "F");
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(6.5); pdf.setTextColor(130, 130, 145);
+    pdf.text(`${companyName} · ${title} · ${docNumber} · ${dateStr}`, margin, footerY + 1);
+    pdf.text(`Sahifa ${pg} / ${pageCount}`, pageW - margin, footerY + 1, { align: "right" });
   }
  
-  doc.save("nakladnoy-" + docNumber + "-" + new Date().toISOString().slice(0, 10) + ".pdf");
+  pdf.save("nakladnoy-" + docNumber + "-" + new Date().toISOString().slice(0, 10) + ".pdf");
 }
  
-// ─── ASOSIY KOD ──────────────────────────────────────────────────────────────
+// ─── constants & types ───────────────────────────────────────────────────────
  
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
  
-async function getNextOrderNumber(db: any): Promise<string> {
+async function getNextOrderNumber(db: ReturnType<typeof getFirestore>): Promise<string> {
   const counterRef = doc(db, "counters", "stockOut");
   try {
     const next = await runTransaction(db, async (transaction) => {
@@ -362,34 +299,26 @@ const OUTGOING_TYPES = [
 type OutgoingType = "sale" | "expense";
  
 interface StockItem {
-  id: string;
-  productId: string;
-  searchQuery: string;
-  size: string;
-  inPackage: number;
-  inUnit: number;
-  pricePerPackage: number;
-  price: number;
-  discount: number;
-  vatRate: string;
-  writeoffCoeff: number;
-  itemComment: string;
+  id: string; productId: string; searchQuery: string;
+  size: string; inPackage: number; inUnit: number;
+  pricePerPackage: number; price: number; discount: number;
+  vatRate: string; writeoffCoeff: number; itemComment: string;
 }
  
 interface EditSearchResult {
-  id: string;
-  orderNumber: string;
-  recipient: string;
-  date: string;
-  total: number;
-  status?: string;
+  id: string; orderNumber: string; recipient: string;
+  date: string; total: number; status?: string;
 }
+ 
+// ─── component ───────────────────────────────────────────────────────────────
  
 export default function StockOutPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const db = useFirestore();
   const { user, role, assignedWarehouseId } = useUser();
+ 
+  // Stable db reference
+  const db = useMemo(() => getFirestore(), []);
  
   const [activeTab, setActiveTab] = useState<"properties" | "delivery">("properties");
   const [productTab, setProductTab] = useState<ProductTab>("all");
@@ -421,48 +350,76 @@ export default function StockOutPage() {
   const [items, setItems] = useState<StockItem[]>([{
     id: generateId(), productId: "", searchQuery: "",
     size: "шт", inPackage: 1, inUnit: 1,
-    pricePerPackage: 0, price: 0,
-    discount: 0, vatRate: "Без НДС",
-    writeoffCoeff: 1, itemComment: "",
+    pricePerPackage: 0, price: 0, discount: 0,
+    vatRate: "Без НДС", writeoffCoeff: 1, itemComment: "",
   }]);
  
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [processedInvoice, setProcessedInvoice] = useState<any>(null);
  
+  // Firestore data — stable subscriptions
+  const [products, setProducts] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+ 
   const isAdmin = role === "Super Admin" || role === "Admin";
  
+  // ── Stable Firestore subscriptions ──────────────────────────────────────
+  useEffect(() => {
+    if (!db) return;
+ 
+    const unsubs: (() => void)[] = [];
+ 
+    const snap = <T extends { id: string }>(
+      col: string,
+      setter: React.Dispatch<React.SetStateAction<T[]>>
+    ) => {
+      const unsub = onSnapshot(
+        collection(db, col),
+        (snapshot: QuerySnapshot) => {
+          setter(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
+        },
+        (err) => {
+          if (err.code !== "unavailable") {
+            console.error(`[${col}] snapshot error:`, err.code);
+          }
+        }
+      );
+      unsubs.push(unsub);
+    };
+ 
+    snap("products", setProducts);
+    snap("warehouses", setWarehouses);
+    snap("inventory", setInventory);
+ 
+    return () => { unsubs.forEach((u) => u()); };
+  }, [db]);
+ 
+  // ── init order number ────────────────────────────────────────────────────
   useEffect(() => {
     if (!db || isEditMode) return;
     setOrderLoading(true);
-    getNextOrderNumber(db).then((num) => setOrderNumber(num)).finally(() => setOrderLoading(false));
+    getNextOrderNumber(db).then(setOrderNumber).finally(() => setOrderLoading(false));
   }, [db, isEditMode]);
  
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
   }, [isAdmin, assignedWarehouseId]);
  
-  const productsQuery = useMemoFirebase(() => db ? collection(db, "products") : null, [db]);
-  const { data: products } = useCollection(productsQuery);
- 
-  const warehousesQuery = useMemoFirebase(() => db ? collection(db, "warehouses") : null, [db]);
-  const { data: warehouses } = useCollection(warehousesQuery);
- 
-  const inventoryQuery = useMemoFirebase(() => db ? collection(db, "inventory") : null, [db]);
-  const { data: inventory } = useCollection(inventoryQuery);
- 
   const formatMoney = (val: number) =>
     val.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
  
   const getStockForProduct = useCallback(
     (pId: string) => {
-      if (!warehouseId || !pId || !inventory) return 0;
+      if (!warehouseId || !pId || !inventory.length) return 0;
       const inv = inventory.find(i => i.warehouseId === warehouseId && i.productId === pId);
       return inv ? inv.stock || 0 : 0;
     },
     [warehouseId, inventory]
   );
  
+  // ── edit search ──────────────────────────────────────────────────────────
   const handleEditSearch = async () => {
     if (!db) return;
     setEditSearchLoading(true);
@@ -476,7 +433,7 @@ export default function StockOutPage() {
         const data = d.data();
         const on = data.orderNumber;
         if (!grouped[on]) {
-          grouped[on] = { id: on, orderNumber: on, recipient: data.recipient || "—", date: data.movementDate, total: 0, status: data.status || "posted" };
+          grouped[on] = { id: on, orderNumber: on, recipient: data.recipient || "—", date: data.movementDate, total: 0 };
         }
         grouped[on].total += data.totalPrice || 0;
       });
@@ -511,7 +468,6 @@ export default function StockOutPage() {
  
       if (snap.empty) {
         toast({ variant: "destructive", title: "Topilmadi", description: `${orderNum} hujjat topilmadi.` });
-        setEditLoading(false);
         return;
       }
  
@@ -529,7 +485,6 @@ export default function StockOutPage() {
       setExpenseAccount(firstDoc.expenseAccount || "Расход продуктов");
       setOutgoingType(firstDoc.outgoingType || "sale");
       setShipFromWarehouse(true);
- 
       setOriginalItems(docs.map(d => ({ productId: d.productId, inUnit: Math.abs(d.quantityChange || 0) })));
  
       const reconstructed: StockItem[] = docs.map(d => ({
@@ -568,16 +523,15 @@ export default function StockOutPage() {
       pricePerPackage: 0, price: 0, discount: 0, vatRate: "Без НДС",
       writeoffCoeff: 1, itemComment: "",
     }]);
-    setRecipient("");
-    setConcept("");
+    setRecipient(""); setConcept("");
     setOrderDate(new Date().toISOString().slice(0, 16));
     if (isAdmin) setWarehouseId("");
     setOrderLoading(true);
-    getNextOrderNumber(db).then(n => setOrderNumber(n)).finally(() => setOrderLoading(false));
+    getNextOrderNumber(db).then(setOrderNumber).finally(() => setOrderLoading(false));
   };
  
   const filteredProducts = useMemo(() => {
-    if (!products) return [];
+    if (!products.length) return [];
     if (productTab === "all") return products;
     return products.filter(p => (p.category || "goods") === productTab);
   }, [products, productTab]);
@@ -598,7 +552,7 @@ export default function StockOutPage() {
       if (item.id !== id) return item;
       const updated = { ...item, [field]: value };
       if (field === "productId" && value) {
-        const p = products?.find(prod => prod.id === value);
+        const p = products.find(prod => prod.id === value);
         if (p) {
           updated.price = p.salePrice || 0;
           updated.pricePerPackage = p.salePrice || 0;
@@ -611,7 +565,7 @@ export default function StockOutPage() {
     }));
   };
  
-  const getRowCalc = (item: StockItem) => {
+  const getRowCalc = useCallback((item: StockItem) => {
     const qty = item.inUnit || 0;
     const price = item.price || 0;
     const gross = qty * price;
@@ -626,13 +580,12 @@ export default function StockOutPage() {
       const original = originalItems.find(o => o.productId === item.productId);
       if (original) stockBase += original.inUnit;
     }
- 
     const stockAfter = stockBase - qty;
-    const product = products?.find(p => p.id === item.productId);
+    const product = products.find(p => p.id === item.productId);
     const costPerUnit = product?.costPrice || 0;
     const costTotal = qty * costPerUnit;
     return { gross, discountAmt, afterDiscount, vatAmt, amountNoVat, stockBefore: stockBase, stockAfter, costPerUnit, costTotal };
-  };
+  }, [getStockForProduct, isEditMode, originalItems, products]);
  
   const validation = useMemo(() => {
     const errors: string[] = [];
@@ -663,7 +616,7 @@ export default function StockOutPage() {
       vat += c.vatAmt; noVat += c.amountNoVat; cost += c.costTotal;
     });
     return { gross, discount, vat, noVat, net: gross - discount, cost };
-  }, [items, getStockForProduct, products, isEditMode, originalItems]);
+  }, [items, getRowCalc]);
  
   const handlePreDispatch = () => {
     if (!validation.isValid) {
@@ -702,18 +655,16 @@ export default function StockOutPage() {
         if (invSnap.exists()) {
           updateDocumentNonBlocking(invRef, { stock: (invSnap.data().stock || 0) + oldQty, updatedAt: new Date().toISOString() });
         }
- 
-        const oldProduct = products?.find(p => p.id === oldProductId);
+        const oldProduct = products.find(p => p.id === oldProductId);
         if (oldProduct) {
           updateDocumentNonBlocking(doc(db, "products", oldProductId), { stock: (oldProduct.stock || 0) + oldQty, updatedAt: new Date().toISOString() });
         }
- 
         updateDocumentNonBlocking(oldDoc.ref, { _deleted: true, deletedAt: new Date().toISOString() });
       }
  
       const invoiceItems: any[] = [];
       for (const item of items) {
-        const product = products?.find(p => p.id === item.productId);
+        const product = products.find(p => p.id === item.productId);
         const { inUnit } = item;
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
@@ -729,7 +680,7 @@ export default function StockOutPage() {
  
         addDocumentNonBlocking(movRef, {
           productId: item.productId, productName: product?.name || "Noma'lum",
-          warehouseId, warehouseName: warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum",
+          warehouseId, warehouseName: warehouses.find(w => w.id === warehouseId)?.name || "Noma'lum",
           quantityChange: -inUnit, movementType: "StockOut",
           movementDate: orderDate || new Date().toISOString(),
           responsibleUserId: user?.uid, responsibleUserName: currentUserName,
@@ -745,7 +696,6 @@ export default function StockOutPage() {
         if (product) {
           updateDocumentNonBlocking(doc(db, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
         }
- 
         const invSnap = await getDoc(invRef);
         if (invSnap.exists()) {
           updateDocumentNonBlocking(invRef, { stock: (invSnap.data().stock || 0) - inUnit, updatedAt: new Date().toISOString() });
@@ -756,7 +706,7 @@ export default function StockOutPage() {
  
       setProcessedInvoice({
         orderNumber: editDocId, recipient, buyerType, concept,
-        warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
+        warehouse: warehouses.find(w => w.id === warehouseId)?.name,
         date: orderDate, items: invoiceItems,
         responsible: currentUserName, totals, outgoingType, isEdited: true,
       });
@@ -781,7 +731,7 @@ export default function StockOutPage() {
       const currentUserName = user?.displayName || user?.email || "Noma'lum";
  
       for (const item of items) {
-        const product = products?.find(p => p.id === item.productId);
+        const product = products.find(p => p.id === item.productId);
         const { inUnit } = item;
         const invId = `${warehouseId}_${item.productId}`;
         const invRef = doc(db, "inventory", invId);
@@ -797,7 +747,7 @@ export default function StockOutPage() {
  
         addDocumentNonBlocking(collection(db, "stockMovements"), {
           productId: item.productId, productName: product?.name || "Noma'lum",
-          warehouseId, warehouseName: warehouses?.find(w => w.id === warehouseId)?.name || "Noma'lum",
+          warehouseId, warehouseName: warehouses.find(w => w.id === warehouseId)?.name || "Noma'lum",
           quantityChange: -inUnit, movementType: "StockOut",
           movementDate: orderDate || new Date().toISOString(),
           responsibleUserId: user?.uid, responsibleUserName: currentUserName,
@@ -812,7 +762,6 @@ export default function StockOutPage() {
         if (product) {
           updateDocumentNonBlocking(doc(db, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
         }
- 
         const invSnap = await getDoc(invRef);
         if (invSnap.exists()) {
           updateDocumentNonBlocking(invRef, { stock: (invSnap.data().stock || 0) - inUnit, updatedAt: new Date().toISOString() });
@@ -823,7 +772,7 @@ export default function StockOutPage() {
  
       setProcessedInvoice({
         orderNumber: saleId, recipient, buyerType, concept,
-        warehouse: warehouses?.find(w => w.id === warehouseId)?.name,
+        warehouse: warehouses.find(w => w.id === warehouseId)?.name,
         date: orderDate, items: invoiceItems,
         responsible: currentUserName, totals, outgoingType,
       });
@@ -854,16 +803,13 @@ export default function StockOutPage() {
     if (!processedInvoice) return;
     const currencyStr = t.settings?.currency?.split(" ")[0] || "сум";
     await generateInvoicePDF({
-      title: "Расходная накладная",
-      type: "out",
-      docNumber: processedInvoice.orderNumber,
-      date: processedInvoice.date,
+      title: "Расходная накладная", type: "out",
+      docNumber: processedInvoice.orderNumber, date: processedInvoice.date,
       partyName: `${processedInvoice.recipient} (${processedInvoice.buyerType})`,
       partyTypeLabel: "Покупатель",
       warehouseName: processedInvoice.warehouse,
       responsibleName: processedInvoice.responsible,
-      items: processedInvoice.items,
-      currency: currencyStr,
+      items: processedInvoice.items, currency: currencyStr,
       labels: {
         number: "Номер документа", date: "Дата", warehouse: "Склад",
         product: "Наименование", qty: "Кол-во", unit: "Ед.",
@@ -899,7 +845,6 @@ export default function StockOutPage() {
                 </>
               )}
             </h1>
- 
             <div className="flex items-center gap-2">
               {isEditMode ? (
                 <Button variant="outline" size="sm" onClick={handleExitEditMode}
@@ -923,7 +868,7 @@ export default function StockOutPage() {
                 <Pencil className="w-4 h-4 text-amber-600 shrink-0" />
                 <p className="text-xs font-bold text-amber-700 flex-1">
                   <span className="font-black">{orderNumber}</span> — hujjat tahrirlash rejimida.
-                  Saqlash tugmasini bosganingizda eski ma'lumotlar o'chirilib, yangilari yoziladi va inventar qayta hisoblanadi.
+                  Saqlash tugmasini bosganingizda eski ma'lumotlar o'chirilib, yangilari yoziladi.
                 </p>
                 <Button variant="ghost" size="icon" className="h-6 w-6 rounded-lg text-amber-600 hover:bg-amber-500/10" onClick={handleExitEditMode}>
                   <X className="w-3.5 h-3.5" />
@@ -973,20 +918,8 @@ export default function StockOutPage() {
                       </div>
                       <div className="flex items-start gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0 mt-2">Комментарий:</Label>
-                        <Select value={docComment} onValueChange={setDocComment}>
-                          <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue placeholder="" /></SelectTrigger>
-                          <SelectContent className="rounded-xl"><SelectItem value="none">—</SelectItem></SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Label className="w-44 shrink-0" />
-                        <Select>
-                          <SelectTrigger className="h-8 text-sm w-36 bg-background/80 border-border/40 rounded-lg font-bold"><SelectValue placeholder="Действия" /></SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="copy">Копировать</SelectItem>
-                            <SelectItem value="print">Распечатать</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Input className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"
+                          placeholder="—" value={docComment} onChange={e => setDocComment(e.target.value)} />
                       </div>
                     </div>
  
@@ -1015,30 +948,23 @@ export default function StockOutPage() {
                           <Checkbox checked={shipFromWarehouse} onCheckedChange={v => setShipFromWarehouse(!!v)} className="border-border/60" />
                           <Select value={warehouseId} onValueChange={setWarehouseId} disabled={!shipFromWarehouse || (!isAdmin && !!assignedWarehouseId)}>
                             <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue placeholder="Выберите склад" /></SelectTrigger>
-                            <SelectContent className="rounded-xl">{warehouses?.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                            <SelectContent className="rounded-xl">{warehouses.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
                           </Select>
-                          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-border/40 shrink-0"><Search className="w-3.5 h-3.5" /></Button>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Счет выручки:</Label>
-                        <div className="flex flex-1 gap-1">
-                          <Select value={revenueAccount} onValueChange={setRevenueAccount}>
-                            <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue /></SelectTrigger>
-                            <SelectContent className="rounded-xl">{REVENUE_ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                          </Select>
-                          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-border/40 shrink-0"><Search className="w-3.5 h-3.5" /></Button>
-                        </div>
+                        <Select value={revenueAccount} onValueChange={setRevenueAccount}>
+                          <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">{REVENUE_ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                        </Select>
                       </div>
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Расходный счет:</Label>
-                        <div className="flex flex-1 gap-1">
-                          <Select value={expenseAccount} onValueChange={setExpenseAccount}>
-                            <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue /></SelectTrigger>
-                            <SelectContent className="rounded-xl">{EXPENSE_ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                          </Select>
-                          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-border/40 shrink-0"><Search className="w-3.5 h-3.5" /></Button>
-                        </div>
+                        <Select value={expenseAccount} onValueChange={setExpenseAccount}>
+                          <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">{EXPENSE_ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                        </Select>
                       </div>
                       <div className="flex items-center gap-3">
                         <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Chiqim turi:</Label>
@@ -1059,7 +985,7 @@ export default function StockOutPage() {
                 </CardContent>
               </Card>
  
-              {/* Jadval */}
+              {/* Items table */}
               <Card className={cn("border rounded-xl bg-card/50 overflow-hidden", isEditMode ? "border-amber-500/30" : "border-border/30")}>
                 <div className="flex border-b border-border/20 bg-muted/10 px-4 pt-3 gap-1 flex-wrap">
                   {PRODUCT_TABS.map(tab => (
@@ -1082,21 +1008,21 @@ export default function StockOutPage() {
                     <thead className="bg-muted/30 border-b border-border/20">
                       <tr>
                         <th className="px-3 py-2.5 text-center font-black uppercase text-muted-foreground w-8">№</th>
-                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-16">Код у нас</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-16">Код</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24">Штрихкод</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground min-w-[200px]">Наименование</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20">Размер</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-center bg-blue-500/5">В таре</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-center bg-blue-500/5">В ед.</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-emerald-500/5">Цена за ед.</th>
-                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-emerald-500/5">Сумма, р.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-emerald-500/5">Сумма</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-right bg-emerald-500/5">Скидка, р.</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-16 text-center bg-amber-500/5">НДС %</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-right bg-amber-500/5">НДС р.</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-emerald-500/5">Без НДС</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-16 text-center bg-purple-500/5">Коэф.</th>
-                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-purple-500/5">Себест. р.</th>
-                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-center bg-rose-500/5">До отгр.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-purple-500/5">Себест.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-center bg-rose-500/5">До</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-center bg-rose-500/5">После</th>
                         <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-28">Коммент.</th>
                         <th className="px-2 py-2.5 w-8" />
@@ -1105,7 +1031,7 @@ export default function StockOutPage() {
                     <tbody className="divide-y divide-border/10">
                       <AnimatePresence mode="popLayout">
                         {items.map((item, index) => {
-                          const product = products?.find(p => p.id === item.productId);
+                          const product = products.find(p => p.id === item.productId);
                           const calc = getRowCalc(item);
                           const hasError = validation.itemErrors[item.id];
                           return (
@@ -1128,7 +1054,7 @@ export default function StockOutPage() {
                                             value={item.searchQuery} onChange={e => updateItem(item.id, "searchQuery", e.target.value)} onClick={e => e.stopPropagation()} />
                                         </div>
                                       </div>
-                                      {filteredProducts?.filter(p =>
+                                      {filteredProducts.filter(p =>
                                         p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) ||
                                         (p.sku && p.sku.toLowerCase().includes(item.searchQuery.toLowerCase()))
                                       ).map(p => (
@@ -1254,8 +1180,7 @@ export default function StockOutPage() {
                   className={cn("h-9 px-5 text-xs font-black rounded-lg gap-1.5 border-none shadow-lg",
                     isEditMode ? "bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20" : "bg-rose-600 text-white hover:bg-rose-700 shadow-rose-600/20")}
                   onClick={handlePreDispatch} disabled={loading || !validation.isValid}>
-                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isEditMode ? <Pencil className="w-3.5 h-3.5" /> : <FileOutput className="w-3.5 h-3.5" />}
-                  {isEditMode ? "Saqlash va yopish" : "Сохранить и закрыть"}
+                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isEditMode ? <><Pencil className="w-3.5 h-3.5" /> Saqlash va yopish</> : <><FileOutput className="w-3.5 h-3.5" /> Сохранить и закрыть</>}
                 </Button>
               </div>
             </div>
@@ -1341,7 +1266,7 @@ export default function StockOutPage() {
                 {isEditMode ? "Tahrirlashni tasdiqlang" : "Tasdiqlash"}
               </DialogTitle>
               <p className="text-muted-foreground font-medium text-sm pt-1">
-                {isEditMode ? "Eski ma'lumotlar o'chirilib, inventar qayta hisoblanadi. Davom etasizmi?" : "Operatsiyani yakunlashdan oldin tekshiring."}
+                {isEditMode ? "Eski ma'lumotlar o'chirilib, inventar qayta hisoblanadi." : "Operatsiyani yakunlashdan oldin tekshiring."}
               </p>
             </DialogHeader>
             <div className="py-4 space-y-3">
@@ -1350,17 +1275,14 @@ export default function StockOutPage() {
                   ["Hujjat №", orderNumber],
                   ["Sana", new Date(orderDate).toLocaleString("ru-RU")],
                   ["Покупатель", recipient],
-                  ["Склад", warehouses?.find(w => w.id === warehouseId)?.name ?? "—"],
+                  ["Склад", warehouses.find(w => w.id === warehouseId)?.name ?? "—"],
                   ["Концепция", concept || "—"],
                   ["Mahsulotlar", `${items.filter(i => i.productId).length} та`],
                   ["Chiqim turi", outgoingType === "sale" ? "Sotuv" : "Xarajat"],
                 ] as [string, string][]).map(([label, val], i) => (
                   <div key={i} className="flex justify-between items-center">
                     <span className="text-muted-foreground font-bold">{label}:</span>
-                    <span className={cn("font-black",
-                      label === "Hujjat №" ? "font-mono text-rose-600" : "",
-                      label === "Chiqim turi" ? outgoingType === "sale" ? "bg-emerald-500/10 text-emerald-600 inline-block px-2 py-0.5 rounded-lg text-[11px]" : "bg-amber-500/10 text-amber-600 inline-block px-2 py-0.5 rounded-lg text-[11px]" : ""
-                    )}>{val}</span>
+                    <span className={cn("font-black", label === "Hujjat №" ? "font-mono text-rose-600" : "")}>{val}</span>
                   </div>
                 ))}
                 <div className="flex justify-between items-center pt-2 border-t border-white/5">
@@ -1402,7 +1324,7 @@ export default function StockOutPage() {
                 {processedInvoice?.isEdited ? "Hujjat yangilandi!" : "Расходная накладная сохранена!"}
               </DialogTitle>
               <p className="text-muted-foreground font-medium text-sm">
-                {processedInvoice?.isEdited ? "Nakladnoy muvaffaqiyatli yangilandi va inventar qayta hisoblandi." : "Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi."}
+                {processedInvoice?.isEdited ? "Nakladnoy muvaffaqiyatli yangilandi." : "Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi."}
               </p>
               <p className="text-rose-600 font-black text-2xl mt-2 font-mono">{processedInvoice?.orderNumber}</p>
               {processedInvoice && (
@@ -1412,11 +1334,6 @@ export default function StockOutPage() {
                   <p>Chiqim turi: <span className={cn("font-black", processedInvoice.outgoingType === "sale" ? "text-emerald-600" : "text-amber-600")}>
                     {processedInvoice.outgoingType === "sale" ? "Sotuv" : "Xarajat"}
                   </span></p>
-                  {processedInvoice.isEdited && (
-                    <p className="text-amber-600 font-black flex items-center justify-center gap-1">
-                      <Pencil className="w-3 h-3" /> Tahrirlangan hujjat
-                    </p>
-                  )}
                 </div>
               )}
             </DialogHeader>
@@ -1435,4 +1352,3 @@ export default function StockOutPage() {
     </div>
   );
 }
- 
