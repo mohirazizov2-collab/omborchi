@@ -1,6 +1,6 @@
 "use client";
- 
-import { useState, useMemo } from "react";
+
+import { useState, useMemo, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { OmniSidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
@@ -49,11 +49,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useScanner } from "@/hooks/use-scanner";
 import { cn } from "@/lib/utils";
- 
+
 // ─── Typlar ───────────────────────────────────────────────────────────────────
- 
+
 type AuditStatus = "draft" | "completed" | "deleted";
- 
+
 interface AuditLogItem {
   productId: string;
   productName: string;
@@ -61,7 +61,7 @@ interface AuditLogItem {
   actualCount: number;
   discrepancy: number;
 }
- 
+
 interface AuditLog {
   id: string;
   auditNumber: string;
@@ -78,35 +78,35 @@ interface AuditLog {
   surplusSum: number;
   deficitSum: number;
 }
- 
+
 type FilterType = "all" | "completed" | "draft" | "surplus" | "deficit";
 type SortCol = "date" | "num" | "surplus" | "deficit";
 type FormMode = "new" | "edit";
- 
+
 // ─── Yordamchi funksiyalar ─────────────────────────────────────────────────────
- 
+
 function generateAuditNumber() {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const rand = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
   return `INV-${dateStr}-${rand}`;
 }
- 
+
 function formatNum(n: number) {
   return Math.round(n).toLocaleString("uz-UZ");
 }
- 
+
 // ─── Asosiy sahifa ─────────────────────────────────────────────────────────────
- 
+
 export default function InventoryAuditPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
   const { user, role, isUserLoading, assignedWarehouseId } = useUser();
- 
+
   const [view, setView] = useState<"list" | "form">("list");
   const [formMode, setFormMode] = useState<FormMode>("new");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
- 
+
   // ── Ro'yxat holatlari ──
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -120,7 +120,7 @@ export default function InventoryAuditPage() {
   const [periodTo, setPeriodTo] = useState(
     new Date().getFullYear() + "-12-31"
   );
- 
+
   // ── Forma holatlari ──
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(
     assignedWarehouseId || ""
@@ -133,44 +133,9 @@ export default function InventoryAuditPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formSearch, setFormSearch] = useState("");
   const [showZeroOnly, setShowZeroOnly] = useState(false);
- 
+
   const isAdmin = role === "Super Admin" || role === "Admin";
- 
-  // ── Skayner ──
-  useScanner(async (barcode) => {
-    if (view !== "form") return;
-    if (!db || !selectedWarehouseId) {
-      toast({
-        variant: "destructive",
-        title: "Xatolik",
-        description: "Avval omborni tanlang!",
-      });
-      return;
-    }
-    const q = query(
-      collection(db, "products"),
-      where("barcode", "==", barcode)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) {
-      toast({
-        variant: "destructive",
-        title: "Topilmadi",
-        description: "Bu shtrix-kodli mahsulot mavjud emas.",
-      });
-      return;
-    }
-    const product = snap.docs[0];
-    setAuditData((prev) => ({
-      ...prev,
-      [product.id]: (prev[product.id] ?? 0) + 1,
-    }));
-    toast({
-      title: "Skanerlandi ✓",
-      description: `${product.data().name} qo'shildi`,
-    });
-  });
- 
+
   // ── Firebase ma'lumotlari ──
   const productsQuery = useMemoFirebase(
     () => (db ? collection(db, "products") : null),
@@ -178,33 +143,82 @@ export default function InventoryAuditPage() {
   );
   const { data: products, isLoading: productsLoading } =
     useCollection(productsQuery);
- 
+
   const warehousesQuery = useMemoFirebase(
     () => (db ? collection(db, "warehouses") : null),
     [db]
   );
   const { data: warehouses } = useCollection(warehousesQuery);
- 
+
   const inventoryQuery = useMemoFirebase(
     () => (db ? collection(db, "inventory") : null),
     [db]
   );
   const { data: inventory } = useCollection(inventoryQuery);
- 
+
   const auditLogsQuery = useMemoFirebase(
     () => (db ? collection(db, "auditLogs") : null),
     [db]
   );
   const { data: auditLogsRaw, isLoading: logsLoading } =
     useCollection(auditLogsQuery);
- 
+
+  // ── Skayner — useCallback bilan stable reference ──
+  const handleScan = useCallback(
+    async (barcode: string) => {
+      if (view !== "form") return;
+      if (!db || !selectedWarehouseId) {
+        toast({
+          variant: "destructive",
+          title: "Xatolik",
+          description: "Avval omborni tanlang!",
+        });
+        return;
+      }
+      try {
+        const q = query(
+          collection(db, "products"),
+          where("barcode", "==", barcode)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          toast({
+            variant: "destructive",
+            title: "Topilmadi",
+            description: "Bu shtrix-kodli mahsulot mavjud emas.",
+          });
+          return;
+        }
+        const product = snap.docs[0];
+        setAuditData((prev) => ({
+          ...prev,
+          [product.id]: (prev[product.id] ?? 0) + 1,
+        }));
+        toast({
+          title: "Skanerlandi ✓",
+          description: `${product.data().name} qo'shildi`,
+        });
+      } catch (err) {
+        console.error("Skaner xatosi:", err);
+        toast({
+          variant: "destructive",
+          title: "Skaner xatosi",
+          description: "Mahsulotni qidirishda muammo bo'ldi.",
+        });
+      }
+    },
+    [db, selectedWarehouseId, view, toast]
+  );
+
+  useScanner(handleScan);
+
   // ── Filtrlangan va saralangan audit ro'yxati ──
   const filteredLogs = useMemo(() => {
     if (!auditLogsRaw) return [];
     let list = auditLogsRaw as unknown as AuditLog[];
- 
+
     if (!showDeleted) list = list.filter((l) => l.status !== "deleted");
- 
+
     if (filterType === "completed")
       list = list.filter((l) => l.status === "completed");
     else if (filterType === "draft")
@@ -213,7 +227,7 @@ export default function InventoryAuditPage() {
       list = list.filter((l) => (l.totalSurplus ?? 0) > 0);
     else if (filterType === "deficit")
       list = list.filter((l) => (l.totalDeficit ?? 0) > 0);
- 
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -223,7 +237,7 @@ export default function InventoryAuditPage() {
           l.items?.some((i) => i.productName?.toLowerCase().includes(q))
       );
     }
- 
+
     list = [...list].sort((a, b) => {
       if (sortCol === "date")
         return (a.auditDate > b.auditDate ? 1 : -1) * sortDir;
@@ -235,15 +249,15 @@ export default function InventoryAuditPage() {
         return ((a.totalDeficit ?? 0) - (b.totalDeficit ?? 0)) * sortDir;
       return 0;
     });
- 
+
     return list;
   }, [auditLogsRaw, showDeleted, filterType, searchQuery, sortCol, sortDir]);
- 
+
   const selectedLog = useMemo(
     () => filteredLogs.find((l) => l.id === selectedLogId) ?? null,
     [filteredLogs, selectedLogId]
   );
- 
+
   // ── Forma uchun filtrlangan mahsulotlar ──
   const filteredProducts = useMemo(() => {
     if (!products || !selectedWarehouseId) return [];
@@ -277,7 +291,7 @@ export default function InventoryAuditPage() {
     showZeroOnly,
     auditData,
   ]);
- 
+
   // ── Form reset ──
   const resetForm = () => {
     setAuditData({});
@@ -288,10 +302,17 @@ export default function InventoryAuditPage() {
     setSelectedWarehouseId(assignedWarehouseId || "");
     setFormSearch("");
   };
- 
+
   // ── Asosiy Submit ──
   const handleSubmitAudit = async () => {
-    if (!db || !user || !selectedWarehouseId) return;
+    if (!db || !user || !selectedWarehouseId) {
+      toast({
+        variant: "destructive",
+        title: "Xatolik",
+        description: "Sklad tanlanmagan yoki foydalanuvchi topilmadi.",
+      });
+      return;
+    }
     if (Object.keys(auditData).length === 0) {
       toast({
         variant: "destructive",
@@ -307,7 +328,7 @@ export default function InventoryAuditPage() {
         totalDeficit = 0,
         surplusSum = 0,
         deficitSum = 0;
- 
+
       const items: AuditLogItem[] = Object.entries(auditData).map(
         ([productId, actualCount]) => {
           const product = products?.find((p) => p.id === productId);
@@ -336,7 +357,7 @@ export default function InventoryAuditPage() {
           };
         }
       );
- 
+
       const auditPayload = {
         auditNumber,
         warehouseId: selectedWarehouseId,
@@ -350,44 +371,45 @@ export default function InventoryAuditPage() {
         surplusSum,
         deficitSum,
       };
- 
+
       if (formMode === "edit" && editingLogId) {
-        // Mavjud hujjatni yangilash
         await updateDocumentNonBlocking(doc(db, "auditLogs", editingLogId), {
           ...auditPayload,
           updatedAt: new Date().toISOString(),
         });
       } else {
-        // Yangi hujjat yaratish
         await addDocumentNonBlocking(collection(db, "auditLogs"), {
           ...auditPayload,
           createdAt: new Date().toISOString(),
         });
       }
- 
-      // ── MUHIM: Inventory stock-larini yangilash ──
-      // Bu bo'lmasdan inventarizatsiya skadga ta'sir qilmaydi!
+
+      // ── Inventory stock-larini yangilash ──
       for (const [productId, actualCount] of Object.entries(auditData)) {
-        const existingInv = inventory?.find(
-          (i) =>
-            (i as any).warehouseId === selectedWarehouseId &&
-            (i as any).productId === productId
-        );
- 
-        if (existingInv) {
-          await updateDocumentNonBlocking(
-            doc(db, "inventory", existingInv.id),
-            { stock: actualCount }
+        try {
+          const existingInv = inventory?.find(
+            (i) =>
+              (i as any).warehouseId === selectedWarehouseId &&
+              (i as any).productId === productId
           );
-        } else {
-          await addDocumentNonBlocking(collection(db, "inventory"), {
-            warehouseId: selectedWarehouseId,
-            productId,
-            stock: actualCount,
-          });
+          if (existingInv) {
+            await updateDocumentNonBlocking(
+              doc(db, "inventory", existingInv.id),
+              { stock: actualCount }
+            );
+          } else {
+            await addDocumentNonBlocking(collection(db, "inventory"), {
+              warehouseId: selectedWarehouseId,
+              productId,
+              stock: actualCount,
+            });
+          }
+        } catch (invErr) {
+          console.error("Inventory yangilashda xato:", productId, invErr);
+          // Bitta mahsulot xatosi butun jarayonni to'xtatmasin
         }
       }
- 
+
       toast({
         title: formMode === "edit" ? "Yangilandi ✓" : "Muvaffaqiyatli ✓",
         description:
@@ -395,33 +417,43 @@ export default function InventoryAuditPage() {
             ? `${auditNumber} inventarizatsiyasi yangilandi.`
             : `${auditNumber} inventarizatsiyasi yakunlandi.`,
       });
- 
+
       resetForm();
       setView("list");
-    } catch {
+    } catch (err) {
+      console.error("Submit xatosi:", err);
       toast({
         variant: "destructive",
         title: "Xatolik",
-        description: "Saqlashda muammo bo'ldi.",
+        description: `Saqlashda muammo: ${String(err)}`,
       });
     } finally {
       setIsSubmitting(false);
     }
   };
- 
+
   // ── Hujjatni o'chirish (soft delete) ──
   const handleDelete = async (logId: string) => {
     if (!db) return;
-    await updateDocumentNonBlocking(doc(db, "auditLogs", logId), {
-      status: "deleted",
-    });
-    setSelectedLogId(null);
-    toast({
-      title: "O'chirildi",
-      description: "Hujjat o'chirilgan deb belgilandi.",
-    });
+    try {
+      await updateDocumentNonBlocking(doc(db, "auditLogs", logId), {
+        status: "deleted",
+      });
+      setSelectedLogId(null);
+      toast({
+        title: "O'chirildi",
+        description: "Hujjat o'chirilgan deb belgilandi.",
+      });
+    } catch (err) {
+      console.error("O'chirishda xato:", err);
+      toast({
+        variant: "destructive",
+        title: "Xatolik",
+        description: `O'chirishda muammo: ${String(err)}`,
+      });
+    }
   };
- 
+
   // ── Nusxa ko'chirish ──
   const handleCopy = (log: AuditLog) => {
     const newAuditData: Record<string, number> = {};
@@ -437,7 +469,7 @@ export default function InventoryAuditPage() {
     setView("form");
     toast({ title: "Nusxa", description: "Hujjat nusxasi yaratildi." });
   };
- 
+
   // ── Hujjatni tahrirlash uchun ochish ──
   const handleEditLog = (log: AuditLog) => {
     const existingAuditData: Record<string, number> = {};
@@ -457,7 +489,7 @@ export default function InventoryAuditPage() {
       description: `${log.auditNumber} tahrirlash uchun ochildi.`,
     });
   };
- 
+
   // ── Sort toggle ──
   const toggleSort = (col: SortCol) => {
     if (sortCol === col) setSortDir((d) => (d === 1 ? -1 : 1));
@@ -466,7 +498,7 @@ export default function InventoryAuditPage() {
       setSortDir(-1);
     }
   };
- 
+
   // ── Statistika ──
   const stats = useMemo(() => {
     const total = filteredLogs.length;
@@ -483,21 +515,21 @@ export default function InventoryAuditPage() {
     );
     return { total, completed, surplusTotal, deficitTotal };
   }, [filteredLogs]);
- 
+
   if (isUserLoading)
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
       </div>
     );
- 
+
   // ════════════════════════════════════════════════════════════════
   // RENDER
   // ════════════════════════════════════════════════════════════════
   return (
     <div className="flex min-h-screen bg-[#f4f6f9]">
       <OmniSidebar />
- 
+
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* ── TOP NAV ── */}
         <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 flex-wrap">
@@ -520,21 +552,21 @@ export default function InventoryAuditPage() {
               ? `Tahrirlash: №${auditNumber}`
               : `Inventarizatsiya №${auditNumber}`}
           </h1>
- 
+
           {view === "form" && formMode === "edit" && (
             <Badge className="bg-amber-50 text-amber-600 border border-amber-200 ml-1">
               <Edit2 className="w-3 h-3 mr-1" /> Tahrirlash rejimi
             </Badge>
           )}
- 
+
           {view === "list" && (
             <>
               <Badge className="bg-blue-50 text-blue-600 border border-blue-100 ml-1">
                 <Barcode className="w-3 h-3 mr-1" /> Skaner tayyor
               </Badge>
- 
+
               <div className="flex-1" />
- 
+
               <Button
                 size="sm"
                 onClick={() => {
@@ -545,7 +577,7 @@ export default function InventoryAuditPage() {
               >
                 <Plus className="w-4 h-4" /> Yaratish
               </Button>
- 
+
               {selectedLog && (
                 <>
                   <Button
@@ -574,7 +606,7 @@ export default function InventoryAuditPage() {
                   </Button>
                 </>
               )}
- 
+
               <Button size="sm" variant="outline" className="gap-1">
                 <FileSpreadsheet className="w-4 h-4" /> Excel
               </Button>
@@ -587,7 +619,7 @@ export default function InventoryAuditPage() {
               </Button>
             </>
           )}
- 
+
           {view === "form" && (
             <>
               <div className="flex-1" />
@@ -630,7 +662,7 @@ export default function InventoryAuditPage() {
             </>
           )}
         </div>
- 
+
         {/* ════════════════ RO'YXAT VIEW ════════════════ */}
         {view === "list" && (
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -689,7 +721,7 @@ export default function InventoryAuditPage() {
                 />
               </div>
             </div>
- 
+
             {/* Status filter chips */}
             <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center gap-2 flex-wrap">
               {(
@@ -714,7 +746,7 @@ export default function InventoryAuditPage() {
                   {label}
                 </button>
               ))}
- 
+
               <div className="flex-1" />
               <div className="flex items-center gap-4 text-[11px] text-slate-400">
                 <span className="flex items-center gap-1">
@@ -731,7 +763,7 @@ export default function InventoryAuditPage() {
                 </span>
               </div>
             </div>
- 
+
             {/* Statistika kartalar */}
             <div className="px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
@@ -765,7 +797,7 @@ export default function InventoryAuditPage() {
                 </div>
               ))}
             </div>
- 
+
             {/* Asosiy jadval */}
             <div className="flex-1 overflow-auto px-6 pb-6">
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -875,7 +907,7 @@ export default function InventoryAuditPage() {
                         const isDeleted = log.status === "deleted";
                         const isCompleted = log.status === "completed";
                         const isSelected = selectedLogId === log.id;
- 
+
                         return (
                           <tr
                             key={log.id}
@@ -997,7 +1029,7 @@ export default function InventoryAuditPage() {
                     )}
                   </tbody>
                 </table>
- 
+
                 {/* Footer jami */}
                 <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-6 text-xs text-slate-500 bg-slate-50">
                   <span>
@@ -1023,7 +1055,7 @@ export default function InventoryAuditPage() {
                   </span>
                 </div>
               </div>
- 
+
               {/* Tanlangan hujjat tafsiloti */}
               <AnimatePresence>
                 {selectedLog && (
@@ -1108,7 +1140,7 @@ export default function InventoryAuditPage() {
             </div>
           </div>
         )}
- 
+
         {/* ════════════════ FORMA VIEW ════════════════ */}
         {view === "form" && (
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -1125,7 +1157,7 @@ export default function InventoryAuditPage() {
                   </span>
                 </div>
               )}
- 
+
               <div>
                 <Label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
                   Sklad
@@ -1147,7 +1179,7 @@ export default function InventoryAuditPage() {
                   </SelectContent>
                 </Select>
               </div>
- 
+
               <div>
                 <Label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
                   Sana
@@ -1159,7 +1191,7 @@ export default function InventoryAuditPage() {
                   className="border border-slate-200 rounded-lg px-3 h-9 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
               </div>
- 
+
               <div className="flex items-center gap-4 ml-4">
                 <div className="text-center">
                   <p className="text-[11px] text-slate-400">Kiritilgan</p>
@@ -1195,7 +1227,7 @@ export default function InventoryAuditPage() {
                 </div>
               </div>
             </div>
- 
+
             {/* Qidiruv va filtrlar */}
             <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center gap-3 flex-wrap">
               <div className="relative">
@@ -1223,7 +1255,7 @@ export default function InventoryAuditPage() {
                 <Barcode className="w-3 h-3 mr-1" /> Skaner aktiv
               </Badge>
             </div>
- 
+
             {/* Mahsulotlar jadvali */}
             <div className="flex-1 overflow-auto px-6 py-4">
               {!selectedWarehouseId ? (
@@ -1275,7 +1307,7 @@ export default function InventoryAuditPage() {
                             auditData[p.id] ?? pAny.warehouseStock;
                           const diff = actual - pAny.warehouseStock;
                           const hasInput = auditData[p.id] !== undefined;
- 
+
                           return (
                             <tr
                               key={p.id}
@@ -1369,7 +1401,7 @@ export default function InventoryAuditPage() {
                       )}
                     </tbody>
                   </table>
- 
+
                   {/* Forma footer */}
                   <div className="border-t border-slate-100 px-5 py-3 flex items-center gap-6 bg-slate-50 text-xs text-slate-500">
                     <span>
