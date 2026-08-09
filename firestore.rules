@@ -4,65 +4,89 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============================================================
-    // YORDAMCHI FUNKSIYALAR
+    // SUPER ADMIN
     // ============================================================
 
-    // Foydalanuvchi tizimga kirganmi?
+    function isSuperAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'f2472839@gmail.com';
+    }
+
+
+    // ============================================================
+    // LOGIN QILGAN FOYDALANUVCHI
+    // ============================================================
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Foydalanuvchi Admin yoki Super Admin ekanligini tekshiradi.
-    //
-    // 1) rolesAdmin/{uid} mavjud bo'lsa -> admin
-    // 2) users/{uid}.role:
-    //    - Admin
-    //    - Super Admin
-    //    - SUPER_ADMIN
-    //
-    // variantlaridan biri bo'lsa -> admin
+
+    // ============================================================
+    // ADMIN / SUPER ADMIN
+    // ============================================================
+
     function isAdmin() {
-      return isSignedIn() &&
+      return isSuperAdmin()
+        ||
         (
-          exists(
-            /databases/$(database)/documents/rolesAdmin/$(request.auth.uid)
-          )
-          ||
+          isSignedIn()
+          &&
           (
             exists(
-              /databases/$(database)/documents/users/$(request.auth.uid)
+              /databases/$(database)/documents/rolesAdmin/$(request.auth.uid)
             )
-            &&
-            get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.role in [
-              'Admin',
-              'Super Admin',
-              'SUPER_ADMIN'
-            ]
+            ||
+            (
+              exists(
+                /databases/$(database)/documents/users/$(request.auth.uid)
+              )
+              &&
+              get(
+                /databases/$(database)/documents/users/$(request.auth.uid)
+              ).data.role in [
+                'Admin',
+                'Super Admin',
+                'SUPER_ADMIN'
+              ]
+            )
           )
         );
     }
 
 
     // ============================================================
-    // FOYDALANUVCHILAR
+    // SUPER ADMIN — BARCHA FIRESTORE UCHUN TO'LIQ HUQUQ
+    // ============================================================
+    //
+    // f2472839@gmail.com:
+    //
+    // READ     ✅
+    // CREATE   ✅
+    // UPDATE   ✅
+    // DELETE   ✅
+    //
+    // Yangi collectionlar ham avtomatik ishlaydi.
+    //
+
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
+    }
+
+
+    // ============================================================
+    // USERS
     // ============================================================
 
     match /users/{userId} {
 
-      // Login qilgan foydalanuvchi ko'rishi mumkin
       allow read: if isSignedIn();
 
-      // Faqat admin yangi user yaratishi mumkin
       allow create: if isAdmin();
 
-      // Admin boshqa userni o'zgartirishi mumkin.
-      // User o'z profilini o'zgartirishi mumkin.
       allow update: if isAdmin()
                     || request.auth.uid == userId;
 
-      // USER o'chirish faqat Admin/Super Admin
       allow delete: if isAdmin();
     }
 
@@ -75,7 +99,6 @@ service cloud.firestore {
 
       allow read: if isSignedIn();
 
-      // Admin role ma'lumotlarini boshqaradi
       allow create, update, delete: if isAdmin();
     }
 
@@ -166,7 +189,6 @@ service cloud.firestore {
 
       allow create, update: if isSignedIn();
 
-      // Inventory o'chirish faqat admin
       allow delete: if isAdmin();
     }
 
@@ -198,21 +220,5 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-
-    // ============================================================
-    // QOLGAN COLLECTIONLAR
-    // ============================================================
-
-    // MUHIM:
-    // Bu yerda:
-    //
-    // match /{path=**} {
-    //   allow read, write: if isSignedIn();
-    // }
-    //
-    // QO'YILMAYDI.
-    //
-    // Chunki u barcha collectionlarga umumiy write permission
-    // berib yuborishi mumkin.
   }
 }
