@@ -1,3 +1,7 @@
+import { addDoc, updateDoc, DocumentReference, CollectionReference } from "firebase/firestore";
+import { errorEmitter } from "./error-emitter";
+import { FirestorePermissionError } from "./errors";
+
 export function updateDocumentNonBlocking(docRef: DocumentReference, data: any): Promise<void> {
   return updateDoc(docRef, data).catch(error => {
     errorEmitter.emit(
