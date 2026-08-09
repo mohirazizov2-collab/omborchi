@@ -11,7 +11,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-
     // ============================================================
     // SUPER ADMIN
     // ============================================================
@@ -21,9 +20,8 @@ service cloud.firestore {
         && request.auth.token.email == 'f2472839@gmail.com';
     }
 
-
     // ============================================================
-    // ADMIN / SUPER ADMIN
+    // ADMIN
     // ============================================================
 
     function isAdmin() {
@@ -32,44 +30,50 @@ service cloud.firestore {
         (
           isSignedIn()
           &&
-          (
-            exists(
-              /databases/$(database)/documents/rolesAdmin/$(request.auth.uid)
-            )
-            ||
-            (
-              exists(
-                /databases/$(database)/documents/users/$(request.auth.uid)
-              )
-              &&
-              get(
-                /databases/$(database)/documents/users/$(request.auth.uid)
-              ).data.role in [
-                'Admin',
-                'Super Admin',
-                'SUPER_ADMIN'
-              ]
-            )
+          exists(
+            /databases/$(database)/documents/users/$(request.auth.uid)
           )
+          &&
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role in [
+            'Admin',
+            'Super Admin',
+            'SUPER_ADMIN'
+          ]
         );
     }
 
+    function isSeller() {
+      return isSignedIn()
+        &&
+        exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        )
+        &&
+        get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.role == 'Sotuvchi';
+    }
 
-    // ============================================================
-    // SUPER ADMIN — BARCHA FIRESTORE
-    // ============================================================
+    function isWarehouseWorker() {
+      return isSignedIn()
+        &&
+        exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        )
+        &&
+        get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.role == 'Omborchi';
+    }
 
-    // Faqat f2472839@gmail.com uchun:
-    //
-    // READ     ✅
-    // CREATE   ✅
-    // UPDATE   ✅
-    // DELETE   ✅
-    //
-    // Yangi collectionlar ham avtomatik ishlaydi.
+    function isAdminOrSeller() {
+      return isAdmin() || isSeller();
+    }
 
-    match /{document=**} {
-      allow read, write: if isSuperAdmin();
+    function isAdminOrWarehouse() {
+      return isAdmin() || isWarehouseWorker();
     }
 
 
@@ -78,51 +82,10 @@ service cloud.firestore {
     // ============================================================
 
     match /users/{userId} {
-
       allow read: if isSignedIn();
-
       allow create: if isAdmin();
-
-      allow update: if isAdmin()
-                    || request.auth.uid == userId;
-
-      allow delete: if isAdmin();
-    }
-
-
-    // ============================================================
-    // ADMIN ROLES
-    // ============================================================
-
-    match /rolesAdmin/{userId} {
-
-      allow read: if isSignedIn();
-
-      allow create, update, delete: if isAdmin();
-    }
-
-
-    // ============================================================
-    // WAREHOUSES
-    // ============================================================
-
-    match /warehouses/{warehouseId} {
-
-      allow read: if isSignedIn();
-
-      allow create, update, delete: if isAdmin();
-    }
-
-
-    // ============================================================
-    // CATEGORIES
-    // ============================================================
-
-    match /categories/{categoryId} {
-
-      allow read: if isSignedIn();
-
-      allow create, update, delete: if isAdmin();
+      allow update: if isAdmin() || request.auth.uid == userId;
+      allow delete: if isSuperAdmin();
     }
 
 
@@ -130,78 +93,88 @@ service cloud.firestore {
     // PRODUCTS
     // ============================================================
 
-    match /products/{productId} {
-
+    match /products/{docId} {
       allow read: if isSignedIn();
+      allow create, update: if isAdminOrSeller();
+      allow delete: if isAdmin();
+    }
 
-      allow create, update, delete: if isAdmin();
+    match /categories/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /recipes/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
 
     // ============================================================
-    // EMPLOYEES
+    // WAREHOUSE
     // ============================================================
 
-    match /employees/{employeeId} {
-
+    match /warehouses/{docId} {
       allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
 
-      allow create, update, delete: if isAdmin();
+    match /inventory/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdminOrWarehouse();
+    }
+
+    match /inventory-audit/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdminOrWarehouse();
+    }
+
+    match /stockMovements/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdminOrWarehouse();
     }
 
 
     // ============================================================
-    // EXPENSES
+    // STOCK IN
     // ============================================================
 
-    match /expenses/{expenseId} {
-
+    match /stock-in/{docId} {
       allow read: if isSignedIn();
-
-      allow create: if isSignedIn();
-
-      allow update, delete: if isAdmin();
-    }
-
-
-    // ============================================================
-    // STOCK MOVEMENTS
-    // ============================================================
-
-    match /stockMovements/{movementId} {
-
-      allow read: if isSignedIn();
-
-      allow create: if isSignedIn();
-
-      allow update, delete: if isAdmin();
-    }
-
-
-    // ============================================================
-    // INVENTORY
-    // ============================================================
-
-    match /inventory/{inventoryId} {
-
-      allow read: if isSignedIn();
-
-      allow create, update: if isSignedIn();
-
+      allow create, update: if isAdminOrWarehouse();
       allow delete: if isAdmin();
     }
 
 
     // ============================================================
-    // DOCUMENTS / NAKLADNOY
+    // STOCK OUT
     // ============================================================
 
-    match /documents/{documentId} {
-
+    match /stock-out/{docId} {
       allow read: if isSignedIn();
+      allow create, update: if isAdminOrWarehouse();
+      allow delete: if isAdmin();
+    }
 
-      allow create, update: if isSignedIn();
 
+    // ============================================================
+    // TRANSFERS
+    // ============================================================
+
+    match /transfers/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdminOrWarehouse();
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    // PRODUCTION
+    // ============================================================
+
+    match /production/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdminOrWarehouse();
       allow delete: if isAdmin();
     }
 
@@ -210,13 +183,127 @@ service cloud.firestore {
     // SALES
     // ============================================================
 
-    match /sales/{saleId} {
-
+    match /sales/{docId} {
       allow read: if isSignedIn();
+      allow create, update: if isAdminOrSeller();
+      allow delete: if isAdmin();
+    }
 
-      allow create: if isSignedIn();
 
+    // ============================================================
+    // EXPENSES
+    // ============================================================
+
+    match /expenses/{docId} {
+      allow read: if isAdmin();
+      allow create: if isAdminOrSeller();
       allow update, delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    // CASH
+    // ============================================================
+
+    match /cash/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+
+    // ============================================================
+    // EMPLOYEES
+    // ============================================================
+
+    match /employees/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /staff/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+
+    // ============================================================
+    // REPORTS
+    // ============================================================
+
+    match /reports/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+
+    // ============================================================
+    // HISTORY
+    // ============================================================
+
+    match /history/{docId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+
+    // ============================================================
+    // AUDIT LOGS
+    // ============================================================
+
+    match /auditLogs/{docId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+
+    // ============================================================
+    // SETTINGS
+    // ============================================================
+
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+
+    // ============================================================
+    // COUNTERS
+    // ============================================================
+
+    match /counters/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+
+    // ============================================================
+    // PROFILE
+    // ============================================================
+
+    match /profile/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || request.auth.uid == userId;
+    }
+
+
+    // ============================================================
+    // CHAT
+    // ============================================================
+
+    match /chats/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /messages/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+
+    // ============================================================
+    // SUPER ADMIN — BARCHA BOSHQA COLLECTIONLAR
+    // ============================================================
+
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
     }
   }
 }
