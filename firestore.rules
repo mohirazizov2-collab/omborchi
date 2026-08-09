@@ -1,78 +1,218 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Yordamchi funksiyalar ---
-    
+    // ============================================================
+    // YORDAMCHI FUNKSIYALAR
+    // ============================================================
+
+    // Foydalanuvchi tizimga kirganmi?
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Foydalanuvchi Admin yoki Super Admin ekanligini tekshiradi.
+    //
+    // 1) rolesAdmin/{uid} mavjud bo'lsa -> admin
+    // 2) users/{uid}.role:
+    //    - Admin
+    //    - Super Admin
+    //    - SUPER_ADMIN
+    //
+    // variantlaridan biri bo'lsa -> admin
     function isAdmin() {
-      return isSignedIn() && 
-        (exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid)) || 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin']);
+      return isSignedIn() &&
+        (
+          exists(
+            /databases/$(database)/documents/rolesAdmin/$(request.auth.uid)
+          )
+          ||
+          (
+            exists(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            )
+            &&
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.role in [
+              'Admin',
+              'Super Admin',
+              'SUPER_ADMIN'
+            ]
+          )
+        );
     }
 
-    // --- Foydalanuvchilar ---
+
+    // ============================================================
+    // FOYDALANUVCHILAR
+    // ============================================================
+
     match /users/{userId} {
+
+      // Login qilgan foydalanuvchi ko'rishi mumkin
       allow read: if isSignedIn();
-      allow write: if isAdmin() || request.auth.uid == userId;
+
+      // Faqat admin yangi user yaratishi mumkin
+      allow create: if isAdmin();
+
+      // Admin boshqa userni o'zgartirishi mumkin.
+      // User o'z profilini o'zgartirishi mumkin.
+      allow update: if isAdmin()
+                    || request.auth.uid == userId;
+
+      // USER o'chirish faqat Admin/Super Admin
+      allow delete: if isAdmin();
     }
+
+
+    // ============================================================
+    // ADMIN ROLES
+    // ============================================================
 
     match /rolesAdmin/{userId} {
+
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+
+      // Admin role ma'lumotlarini boshqaradi
+      allow create, update, delete: if isAdmin();
     }
 
-    // --- Omborxonalar ---
+
+    // ============================================================
+    // OMBORLAR
+    // ============================================================
+
     match /warehouses/{warehouseId} {
-      allow read: if true;
-      allow write: if isAdmin();
+
+      allow read: if isSignedIn();
+
+      allow create, update, delete: if isAdmin();
     }
 
-    // --- Kategoriyalar ---
+
+    // ============================================================
+    // KATEGORIYALAR
+    // ============================================================
+
     match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+
+      allow read: if isSignedIn();
+
+      allow create, update, delete: if isAdmin();
     }
 
-    // --- Mahsulotlar ---
+
+    // ============================================================
+    // MAHSULOTLAR
+    // ============================================================
+
     match /products/{productId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+
+      allow read: if isSignedIn();
+
+      allow create, update, delete: if isAdmin();
     }
 
-    // --- Ishchilar ---
+
+    // ============================================================
+    // ISHCHILAR
+    // ============================================================
+
     match /employees/{employeeId} {
+
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+
+      allow create, update, delete: if isAdmin();
     }
 
-    // --- Xarajatlar ---
+
+    // ============================================================
+    // XARAJATLAR
+    // ============================================================
+
     match /expenses/{expenseId} {
+
       allow read: if isSignedIn();
+
       allow create: if isSignedIn();
+
       allow update, delete: if isAdmin();
     }
 
-    // --- Zaxira harakatlari (Audit Trail) ---
+
+    // ============================================================
+    // STOCK MOVEMENTS / AUDIT TRAIL
+    // ============================================================
+
     match /stockMovements/{movementId} {
+
       allow read: if isSignedIn();
+
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin(); 
+
+      allow update, delete: if isAdmin();
     }
 
-    // --- Inventar (Ombordagi qoldiqlar) ---
+
+    // ============================================================
+    // INVENTORY
+    // ============================================================
+
     match /inventory/{inventoryId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+
+      allow read: if isSignedIn();
+
+      allow create, update: if isSignedIn();
+
+      // Inventory o'chirish faqat admin
+      allow delete: if isAdmin();
     }
 
-    // --- Qolgan barcha hujjatlar ---
-    match /{path=**} {
-      allow read, write: if isSignedIn();
+
+    // ============================================================
+    // NAKLADNOY / HUJJATLAR
+    // ============================================================
+
+    match /documents/{documentId} {
+
+      allow read: if isSignedIn();
+
+      allow create, update: if isSignedIn();
+
+      allow delete: if isAdmin();
     }
+
+
+    // ============================================================
+    // SAVDOLAR
+    // ============================================================
+
+    match /sales/{saleId} {
+
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn();
+
+      allow update, delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    // QOLGAN COLLECTIONLAR
+    // ============================================================
+
+    // MUHIM:
+    // Bu yerda:
+    //
+    // match /{path=**} {
+    //   allow read, write: if isSignedIn();
+    // }
+    //
+    // QO'YILMAYDI.
+    //
+    // Chunki u barcha collectionlarga umumiy write permission
+    // berib yuborishi mumkin.
   }
 }
