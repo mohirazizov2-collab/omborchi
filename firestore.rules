@@ -4,21 +4,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============================================================
-    // SUPER ADMIN
-    // ============================================================
-
-    function isSuperAdmin() {
-      return request.auth != null
-        && request.auth.token.email == 'f2472839@gmail.com';
-    }
-
-
-    // ============================================================
-    // LOGIN QILGAN FOYDALANUVCHI
+    // AUTH
     // ============================================================
 
     function isSignedIn() {
       return request.auth != null;
+    }
+
+
+    // ============================================================
+    // SUPER ADMIN
+    // ============================================================
+
+    function isSuperAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'f2472839@gmail.com';
     }
 
 
@@ -56,10 +56,10 @@ service cloud.firestore {
 
 
     // ============================================================
-    // SUPER ADMIN — BARCHA FIRESTORE UCHUN TO'LIQ HUQUQ
+    // SUPER ADMIN — BARCHA FIRESTORE
     // ============================================================
-    //
-    // f2472839@gmail.com:
+
+    // Faqat f2472839@gmail.com uchun:
     //
     // READ     ✅
     // CREATE   ✅
@@ -67,7 +67,6 @@ service cloud.firestore {
     // DELETE   ✅
     //
     // Yangi collectionlar ham avtomatik ishlaydi.
-    //
 
     match /{document=**} {
       allow read, write: if isSuperAdmin();
@@ -104,7 +103,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // OMBORLAR
+    // WAREHOUSES
     // ============================================================
 
     match /warehouses/{warehouseId} {
@@ -116,7 +115,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // KATEGORIYALAR
+    // CATEGORIES
     // ============================================================
 
     match /categories/{categoryId} {
@@ -128,7 +127,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // MAHSULOTLAR
+    // PRODUCTS
     // ============================================================
 
     match /products/{productId} {
@@ -140,7 +139,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // ISHCHILAR
+    // EMPLOYEES
     // ============================================================
 
     match /employees/{employeeId} {
@@ -152,7 +151,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // XARAJATLAR
+    // EXPENSES
     // ============================================================
 
     match /expenses/{expenseId} {
@@ -166,7 +165,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // STOCK MOVEMENTS / AUDIT TRAIL
+    // STOCK MOVEMENTS
     // ============================================================
 
     match /stockMovements/{movementId} {
@@ -194,7 +193,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // NAKLADNOY / HUJJATLAR
+    // DOCUMENTS / NAKLADNOY
     // ============================================================
 
     match /documents/{documentId} {
@@ -208,7 +207,7 @@ service cloud.firestore {
 
 
     // ============================================================
-    // SAVDOLAR
+    // SALES
     // ============================================================
 
     match /sales/{saleId} {
@@ -219,6 +218,5 @@ service cloud.firestore {
 
       allow update, delete: if isAdmin();
     }
-
   }
 }
