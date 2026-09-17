@@ -1,0 +1,1240 @@
+"use client";
+ 
+import { OmniSidebar } from "@/components/layout/sidebar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus, Trash2, FileText, Loader2, Search,
+  CheckCircle2, Calendar, Warehouse, FileInput, Download,
+  Save, X, RefreshCw,
+} from "lucide-react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useLanguage } from "@/lib/i18n/context";
+import { useUser } from "@/firebase";
+import {
+  getFirestore,
+  collection, doc, getDoc, setDoc, runTransaction,
+  onSnapshot, query, QuerySnapshot,
+} from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import {
+  addDocumentNonBlocking,
+  updateDocumentNonBlocking,
+} from "@/firebase/non-blocking-updates";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+import {
+  Dialog, DialogContent, DialogHeader,
+  DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+ 
+// ─── PDF (inline) ───────────────────────────────────────────────────────────
+ 
+const fmtMoney = (val: number, currency = "сум") =>
+  val.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
+  " " + currency;
+ 
+async function generateStockInPDF(params: {
+  dnNumber: string;
+  supplier: string;
+  warehouse: string;
+  date: string;
+  responsible: string;
+  items: Array<{
+    name: string; sku?: string; quantity: number;
+    price: number; vatRate: number; vatAmount: number; unit?: string;
+  }>;
+  totals: { gross: number; vatTotal: number; net: number };
+  currency?: string;
+}): Promise<void> {
+  const { dnNumber, supplier, warehouse, date, responsible, items, totals, currency = "сум" } = params;
+ 
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 12;
+ 
+  const colorAccent: [number, number, number] = [22, 163, 74];
+  const colorDark: [number, number, number] = [18, 18, 24];
+  const colorGray: [number, number, number] = [110, 110, 120];
+  const colorLightBg: [number, number, number] = [248, 248, 250];
+  const colorWhite: [number, number, number] = [255, 255, 255];
+  const colorAmber: [number, number, number] = [217, 119, 6];
+ 
+  // Header
+  doc.setFillColor(...colorDark);
+  doc.rect(0, 0, pageW, 24, "F");
+  doc.setFillColor(...colorAccent);
+  doc.rect(0, 24, pageW, 2, "F");
+ 
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...colorWhite);
+  doc.text("OMBORCHI.UZ", margin, 15);
+ 
+  doc.setFontSize(8);
+  doc.setTextColor(180, 180, 195);
+  doc.text("KIRIM NAKЛАДНОЙ", pageW / 2, 10, { align: "center" });
+ 
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...colorAccent);
+  doc.text("№ " + dnNumber, pageW / 2, 20, { align: "center" });
+ 
+  const dateStr = (() => {
+    try {
+      return new Date(date).toLocaleString("ru-RU", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+      });
+    } catch { return date; }
+  })();
+ 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(160, 160, 175);
+  doc.text(dateStr, pageW - margin, 15, { align: "right" });
+ 
+  // Info panel
+  const infoY = 30;
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(margin, infoY, pageW - margin * 2, 26, 2, 2, "F");
+ 
+  const drawInfo = (x: number, y: number, label: string, value: string) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...colorGray);
+    doc.text(label + ":", x, y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...colorDark);
+    const safe = (value || "—").length > 50
+      ? (value || "—").substring(0, 47) + "..."
+      : (value || "—");
+    doc.text(safe, x + 36, y);
+  };
+ 
+  const col1X = margin + 4;
+  const col2X = pageW / 2 + 4;
+ 
+  drawInfo(col1X, infoY + 7, "Hujjat №", dnNumber);
+  drawInfo(col1X, infoY + 14, "Ombor", warehouse || "—");
+  drawInfo(col1X, infoY + 21, "Mas'ul shaxs", responsible || "—");
+  drawInfo(col2X, infoY + 7, "Yetkazuvchi", supplier);
+  drawInfo(col2X, infoY + 14, "Sana", dateStr);
+ 
+  // Table
+  const tableStartY = infoY + 30;
+ 
+  const tableHead = [[
+    { content: "№", styles: { halign: "center" as const } },
+    { content: "Mahsulot nomi", styles: { halign: "left" as const } },
+    { content: "SKU", styles: { halign: "center" as const } },
+    { content: "Miqdor", styles: { halign: "center" as const } },
+    { content: "Birlik", styles: { halign: "center" as const } },
+    { content: "Narx", styles: { halign: "right" as const } },
+    { content: "QQS %", styles: { halign: "center" as const } },
+    { content: "QQS summa", styles: { halign: "right" as const } },
+    { content: "Summa (QQSsiz)", styles: { halign: "right" as const } },
+    { content: "Jami summa", styles: { halign: "right" as const } },
+  ]];
+ 
+  const tableBody = items.map((item, i) => {
+    const gross = item.quantity * item.price;
+    const net = gross - item.vatAmount;
+    return [
+      { content: String(i + 1), styles: { halign: "center" as const } },
+      { content: item.name || "—" },
+      { content: item.sku || "—", styles: { halign: "center" as const } },
+      { content: Number(item.quantity || 0).toLocaleString("ru-RU"), styles: { halign: "center" as const } },
+      { content: item.unit || "шт", styles: { halign: "center" as const } },
+      { content: fmtMoney(item.price || 0, currency), styles: { halign: "right" as const } },
+      { content: `${item.vatRate}%`, styles: { halign: "center" as const } },
+      { content: fmtMoney(item.vatAmount || 0, currency), styles: { halign: "right" as const } },
+      { content: fmtMoney(net, currency), styles: { halign: "right" as const } },
+      {
+        content: fmtMoney(gross, currency),
+        styles: { halign: "right" as const, fontStyle: "bold" as const, textColor: colorAccent },
+      },
+    ];
+  });
+ 
+  autoTable(doc, {
+    head: tableHead,
+    body: tableBody,
+    startY: tableStartY,
+    margin: { left: margin, right: margin },
+    styles: {
+      fontSize: 7.5,
+      cellPadding: { top: 3, bottom: 3, left: 2.5, right: 2.5 },
+      font: "helvetica",
+      textColor: colorDark,
+      lineColor: [225, 225, 232],
+      lineWidth: 0.25,
+      overflow: "ellipsize",
+    },
+    headStyles: {
+      fillColor: colorDark,
+      textColor: colorWhite,
+      fontStyle: "bold",
+      fontSize: 7,
+    },
+    alternateRowStyles: { fillColor: colorLightBg },
+    columnStyles: {
+      0: { cellWidth: 8 },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 16 },
+      5: { cellWidth: 34 },
+      6: { cellWidth: 16 },
+      7: { cellWidth: 28 },
+      8: { cellWidth: 30 },
+      9: { cellWidth: 34 },
+    },
+  });
+ 
+  // Totals
+  const finalY: number = (doc as any).lastAutoTable.finalY;
+  const summaryX = pageW - margin - 100;
+  const summaryW = 100;
+  const summaryY = finalY + 5;
+ 
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(summaryX, summaryY, summaryW, 32, 2, 2, "F");
+  doc.setFillColor(...colorDark);
+  doc.roundedRect(summaryX, summaryY, summaryW, 9, 2, 2, "F");
+  doc.rect(summaryX, summaryY + 5, summaryW, 4, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorWhite);
+  doc.text("JAMI HISOB", summaryX + summaryW / 2, summaryY + 6, { align: "center" });
+ 
+  const summaryRows: [string, string, [number, number, number]][] = [
+    ["QQS sofsiz summa:", fmtMoney(totals.net, currency), colorDark],
+    ["QQS miqdori:", fmtMoney(totals.vatTotal, currency), colorAmber],
+  ];
+  summaryRows.forEach(([label, val, col], i) => {
+    const ry = summaryY + 15 + i * 7;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...colorGray);
+    doc.text(label, summaryX + 4, ry);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...col);
+    doc.text(val, summaryX + summaryW - 4, ry, { align: "right" });
+  });
+ 
+  const netBoxY = summaryY + 34;
+  doc.setFillColor(...colorAccent);
+  doc.roundedRect(summaryX, netBoxY, summaryW, 13, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorWhite);
+  doc.text("UMUMIY SUMMA (QQS bilan):", summaryX + 4, netBoxY + 5);
+  doc.setFontSize(9);
+  doc.text(fmtMoney(totals.gross, currency), summaryX + summaryW - 4, netBoxY + 9, { align: "right" });
+ 
+  // Signatures
+  const signY = finalY + 5;
+  const signW = 82;
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(margin, signY, signW, 30, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorGray);
+  doc.text("YETKAZDI / ОТГРУЗИЛ", margin + 4, signY + 6);
+  doc.setDrawColor(...colorGray);
+  doc.setLineWidth(0.3);
+  doc.line(margin + 4, signY + 20, margin + signW - 4, signY + 20);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text(supplier || "________________", margin + 4, signY + 26);
+ 
+  const sign2X = margin + signW + 6;
+  doc.setFillColor(...colorLightBg);
+  doc.roundedRect(sign2X, signY, signW, 30, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...colorGray);
+  doc.text("QABUL QILDI / ПОЛУЧИЛ", sign2X + 4, signY + 6);
+  doc.setDrawColor(...colorGray);
+  doc.line(sign2X + 4, signY + 20, sign2X + signW - 4, signY + 20);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text(responsible || "________________", sign2X + 4, signY + 26);
+ 
+  // Footer
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  for (let pg = 1; pg <= pageCount; pg++) {
+    doc.setPage(pg);
+    const footerY = doc.internal.pageSize.getHeight() - 5;
+    doc.setFillColor(...colorDark);
+    doc.rect(0, footerY - 4, pageW, 10, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(130, 130, 145);
+    doc.text(
+      `OMBORCHI.UZ · Kirim nakładnoyi · ${dnNumber} · ${dateStr}`,
+      margin, footerY + 1
+    );
+    doc.text(`Sahifa ${pg} / ${pageCount}`, pageW - margin, footerY + 1, { align: "right" });
+  }
+ 
+  doc.save(`kirim-${dnNumber}-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+ 
+// ─── helpers ────────────────────────────────────────────────────────────────
+ 
+const generateId = () =>
+  Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+ 
+async function getNextDnNumber(db: ReturnType<typeof getFirestore>): Promise<string> {
+  const counterRef = doc(db, "counters", "stockIn");
+  try {
+    const next = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(counterRef);
+      const cur = snap.exists() ? snap.data().lastNumber || 0 : 0;
+      const nxt = cur + 1;
+      tx.set(counterRef, { lastNumber: nxt }, { merge: true });
+      return nxt;
+    });
+    return `AI-${String(next).padStart(4, "0")}`;
+  } catch {
+    return `AI-${Date.now().toString().slice(-4)}`;
+  }
+}
+ 
+const fmt = (v: number) =>
+  v.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+ 
+const VAT_RATES = [0, 10, 18, 20];
+ 
+type ProductTab = "all" | "goods" | "dishes" | "prep" | "services";
+ 
+interface LineItem {
+  id: string;
+  productId: string;
+  searchQuery: string;
+  containerQty: number;
+  unitQty: number;
+  actualQty: number;
+  containerSize: number;
+  price: number;
+  vatRate: number;
+  stockBefore: number;
+  tab: ProductTab;
+}
+ 
+// ─── component ──────────────────────────────────────────────────────────────
+ 
+export default function StockInPage() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const { user, role, assignedWarehouseId } = useUser();
+ 
+  // Get db once, stably
+  const db = useMemo(() => getFirestore(), []);
+ 
+  // form state
+  const [loading, setLoading] = useState(false);
+  const [dnLoading, setDnLoading] = useState(false);
+  const [dnNumber, setDnNumber] = useState("");
+  const [supplier, setSupplier] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const [movementDateStr, setMovementDateStr] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [incomingDocNo, setIncomingDocNo] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
+  const [comment, setComment] = useState("");
+  const [concept, setConcept] = useState("");
+  const [activeTab, setActiveTab] = useState<ProductTab>("all");
+ 
+  // items
+  const [items, setItems] = useState<LineItem[]>([{
+    id: generateId(), productId: "", searchQuery: "",
+    containerQty: 1, unitQty: 1, actualQty: 1,
+    containerSize: 1, price: 0, vatRate: 0,
+    stockBefore: 0, tab: "goods",
+  }]);
+ 
+  // success dialog
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [processedInvoice, setProcessedInvoice] = useState<any>(null);
+ 
+  // Firestore data — manual onSnapshot to avoid hook re-subscription issues
+  const [products, setProducts] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+ 
+  const isAdmin = role === "Super Admin" || role === "Admin";
+ 
+  // ── Stable Firestore subscriptions ────────────────────────────────────
+  useEffect(() => {
+    if (!db) return;
+ 
+    const unsubs: (() => void)[] = [];
+ 
+    const snap = <T extends { id: string }>(
+      col: string,
+      setter: React.Dispatch<React.SetStateAction<T[]>>
+    ) => {
+      const q = collection(db, col);
+      const unsub = onSnapshot(
+        q,
+        (snapshot: QuerySnapshot) => {
+          setter(
+            snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T))
+          );
+        },
+        (err) => {
+          // Silently ignore channel-closed errors (they self-recover)
+          if (err.code !== "unavailable") {
+            console.error(`[${col}] snapshot error:`, err.code);
+          }
+        }
+      );
+      unsubs.push(unsub);
+    };
+ 
+    snap("products", setProducts);
+    snap("warehouses", setWarehouses);
+    snap("inventory", setInventory);
+ 
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }, [db]);
+ 
+  // ── init DN number ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!db) return;
+    setDnLoading(true);
+    getNextDnNumber(db)
+      .then(setDnNumber)
+      .finally(() => setDnLoading(false));
+  }, [db]);
+ 
+  useEffect(() => {
+    if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
+  }, [isAdmin, assignedWarehouseId]);
+ 
+  // stockBefore helper
+  const getStock = useCallback(
+    (productId: string) => {
+      if (!inventory.length || !warehouseId) return 0;
+      const inv = inventory.find(
+        (i) => i.warehouseId === warehouseId && i.productId === productId
+      );
+      return inv?.stock || 0;
+    },
+    [inventory, warehouseId]
+  );
+ 
+  // ── item helpers ───────────────────────────────────────────────────────
+  const addItem = () =>
+    setItems((prev) => [
+      ...prev,
+      {
+        id: generateId(), productId: "", searchQuery: "",
+        containerQty: 1, unitQty: 1, actualQty: 1,
+        containerSize: 1, price: 0, vatRate: 0,
+        stockBefore: 0, tab: "goods",
+      },
+    ]);
+ 
+  const removeItem = (id: string) => {
+    if (items.length > 1) setItems((p) => p.filter((i) => i.id !== id));
+  };
+ 
+  const updateItem = (id: string, field: string, value: any) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const upd: any = { ...item, [field]: value };
+ 
+        if (field === "productId" && value) {
+          const p = products.find((pr) => pr.id === value);
+          if (p) {
+            upd.price = p.purchasePrice || p.salePrice || 0;
+            upd.vatRate = p.vatRate || 0;
+            upd.containerSize = p.containerSize || 1;
+            upd.stockBefore = getStock(value);
+            upd.tab =
+              p.category === "dish" ? "dishes"
+              : p.category === "prep" ? "prep"
+              : p.category === "service" ? "services"
+              : "goods";
+          }
+        }
+ 
+        if (field === "containerQty") {
+          upd.unitQty = parseFloat(value) * upd.containerSize;
+          upd.actualQty = upd.unitQty;
+        }
+        if (field === "unitQty") {
+          upd.containerQty = parseFloat(value) / upd.containerSize;
+          upd.actualQty = parseFloat(value);
+        }
+        if (field === "actualQty") {
+          upd.unitQty = parseFloat(value);
+          upd.containerQty = parseFloat(value) / upd.containerSize;
+        }
+        if (field === "containerSize") {
+          upd.unitQty = upd.containerQty * parseFloat(value);
+          upd.actualQty = upd.unitQty;
+        }
+ 
+        return upd;
+      })
+    );
+  };
+ 
+  // ── filtered items by tab ──────────────────────────────────────────────
+  const visibleItems = useMemo(() => {
+    if (activeTab === "all") return items;
+    return items.filter((i) => i.tab === activeTab);
+  }, [items, activeTab]);
+ 
+  // ── totals ─────────────────────────────────────────────────────────────
+  const totals = useMemo(() => {
+    let gross = 0, vatTotal = 0;
+    items.forEach((item) => {
+      const qty = item.actualQty || 0;
+      const rowGross = qty * (item.price || 0);
+      const rowVat = (rowGross * item.vatRate) / 100;
+      gross += rowGross;
+      vatTotal += rowVat;
+    });
+    return { gross, vatTotal, net: gross - vatTotal };
+  }, [items]);
+ 
+  // ── reset form helper ──────────────────────────────────────────────────
+  const resetForm = async () => {
+    setItems([{
+      id: generateId(), productId: "", searchQuery: "",
+      containerQty: 1, unitQty: 1, actualQty: 1,
+      containerSize: 1, price: 0, vatRate: 0,
+      stockBefore: 0, tab: "goods",
+    }]);
+    setSupplier(""); setIncomingDocNo(""); setInvoiceNo("");
+    setInvoiceDate(""); setComment(""); setConcept("");
+    setMovementDateStr(new Date().toISOString().split("T")[0]);
+    if (isAdmin) setWarehouseId("");
+    const next = await getNextDnNumber(db);
+    setDnNumber(next);
+  };
+ 
+  // ── process ────────────────────────────────────────────────────────────
+  const handleProcess = async (closeAfter = false) => {
+    if (!dnNumber || !supplier || !warehouseId) {
+      toast({
+        variant: "destructive", title: "Xatolik",
+        description: "DN raqam, yetkazuvchi va ombor majburiy.",
+      });
+      return;
+    }
+    if (items.some((i) => !i.productId)) {
+      toast({
+        variant: "destructive", title: "Xatolik",
+        description: "Barcha qatorlarda mahsulot tanlanishi shart.",
+      });
+      return;
+    }
+ 
+    setLoading(true);
+    try {
+      const invoiceItems: any[] = [];
+      const userName = user?.displayName || user?.email || "Noma'lum";
+      const movDate = movementDateStr
+        ? new Date(movementDateStr).toISOString()
+        : new Date().toISOString();
+ 
+      for (const item of items) {
+        const product = products.find((p) => p.id === item.productId);
+        const qty = item.actualQty || 0;
+        const unitLabel = product?.unit
+          ? t.units[product.unit as keyof typeof t.units] || product.unit
+          : "pcs";
+        const rowTotal = qty * item.price;
+        const vatAmt = (rowTotal * item.vatRate) / 100;
+ 
+        invoiceItems.push({
+          name: product?.name || "Noma'lum",
+          sku: product?.sku || "",
+          quantity: qty,
+          price: item.price,
+          vatRate: item.vatRate,
+          vatAmount: vatAmt,
+          unit: unitLabel,
+        });
+ 
+        addDocumentNonBlocking(collection(db, "stockMovements"), {
+          productId: item.productId,
+          productName: product?.name || "Noma'lum",
+          warehouseId,
+          warehouseName:
+            warehouses.find((w) => w.id === warehouseId)?.name || "Noma'lum",
+          quantityChange: qty,
+          movementType: "StockIn",
+          movementDate: movDate,
+          responsibleUserId: user?.uid,
+          responsibleUserName: userName,
+          dnNumber, supplier,
+          incomingDocNo, invoiceNo, invoiceDate, comment, concept,
+          unitPrice: item.price,
+          totalPrice: rowTotal,
+          vatRate: item.vatRate,
+          vatAmount: vatAmt,
+          unit: product?.unit || "pcs",
+        });
+ 
+        if (product) {
+          updateDocumentNonBlocking(doc(db, "products", item.productId), {
+            stock: (product.stock || 0) + qty,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+ 
+        const invId = `${warehouseId}_${item.productId}`;
+        const invRef = doc(db, "inventory", invId);
+        const invSnap = await getDoc(invRef);
+        if (invSnap.exists()) {
+          updateDocumentNonBlocking(invRef, {
+            stock: (invSnap.data().stock || 0) + qty,
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          await setDoc(invRef, {
+            id: invId, warehouseId,
+            productId: item.productId,
+            stock: qty,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+ 
+      const savedInvoice = {
+        dnNumber, supplier, incomingDocNo, invoiceNo,
+        warehouse: warehouses.find((w) => w.id === warehouseId)?.name,
+        date: new Date(movDate).toLocaleString(),
+        items: invoiceItems, responsible: userName,
+        totals,
+      };
+      setProcessedInvoice(savedInvoice);
+      toast({
+        title: "Muvaffaqiyatli saqlandi!",
+        description: `${dnNumber} — kirim nakładnoyi rasmiylashtirildi.`,
+      });
+ 
+      await resetForm();
+      if (!closeAfter) setIsSuccessOpen(true);
+    } catch (err: any) {
+      toast({
+        variant: "destructive", title: "Xatolik",
+        description:
+          err?.code === "permission-denied"
+            ? "Ruxsat yo'q."
+            : "Saqlashda xatolik yuz berdi.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+ 
+  const handleDownloadPDF = async () => {
+    if (!processedInvoice) return;
+    const currencyStr = t.settings.currency.split(" ")[0];
+    await generateStockInPDF({
+      dnNumber: processedInvoice.dnNumber,
+      supplier: processedInvoice.supplier,
+      warehouse: processedInvoice.warehouse || "—",
+      date: processedInvoice.date,
+      responsible: processedInvoice.responsible,
+      items: processedInvoice.items,
+      totals: processedInvoice.totals,
+      currency: currencyStr,
+    });
+  };
+ 
+  // ── tabs ───────────────────────────────────────────────────────────────
+  const TABS: { key: ProductTab; label: string }[] = [
+    { key: "all", label: "Barcha" },
+    { key: "goods", label: "Tovarlar" },
+    { key: "dishes", label: "Taomlar" },
+    { key: "prep", label: "Yarim tayyor" },
+    { key: "services", label: "Xizmatlar" },
+  ];
+ 
+  // ── render ─────────────────────────────────────────────────────────────
+  return (
+    <div className="flex min-h-screen bg-background font-body">
+      <OmniSidebar />
+ 
+      <main className="flex-1 overflow-y-auto">
+        {/* Page title bar */}
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b border-border/30 px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FileInput className="w-5 h-5 text-primary" />
+            <h1 className="font-black text-base tracking-tight">
+              {t.stockIn.title}{" "}
+              {dnNumber && (
+                <span className="font-mono text-primary">№{dnNumber}</span>
+              )}
+              {movementDateStr && (
+                <span className="font-normal text-muted-foreground ml-2 text-sm">
+                  от {new Date(movementDateStr).toLocaleDateString("ru-RU")}
+                </span>
+              )}
+            </h1>
+          </div>
+ 
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline" size="sm"
+              className="h-9 rounded-lg font-bold text-xs gap-2"
+              onClick={() => handleProcess(false)}
+              disabled={loading}
+            >
+              {loading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <RefreshCw className="w-3.5 h-3.5" />}
+              Обновить
+            </Button>
+            <Button
+              size="sm"
+              className="h-9 rounded-lg font-bold text-xs gap-2 bg-primary text-white"
+              onClick={() => handleProcess(false)}
+              disabled={loading}
+            >
+              <Save className="w-3.5 h-3.5" />
+              Сохранить
+            </Button>
+            <Button variant="ghost" size="sm" className="h-9 rounded-lg font-bold text-xs gap-2" asChild>
+              <Link href="/products">
+                <X className="w-3.5 h-3.5" />
+                Выйти
+              </Link>
+            </Button>
+            <Button
+              size="sm"
+              className="h-9 rounded-lg font-bold text-xs gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => handleProcess(true)}
+              disabled={loading}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Сохранить и закрыть
+            </Button>
+          </div>
+        </div>
+ 
+        <div className="p-6 space-y-4">
+ 
+          {/* HEADER CARD */}
+          <Card className="border border-border/40 rounded-2xl shadow-sm">
+            <div className="px-5 py-2.5 border-b border-border/20 flex gap-4 text-sm">
+              <button className="font-bold text-primary border-b-2 border-primary pb-1">
+                Основные свойства
+              </button>
+              <button className="text-muted-foreground font-medium pb-1">
+                Доставка и оплата
+              </button>
+            </div>
+ 
+            <CardContent className="p-5">
+              <div className="grid grid-cols-2 gap-x-10 gap-y-4">
+                {/* left column */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      {t.stockIn.dnNumber}:
+                    </Label>
+                    <div className="relative flex-1">
+                      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-primary/40" />
+                      {dnLoading && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-primary animate-spin" />
+                      )}
+                      <Input
+                        className="h-9 pl-9 rounded-lg font-mono font-bold text-primary text-sm"
+                        value={dnNumber}
+                        onChange={(e) => setDnNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
+ 
+                  <div className="flex items-center gap-3">
+                    <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      Дата и время получения:
+                    </Label>
+                    <div className="relative flex-1">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-primary/40" />
+                      <Input
+                        type="date"
+                        className="h-9 pl-9 rounded-lg text-sm font-bold"
+                        value={movementDateStr}
+                        onChange={(e) => setMovementDateStr(e.target.value)}
+                      />
+                    </div>
+                  </div>
+ 
+                  <div className="flex items-center gap-3">
+                    <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      Концепция:
+                    </Label>
+                    <Input
+                      className="h-9 rounded-lg text-sm font-bold flex-1"
+                      placeholder="—"
+                      value={concept}
+                      onChange={(e) => setConcept(e.target.value)}
+                    />
+                  </div>
+ 
+                  <div className="flex items-center gap-3">
+                    <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      Вход. документ №:
+                    </Label>
+                    <Input
+                      className="h-9 rounded-lg text-sm font-bold flex-1"
+                      placeholder="9876543"
+                      value={incomingDocNo}
+                      onChange={(e) => setIncomingDocNo(e.target.value)}
+                    />
+                  </div>
+ 
+                  <div className="flex items-center gap-3">
+                    <Label className="w-44 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      Комментарий:
+                    </Label>
+                    <Input
+                      className="h-9 rounded-lg text-sm flex-1"
+                      placeholder="Na osnove zakaza..."
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                    />
+                  </div>
+                </div>
+ 
+                {/* right column */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      {t.stockIn.supplier}:
+                    </Label>
+                    <Input
+                      className="h-9 rounded-lg text-sm font-bold flex-1"
+                      placeholder="Yetkazuvchi nomi"
+                      value={supplier}
+                      onChange={(e) => setSupplier(e.target.value)}
+                    />
+                  </div>
+ 
+                  <div className="flex items-center gap-3">
+                    <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      {t.stockIn.targetWarehouse}:
+                    </Label>
+                    <Select
+                      onValueChange={setWarehouseId}
+                      value={warehouseId}
+                      disabled={!isAdmin && !!assignedWarehouseId}
+                    >
+                      <SelectTrigger className="h-9 rounded-lg flex-1 text-sm font-bold">
+                        <div className="flex items-center gap-2">
+                          <Warehouse className="w-3.5 h-3.5 text-primary/40" />
+                          <SelectValue placeholder="Ombor tanlang" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {warehouses.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+ 
+                  <div className="flex items-center gap-3">
+                    <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      Счёт-фактура:
+                    </Label>
+                    <Input
+                      className="h-9 rounded-lg text-sm font-bold flex-1"
+                      placeholder="123456"
+                      value={invoiceNo}
+                      onChange={(e) => setInvoiceNo(e.target.value)}
+                    />
+                  </div>
+ 
+                  <div className="flex items-center gap-3">
+                    <Label className="w-32 shrink-0 text-xs font-semibold text-right text-muted-foreground">
+                      От:
+                    </Label>
+                    <Input
+                      type="date"
+                      className="h-9 rounded-lg text-sm font-bold flex-1"
+                      value={invoiceDate}
+                      onChange={(e) => setInvoiceDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+ 
+          {/* ITEMS TABLE */}
+          <Card className="border border-border/40 rounded-2xl shadow-sm overflow-hidden">
+            {/* Tab bar */}
+            <div className="flex items-center border-b border-border/20 bg-muted/10 px-4 gap-1">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    "px-4 py-2.5 text-xs font-bold transition-colors border-b-2",
+                    activeTab === tab.key
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                  {tab.key !== "all" && (
+                    <span className={cn(
+                      "ml-1.5 text-[9px] rounded-full px-1.5 py-0.5",
+                      activeTab === tab.key
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground"
+                    )}>
+                      {items.filter((i) => i.tab === tab.key && i.productId).length}
+                    </span>
+                  )}
+                </button>
+              ))}
+              <div className="ml-auto py-2">
+                <Button
+                  size="sm" onClick={addItem}
+                  className="h-8 rounded-lg font-bold text-[10px] uppercase tracking-wide bg-primary text-white gap-1.5"
+                >
+                  <Plus className="w-3 h-3" />
+                  {t.actions.addItem}
+                </Button>
+              </div>
+            </div>
+ 
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted/20 text-[10px] uppercase font-black tracking-wider text-muted-foreground border-b border-border/20">
+                  <tr>
+                    <th className="px-3 py-3 w-10 text-center">№</th>
+                    <th className="px-3 py-3 w-20 text-center">Kod</th>
+                    <th className="px-3 py-3 min-w-[220px]">Mahsulot nomi</th>
+                    <th className="px-2 py-3 w-24 text-right">Qadoqda</th>
+                    <th className="px-2 py-3 w-24 text-right">Birlikda</th>
+                    <th className="px-2 py-3 w-24 text-right bg-amber-50/50 dark:bg-amber-900/10">Faktik</th>
+                    <th className="px-2 py-3 w-32 text-right">Narx</th>
+                    <th className="px-2 py-3 w-32 text-right">Summa</th>
+                    <th className="px-2 py-3 w-20 text-right">QQS, %</th>
+                    <th className="px-2 py-3 w-28 text-right">QQS summa</th>
+                    <th className="px-2 py-3 w-28 text-right">Sofsiz</th>
+                    <th className="px-2 py-3 w-28 text-right">Oldingi qoldiq</th>
+                    <th className="px-2 py-3 w-28 text-right">Yangi qoldiq</th>
+                    <th className="px-3 py-3 w-10"></th>
+                  </tr>
+                </thead>
+ 
+                <tbody className="divide-y divide-border/10">
+                  <AnimatePresence mode="popLayout">
+                    {visibleItems.map((item, index) => {
+                      const sel = products.find((p) => p.id === item.productId);
+                      const qty = item.actualQty || 0;
+                      const rowGross = qty * (item.price || 0);
+                      const rowVat = (rowGross * item.vatRate) / 100;
+                      const rowNet = rowGross - rowVat;
+                      const stockAfter = item.stockBefore + qty;
+                      const unitLabel = sel
+                        ? t.units[sel.unit as keyof typeof t.units] || sel.unit
+                        : "";
+ 
+                      return (
+                        <motion.tr
+                          key={item.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -16 }}
+                          className="hover:bg-primary/[0.02] group"
+                        >
+                          <td className="px-3 py-2 text-center text-xs font-bold opacity-40">
+                            {index + 1}
+                          </td>
+ 
+                          <td className="px-3 py-2 text-center">
+                            <span className="text-[10px] font-mono text-muted-foreground">
+                              {sel?.sku || "—"}
+                            </span>
+                          </td>
+ 
+                          <td className="px-3 py-2">
+                            <Select
+                              onValueChange={(v) => updateItem(item.id, "productId", v)}
+                              value={item.productId}
+                            >
+                              <SelectTrigger className="h-9 rounded-lg bg-background/50 border-border/40 font-bold text-xs w-full">
+                                <SelectValue placeholder={t.products.search} />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl max-h-[300px]">
+                                <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10 mb-1">
+                                  <div className="relative">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Qidirish..."
+                                      className="h-8 pl-8 text-xs rounded-lg"
+                                      value={item.searchQuery}
+                                      onChange={(e) => updateItem(item.id, "searchQuery", e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </div>
+                                </div>
+                                {products
+                                  .filter(
+                                    (p) =>
+                                      p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) ||
+                                      (p.sku && p.sku.toLowerCase().includes(item.searchQuery.toLowerCase()))
+                                  )
+                                  .map((p) => (
+                                    <SelectItem key={p.id} value={p.id} className="text-xs py-2 font-bold">
+                                      {p.sku && (
+                                        <span className="font-mono text-muted-foreground mr-1.5">
+                                          {p.sku}
+                                        </span>
+                                      )}
+                                      {p.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+ 
+                          <td className="px-2 py-2">
+                            <Input
+                              type="number" min={0}
+                              className="h-9 rounded-lg text-right text-xs font-black bg-background/50 border-border/40 w-full"
+                              value={item.containerQty}
+                              onChange={(e) => updateItem(item.id, "containerQty", parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+ 
+                          <td className="px-2 py-2">
+                            <div className="space-y-0.5">
+                              <Input
+                                type="number" min={0}
+                                className="h-9 rounded-lg text-right text-xs font-black bg-background/50 border-border/40 w-full"
+                                value={item.unitQty}
+                                onChange={(e) => updateItem(item.id, "unitQty", parseFloat(e.target.value) || 0)}
+                              />
+                              {unitLabel && (
+                                <p className="text-[9px] text-center text-primary/60 font-bold uppercase">
+                                  {unitLabel}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+ 
+                          <td className="px-2 py-2 bg-amber-50/30 dark:bg-amber-900/5">
+                            <Input
+                              type="number" min={0}
+                              className="h-9 rounded-lg text-right text-xs font-black bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40 w-full"
+                              value={item.actualQty}
+                              onChange={(e) => updateItem(item.id, "actualQty", parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+ 
+                          <td className="px-2 py-2">
+                            <Input
+                              type="number" min={0}
+                              className="h-9 rounded-lg text-right text-xs font-black bg-background/50 border-border/40 w-full"
+                              value={item.price}
+                              onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+ 
+                          <td className="px-2 py-2 text-right font-black text-sm text-primary">
+                            {fmt(rowGross)}
+                          </td>
+ 
+                          <td className="px-2 py-2">
+                            <Select
+                              value={String(item.vatRate)}
+                              onValueChange={(v) => updateItem(item.id, "vatRate", parseFloat(v))}
+                            >
+                              <SelectTrigger className="h-9 rounded-lg text-xs font-bold bg-background/50 border-border/40 w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl">
+                                {VAT_RATES.map((r) => (
+                                  <SelectItem key={r} value={String(r)} className="text-xs">
+                                    {r}%
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+ 
+                          <td className="px-2 py-2 text-right text-xs font-semibold text-muted-foreground">
+                            {fmt(rowVat)}
+                          </td>
+ 
+                          <td className="px-2 py-2 text-right text-xs font-semibold text-muted-foreground">
+                            {fmt(rowNet)}
+                          </td>
+ 
+                          <td className="px-2 py-2 text-right text-xs text-muted-foreground">
+                            {fmt(item.stockBefore)}
+                          </td>
+ 
+                          <td className={cn(
+                            "px-2 py-2 text-right text-xs font-bold",
+                            stockAfter >= 0 ? "text-emerald-600" : "text-rose-500"
+                          )}>
+                            {fmt(stockAfter)}
+                          </td>
+ 
+                          <td className="px-3 py-2">
+                            <Button
+                              variant="ghost" size="icon"
+                              className="h-8 w-8 rounded-lg hover:bg-rose-500/10 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeItem(item.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </AnimatePresence>
+ 
+                  {visibleItems.length === 0 && (
+                    <tr>
+                      <td colSpan={14} className="py-10 text-center text-muted-foreground text-sm">
+                        Bu tabda mahsulot yo'q.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+ 
+            {/* Footer totals */}
+            <div className="border-t border-border/20 bg-muted/10 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-8 text-sm">
+                <div>
+                  <span className="text-muted-foreground text-xs font-semibold mr-2">Позиций:</span>
+                  <span className="font-black">{items.filter((i) => i.productId).length}</span>
+                </div>
+              </div>
+ 
+              <div className="flex items-center gap-8 text-sm font-bold">
+                <div className="text-right">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold mb-0.5">
+                    QQS sofsiz summa
+                  </p>
+                  <p className="text-base font-black">{fmt(totals.net)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold mb-0.5">
+                    QQS miqdori
+                  </p>
+                  <p className="text-base font-black text-amber-600">{fmt(totals.vatTotal)}</p>
+                </div>
+                <div className="text-right bg-primary/5 rounded-xl px-5 py-2">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold mb-0.5">
+                    Общая сумма (QQS bilan)
+                  </p>
+                  <p className="text-2xl font-black text-primary font-headline">
+                    {fmt(totals.gross)}{" "}
+                    <span className="text-xs font-bold opacity-60">
+                      {t.settings.currency.split(" ")[0]}
+                    </span>
+                  </p>
+                  {totals.vatTotal > 0 && (
+                    <p className="text-[10px] text-muted-foreground">
+                      в том числе НДС: {fmt(totals.vatTotal)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+ 
+        {/* Success Dialog */}
+        <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
+          <DialogContent className="rounded-[2rem] border-white/5 bg-card/50 backdrop-blur-2xl p-8 shadow-2xl text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-4">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black tracking-tight">
+                Muvaffaqiyatli saqlandi!
+              </DialogTitle>
+              <p className="text-muted-foreground text-sm mt-1">
+                Kirim nakładnoyi rasmiylashtirildi.
+              </p>
+              <p className="text-primary font-black text-lg mt-2 font-mono">
+                {processedInvoice?.dnNumber}
+              </p>
+              {processedInvoice && (
+                <div className="mt-3 text-left bg-muted/20 rounded-xl p-4 space-y-1 text-xs">
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Yetkazuvchi:</span>
+                    <strong>{processedInvoice.supplier}</strong>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Ombor:</span>
+                    <strong>{processedInvoice.warehouse}</strong>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Sana:</span>
+                    <strong>{processedInvoice.date}</strong>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground w-28 inline-block">Jami summa:</span>
+                    <strong className="text-primary">{fmt(processedInvoice.totals.gross)}</strong>
+                  </p>
+                  {processedInvoice.totals.vatTotal > 0 && (
+                    <p>
+                      <span className="text-muted-foreground w-28 inline-block">QQS:</span>
+                      <strong>{fmt(processedInvoice.totals.vatTotal)}</strong>
+                    </p>
+                  )}
+                </div>
+              )}
+            </DialogHeader>
+            <DialogFooter className="mt-6 flex-col gap-2">
+              <Button
+                onClick={handleDownloadPDF}
+                className="w-full h-12 rounded-xl bg-primary text-white font-bold gap-2"
+              >
+                <Download className="w-4 h-4" />
+                PDF yuklash
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setIsSuccessOpen(false)}
+                className="w-full h-10 rounded-xl font-bold text-sm"
+              >
+                Yopish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </main>
+    </div>
+  );
+}

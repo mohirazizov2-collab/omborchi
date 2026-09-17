@@ -1,0 +1,14 @@
+
+# Settings to manage and configure a Firebase App Hosting backend.
+# https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  maxInstances: 2
+  minInstances: 0
+  memoryPerInstance: 512Mi
+
+env:
+  - name: GOOGLE_GENAI_API_KEY
+    value: "AIzaSyC9G1AR3Cvf1oy_8wltCTytiqRCzFg5Y_4"
+  - name: GEMINI_API_KEY
+    value: "AIzaSyC9G1AR3Cvf1oy_8wltCTytiqRCzFg5Y_4"

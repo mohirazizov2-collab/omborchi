@@ -1,0 +1,1354 @@
+"use client";
+ 
+import { OmniSidebar } from "@/components/layout/sidebar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Trash2, Plus, Loader2, Search, Download,
+  CheckCircle2, FileOutput, AlertTriangle, ArrowRight, Info,
+  RefreshCw, X, Save, LogOut, Pencil, Clock, RotateCcw,
+} from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useLanguage } from "@/lib/i18n/context";
+import { useUser } from "@/firebase";
+import {
+  getFirestore,
+  collection, doc, getDoc, setDoc, runTransaction,
+  onSnapshot, getDocs, query, where, orderBy, limit, QuerySnapshot,
+} from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+ 
+// ─── PDF SERVICE (inline) ────────────────────────────────────────────────────
+ 
+interface InvoiceItem {
+  name: string;
+  sku?: string;
+  quantity: number;
+  price: number;
+  discount?: number;
+  vatRate?: string;
+  vatAmount?: number;
+  total: number;
+  unit?: string;
+  costPerUnit?: number;
+  costTotal?: number;
+}
+ 
+const fmtMoney = (val: number, currency = "сум") =>
+  val.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + currency;
+ 
+async function generateInvoicePDF(params: {
+  title: string; type: "in" | "out"; docNumber: string; date: string;
+  partyName: string; partyTypeLabel: string; warehouseName?: string;
+  responsibleName?: string; items: InvoiceItem[]; currency?: string;
+  labels?: Record<string, string>;
+  companyName?: string; companyInn?: string; companyAddress?: string;
+}): Promise<void> {
+  const {
+    title, type, docNumber, date, partyName, partyTypeLabel,
+    warehouseName, responsibleName, items, currency = "сум", labels = {},
+    companyName = "OMBORCHI.UZ", companyInn = "", companyAddress = "",
+  } = params;
+ 
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const margin = 12;
+ 
+  const colorAccent: [number, number, number] = type === "out" ? [220, 38, 38] : [22, 163, 74];
+  const colorDark: [number, number, number] = [18, 18, 24];
+  const colorGray: [number, number, number] = [110, 110, 120];
+  const colorLightBg: [number, number, number] = [248, 248, 250];
+  const colorWhite: [number, number, number] = [255, 255, 255];
+  const colorAmber: [number, number, number] = [217, 119, 6];
+ 
+  pdf.setFillColor(...colorDark);
+  pdf.rect(0, 0, pageW, 24, "F");
+  pdf.setFillColor(...colorAccent);
+  pdf.rect(0, 24, pageW, 2, "F");
+ 
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(14);
+  pdf.setTextColor(...colorWhite);
+  pdf.text(companyName, margin, 15);
+ 
+  pdf.setFontSize(8);
+  pdf.setTextColor(180, 180, 195);
+  pdf.text(title.toUpperCase(), pageW / 2, 10, { align: "center" });
+ 
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(13);
+  pdf.setTextColor(...colorAccent);
+  pdf.text("№ " + docNumber, pageW / 2, 20, { align: "center" });
+ 
+  const dateStr = (() => {
+    try {
+      return new Date(date).toLocaleString("ru-RU", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+    } catch { return date; }
+  })();
+ 
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(8);
+  pdf.setTextColor(160, 160, 175);
+  pdf.text(dateStr, pageW - margin, 15, { align: "right" });
+ 
+  const infoY = 30;
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(margin, infoY, pageW - margin * 2, 26, 2, 2, "F");
+ 
+  const drawInfo = (x: number, y: number, label: string, value: string) => {
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...colorGray);
+    pdf.text(label + ":", x, y);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...colorDark);
+    const safe = (value || "—").length > 50 ? (value || "—").substring(0, 47) + "..." : (value || "—");
+    pdf.text(safe, x + 36, y);
+  };
+ 
+  const col1X = margin + 4;
+  const col2X = pageW / 2 + 4;
+  drawInfo(col1X, infoY + 7, labels.number || "Hujjat №", docNumber);
+  drawInfo(col1X, infoY + 14, labels.warehouse || "Ombor", warehouseName || "—");
+  drawInfo(col1X, infoY + 21, "Mas'ul shaxs", responsibleName || "—");
+  drawInfo(col2X, infoY + 7, partyTypeLabel || "Tomon", partyName);
+  drawInfo(col2X, infoY + 14, labels.date || "Sana", dateStr);
+  if (companyInn) drawInfo(col2X, infoY + 21, "INN", companyInn);
+ 
+  const tableStartY = infoY + 30;
+ 
+  const tableHead = [[
+    { content: "№", styles: { halign: "center" as const } },
+    { content: labels.product || "Mahsulot nomi", styles: { halign: "left" as const } },
+    { content: "SKU", styles: { halign: "center" as const } },
+    { content: labels.qty || "Miqdor", styles: { halign: "center" as const } },
+    { content: labels.unit || "Birlik", styles: { halign: "center" as const } },
+    { content: labels.price || "Narx", styles: { halign: "right" as const } },
+    { content: "Chegirma", styles: { halign: "center" as const } },
+    { content: "НДС %", styles: { halign: "center" as const } },
+    { content: "НДС сум", styles: { halign: "right" as const } },
+    { content: labels.total || "Summasi", styles: { halign: "right" as const } },
+  ]];
+ 
+  const tableBody = items.map((item, i) => [
+    { content: String(i + 1), styles: { halign: "center" as const } },
+    { content: item.name || "—" },
+    { content: item.sku || "—", styles: { halign: "center" as const } },
+    { content: Number(item.quantity || 0).toLocaleString("ru-RU"), styles: { halign: "center" as const } },
+    { content: item.unit || "шт", styles: { halign: "center" as const } },
+    { content: fmtMoney(item.price || 0, currency), styles: { halign: "right" as const } },
+    { content: item.discount ? item.discount + "%" : "—", styles: { halign: "center" as const } },
+    { content: item.vatRate || "Без НДС", styles: { halign: "center" as const } },
+    { content: item.vatAmount ? fmtMoney(item.vatAmount, currency) : "—", styles: { halign: "right" as const } },
+    {
+      content: fmtMoney(item.total || 0, currency),
+      styles: { halign: "right" as const, fontStyle: "bold" as const, textColor: colorAccent },
+    },
+  ]);
+ 
+  autoTable(pdf, {
+    head: tableHead, body: tableBody, startY: tableStartY,
+    margin: { left: margin, right: margin },
+    styles: {
+      fontSize: 7.5,
+      cellPadding: { top: 3, bottom: 3, left: 2.5, right: 2.5 },
+      font: "helvetica", textColor: colorDark,
+      lineColor: [225, 225, 232], lineWidth: 0.25, overflow: "ellipsize",
+    },
+    headStyles: { fillColor: colorDark, textColor: colorWhite, fontStyle: "bold", fontSize: 7 },
+    alternateRowStyles: { fillColor: colorLightBg },
+    columnStyles: {
+      0: { cellWidth: 8 }, 1: { cellWidth: 64 }, 2: { cellWidth: 22 },
+      3: { cellWidth: 18 }, 4: { cellWidth: 16 }, 5: { cellWidth: 34 },
+      6: { cellWidth: 20 }, 7: { cellWidth: 18 }, 8: { cellWidth: 30 }, 9: { cellWidth: 38 },
+    },
+  });
+ 
+  const finalY: number = (pdf as any).lastAutoTable.finalY;
+  const gross = items.reduce((s, it) => s + (it.quantity || 0) * (it.price || 0), 0);
+  const totalDiscount = items.reduce((s, it) => s + ((it.quantity || 0) * (it.price || 0) * (it.discount || 0)) / 100, 0);
+  const net = gross - totalDiscount;
+  const totalVat = items.reduce((s, it) => s + (it.vatAmount || 0), 0);
+ 
+  const summaryX = pageW - margin - 100;
+  const summaryW = 100;
+  const summaryY = finalY + 5;
+ 
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(summaryX, summaryY, summaryW, 38, 2, 2, "F");
+  pdf.setFillColor(...colorDark);
+  pdf.roundedRect(summaryX, summaryY, summaryW, 9, 2, 2, "F");
+  pdf.rect(summaryX, summaryY + 5, summaryW, 4, "F");
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(7);
+  pdf.setTextColor(...colorWhite);
+  pdf.text((labels.grandTotal || "JAMI HISOB").toUpperCase(), summaryX + summaryW / 2, summaryY + 6, { align: "center" });
+ 
+  const summaryRows: [string, string, [number, number, number]][] = [
+    ["Umumiy summa:", fmtMoney(gross, currency), colorDark],
+    ["Chegirma:", fmtMoney(totalDiscount, currency), colorAmber],
+    ["НДС:", fmtMoney(totalVat, currency), colorAmber],
+  ];
+  summaryRows.forEach(([label, val, col], i) => {
+    const ry = summaryY + 15 + i * 6;
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...colorGray);
+    pdf.text(label, summaryX + 4, ry);
+    pdf.setFont("helvetica", "bold"); pdf.setTextColor(...col);
+    pdf.text(val, summaryX + summaryW - 4, ry, { align: "right" });
+  });
+ 
+  const netBoxY = summaryY + 40;
+  pdf.setFillColor(...colorAccent);
+  pdf.roundedRect(summaryX, netBoxY, summaryW, 13, 2, 2, "F");
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(7); pdf.setTextColor(...colorWhite);
+  pdf.text("TO'LOV SUMMASI:", summaryX + 4, netBoxY + 5);
+  pdf.setFontSize(9);
+  pdf.text(fmtMoney(net, currency), summaryX + summaryW - 4, netBoxY + 9, { align: "right" });
+ 
+  const signY = finalY + 5;
+  const signW = 82;
+ 
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(margin, signY, signW, 30, 2, 2, "F");
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(7); pdf.setTextColor(...colorGray);
+  pdf.text((labels.shippedBy || "OTPUSTIL / CHIQARGAN").toUpperCase(), margin + 4, signY + 6);
+  pdf.setDrawColor(...colorGray); pdf.setLineWidth(0.3);
+  pdf.line(margin + 4, signY + 20, margin + signW - 4, signY + 20);
+  pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
+  pdf.text(responsibleName || "________________", margin + 4, signY + 26);
+ 
+  const sign2X = margin + signW + 6;
+  pdf.setFillColor(...colorLightBg);
+  pdf.roundedRect(sign2X, signY, signW, 30, 2, 2, "F");
+  pdf.setFont("helvetica", "bold"); pdf.setFontSize(7); pdf.setTextColor(...colorGray);
+  pdf.text((labels.receivedBy || "POLUCHIL / QABUL QILDI").toUpperCase(), sign2X + 4, signY + 6);
+  pdf.setDrawColor(...colorGray);
+  pdf.line(sign2X + 4, signY + 20, sign2X + signW - 4, signY + 20);
+  pdf.setFont("helvetica", "normal"); pdf.setFontSize(7);
+  pdf.text(partyName || "________________", sign2X + 4, signY + 26);
+ 
+  const pageCount = (pdf as any).internal.getNumberOfPages();
+  for (let pg = 1; pg <= pageCount; pg++) {
+    pdf.setPage(pg);
+    const footerY = pdf.internal.pageSize.getHeight() - 5;
+    pdf.setFillColor(...colorDark);
+    pdf.rect(0, footerY - 4, pageW, 10, "F");
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(6.5); pdf.setTextColor(130, 130, 145);
+    pdf.text(`${companyName} · ${title} · ${docNumber} · ${dateStr}`, margin, footerY + 1);
+    pdf.text(`Sahifa ${pg} / ${pageCount}`, pageW - margin, footerY + 1, { align: "right" });
+  }
+ 
+  pdf.save("nakladnoy-" + docNumber + "-" + new Date().toISOString().slice(0, 10) + ".pdf");
+}
+ 
+// ─── constants & types ───────────────────────────────────────────────────────
+ 
+const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+ 
+async function getNextOrderNumber(db: ReturnType<typeof getFirestore>): Promise<string> {
+  const counterRef = doc(db, "counters", "stockOut");
+  try {
+    const next = await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(counterRef);
+      const current = snap.exists() ? (snap.data().lastNumber || 0) : 0;
+      const nextNum = current + 1;
+      transaction.set(counterRef, { lastNumber: nextNum }, { merge: true });
+      return nextNum;
+    });
+    return `AO-${String(next).padStart(4, "0")}`;
+  } catch {
+    return `AO-${Date.now().toString().slice(-4)}`;
+  }
+}
+ 
+const PRODUCT_TABS = [
+  { key: "all", label: "Все" },
+  { key: "goods", label: "Товары" },
+  { key: "dishes", label: "Блюда" },
+  { key: "preparations", label: "Заготовки" },
+  { key: "services", label: "Услуги" },
+  { key: "modifiers", label: "Модификаторы" },
+] as const;
+ 
+type ProductTab = typeof PRODUCT_TABS[number]["key"];
+ 
+const VAT_RATES = ["0%", "12%", "20%", "Без НДС"];
+const CONCEPTS = ["Столовая", "Ресторан", "Кафе", "Бар", "Фастфуд"];
+const REVENUE_ACCOUNTS = ["Торговая выручка", "Прочие доходы", "Оптовая выручка"];
+const EXPENSE_ACCOUNTS = ["Расход продуктов", "Себестоимость продаж", "Прочие расходы"];
+ 
+const OUTGOING_TYPES = [
+  { value: "sale", label: "Sotuv", description: "Mahsulot sotildi" },
+  { value: "expense", label: "Xarajat", description: "Mahsulot sarflandi / hisobdan chiqarildi" },
+] as const;
+ 
+type OutgoingType = "sale" | "expense";
+ 
+interface StockItem {
+  id: string; productId: string; searchQuery: string;
+  size: string; inPackage: number; inUnit: number;
+  pricePerPackage: number; price: number; discount: number;
+  vatRate: string; writeoffCoeff: number; itemComment: string;
+}
+ 
+interface EditSearchResult {
+  id: string; orderNumber: string; recipient: string;
+  date: string; total: number; status?: string;
+}
+ 
+// ─── component ───────────────────────────────────────────────────────────────
+ 
+export default function StockOutPage() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const { user, role, assignedWarehouseId } = useUser();
+ 
+  // Stable db reference
+  const db = useMemo(() => getFirestore(), []);
+ 
+  const [activeTab, setActiveTab] = useState<"properties" | "delivery">("properties");
+  const [productTab, setProductTab] = useState<ProductTab>("all");
+  const [loading, setLoading] = useState(false);
+  const [orderLoading, setOrderLoading] = useState(false);
+ 
+  // Edit mode
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editDocId, setEditDocId] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [isEditSearchOpen, setIsEditSearchOpen] = useState(false);
+  const [editSearchQuery, setEditSearchQuery] = useState("");
+  const [editSearchResults, setEditSearchResults] = useState<EditSearchResult[]>([]);
+  const [editSearchLoading, setEditSearchLoading] = useState(false);
+  const [originalItems, setOriginalItems] = useState<Array<{ productId: string; inUnit: number }>>([]);
+ 
+  const [orderNumber, setOrderNumber] = useState("");
+  const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 16));
+  const [concept, setConcept] = useState("");
+  const [docComment, setDocComment] = useState("");
+  const [buyerType, setBuyerType] = useState("Поставщик");
+  const [recipient, setRecipient] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const [shipFromWarehouse, setShipFromWarehouse] = useState(true);
+  const [revenueAccount, setRevenueAccount] = useState("Торговая выручка");
+  const [expenseAccount, setExpenseAccount] = useState("Расход продуктов");
+  const [outgoingType, setOutgoingType] = useState<OutgoingType>("sale");
+ 
+  const [items, setItems] = useState<StockItem[]>([{
+    id: generateId(), productId: "", searchQuery: "",
+    size: "шт", inPackage: 1, inUnit: 1,
+    pricePerPackage: 0, price: 0, discount: 0,
+    vatRate: "Без НДС", writeoffCoeff: 1, itemComment: "",
+  }]);
+ 
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [processedInvoice, setProcessedInvoice] = useState<any>(null);
+ 
+  // Firestore data — stable subscriptions
+  const [products, setProducts] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+ 
+  const isAdmin = role === "Super Admin" || role === "Admin";
+ 
+  // ── Stable Firestore subscriptions ──────────────────────────────────────
+  useEffect(() => {
+    if (!db) return;
+ 
+    const unsubs: (() => void)[] = [];
+ 
+    const snap = <T extends { id: string }>(
+      col: string,
+      setter: React.Dispatch<React.SetStateAction<T[]>>
+    ) => {
+      const unsub = onSnapshot(
+        collection(db, col),
+        (snapshot: QuerySnapshot) => {
+          setter(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
+        },
+        (err) => {
+          if (err.code !== "unavailable") {
+            console.error(`[${col}] snapshot error:`, err.code);
+          }
+        }
+      );
+      unsubs.push(unsub);
+    };
+ 
+    snap("products", setProducts);
+    snap("warehouses", setWarehouses);
+    snap("inventory", setInventory);
+ 
+    return () => { unsubs.forEach((u) => u()); };
+  }, [db]);
+ 
+  // ── init order number ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!db || isEditMode) return;
+    setOrderLoading(true);
+    getNextOrderNumber(db).then(setOrderNumber).finally(() => setOrderLoading(false));
+  }, [db, isEditMode]);
+ 
+  useEffect(() => {
+    if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
+  }, [isAdmin, assignedWarehouseId]);
+ 
+  const formatMoney = (val: number) =>
+    val.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+ 
+  const getStockForProduct = useCallback(
+    (pId: string) => {
+      if (!warehouseId || !pId || !inventory.length) return 0;
+      const inv = inventory.find(i => i.warehouseId === warehouseId && i.productId === pId);
+      return inv ? inv.stock || 0 : 0;
+    },
+    [warehouseId, inventory]
+  );
+ 
+  // ── edit search ──────────────────────────────────────────────────────────
+  const handleEditSearch = async () => {
+    if (!db) return;
+    setEditSearchLoading(true);
+    try {
+      const movRef = collection(db, "stockMovements");
+      const q = query(movRef, where("movementType", "==", "StockOut"), orderBy("movementDate", "desc"), limit(50));
+      const snap = await getDocs(q);
+ 
+      const grouped: Record<string, EditSearchResult> = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const on = data.orderNumber;
+        if (!grouped[on]) {
+          grouped[on] = { id: on, orderNumber: on, recipient: data.recipient || "—", date: data.movementDate, total: 0 };
+        }
+        grouped[on].total += data.totalPrice || 0;
+      });
+ 
+      let results = Object.values(grouped);
+      if (editSearchQuery.trim()) {
+        const qStr = editSearchQuery.toLowerCase();
+        results = results.filter(r =>
+          r.orderNumber.toLowerCase().includes(qStr) || r.recipient.toLowerCase().includes(qStr)
+        );
+      }
+      setEditSearchResults(results.slice(0, 20));
+    } catch {
+      toast({ variant: "destructive", title: "Xatolik", description: "Qidiruvda xatolik yuz berdi." });
+    } finally {
+      setEditSearchLoading(false);
+    }
+  };
+ 
+  useEffect(() => {
+    if (isEditSearchOpen) handleEditSearch();
+  }, [isEditSearchOpen]);
+ 
+  const handleLoadInvoiceForEdit = async (orderNum: string) => {
+    if (!db) return;
+    setEditLoading(true);
+    setIsEditSearchOpen(false);
+    try {
+      const movRef = collection(db, "stockMovements");
+      const q = query(movRef, where("orderNumber", "==", orderNum), where("movementType", "==", "StockOut"));
+      const snap = await getDocs(q);
+ 
+      if (snap.empty) {
+        toast({ variant: "destructive", title: "Topilmadi", description: `${orderNum} hujjat topilmadi.` });
+        return;
+      }
+ 
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      const firstDoc = docs[0];
+ 
+      setOrderNumber(firstDoc.orderNumber);
+      setOrderDate(firstDoc.movementDate || new Date().toISOString().slice(0, 16));
+      setConcept(firstDoc.concept || "");
+      setDocComment("");
+      setBuyerType(firstDoc.buyerType || "Поставщик");
+      setRecipient(firstDoc.recipient || "");
+      setWarehouseId(firstDoc.warehouseId || "");
+      setRevenueAccount(firstDoc.revenueAccount || "Торговая выручка");
+      setExpenseAccount(firstDoc.expenseAccount || "Расход продуктов");
+      setOutgoingType(firstDoc.outgoingType || "sale");
+      setShipFromWarehouse(true);
+      setOriginalItems(docs.map(d => ({ productId: d.productId, inUnit: Math.abs(d.quantityChange || 0) })));
+ 
+      const reconstructed: StockItem[] = docs.map(d => ({
+        id: d.id, productId: d.productId || "", searchQuery: "",
+        size: d.unit || "шт", inPackage: 1,
+        inUnit: Math.abs(d.quantityChange || 0),
+        pricePerPackage: d.unitPrice || 0, price: d.unitPrice || 0,
+        discount: d.discount || 0, vatRate: d.vatRate || "Без НДС",
+        writeoffCoeff: 1, itemComment: "",
+      }));
+ 
+      setItems(reconstructed.length > 0 ? reconstructed : [{
+        id: generateId(), productId: "", searchQuery: "",
+        size: "шт", inPackage: 1, inUnit: 1,
+        pricePerPackage: 0, price: 0, discount: 0, vatRate: "Без НДС",
+        writeoffCoeff: 1, itemComment: "",
+      }]);
+ 
+      setEditDocId(orderNum);
+      setIsEditMode(true);
+      toast({ title: "Tahrirlash rejimi", description: `${orderNum} hujjat yuklandi.` });
+    } catch {
+      toast({ variant: "destructive", title: "Xatolik", description: "Hujjatni yuklashda xatolik." });
+    } finally {
+      setEditLoading(false);
+    }
+  };
+ 
+  const handleExitEditMode = () => {
+    setIsEditMode(false);
+    setEditDocId(null);
+    setOriginalItems([]);
+    setItems([{
+      id: generateId(), productId: "", searchQuery: "",
+      size: "шт", inPackage: 1, inUnit: 1,
+      pricePerPackage: 0, price: 0, discount: 0, vatRate: "Без НДС",
+      writeoffCoeff: 1, itemComment: "",
+    }]);
+    setRecipient(""); setConcept("");
+    setOrderDate(new Date().toISOString().slice(0, 16));
+    if (isAdmin) setWarehouseId("");
+    setOrderLoading(true);
+    getNextOrderNumber(db).then(setOrderNumber).finally(() => setOrderLoading(false));
+  };
+ 
+  const filteredProducts = useMemo(() => {
+    if (!products.length) return [];
+    if (productTab === "all") return products;
+    return products.filter(p => (p.category || "goods") === productTab);
+  }, [products, productTab]);
+ 
+  const addItem = () => setItems(prev => [...prev, {
+    id: generateId(), productId: "", searchQuery: "",
+    size: "шт", inPackage: 1, inUnit: 1,
+    pricePerPackage: 0, price: 0, discount: 0, vatRate: "Без НДС",
+    writeoffCoeff: 1, itemComment: "",
+  }]);
+ 
+  const removeItem = (id: string) => {
+    if (items.length > 1) setItems(items.filter(i => i.id !== id));
+  };
+ 
+  const updateItem = (id: string, field: string, value: any) => {
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = { ...item, [field]: value };
+      if (field === "productId" && value) {
+        const p = products.find(prod => prod.id === value);
+        if (p) {
+          updated.price = p.salePrice || 0;
+          updated.pricePerPackage = p.salePrice || 0;
+          updated.size = p.unit || "шт";
+        }
+      }
+      if (field === "inPackage") updated.inUnit = value * updated.writeoffCoeff;
+      if (field === "writeoffCoeff") updated.inUnit = updated.inPackage * value;
+      return updated;
+    }));
+  };
+ 
+  const getRowCalc = useCallback((item: StockItem) => {
+    const qty = item.inUnit || 0;
+    const price = item.price || 0;
+    const gross = qty * price;
+    const discountAmt = (gross * (item.discount || 0)) / 100;
+    const afterDiscount = gross - discountAmt;
+    const vatPct = item.vatRate === "Без НДС" || item.vatRate === "0%" ? 0 : parseFloat(item.vatRate) || 0;
+    const vatAmt = (afterDiscount * vatPct) / (100 + vatPct);
+    const amountNoVat = afterDiscount - vatAmt;
+ 
+    let stockBase = getStockForProduct(item.productId);
+    if (isEditMode) {
+      const original = originalItems.find(o => o.productId === item.productId);
+      if (original) stockBase += original.inUnit;
+    }
+    const stockAfter = stockBase - qty;
+    const product = products.find(p => p.id === item.productId);
+    const costPerUnit = product?.costPrice || 0;
+    const costTotal = qty * costPerUnit;
+    return { gross, discountAmt, afterDiscount, vatAmt, amountNoVat, stockBefore: stockBase, stockAfter, costPerUnit, costTotal };
+  }, [getStockForProduct, isEditMode, originalItems, products]);
+ 
+  const validation = useMemo(() => {
+    const errors: string[] = [];
+    const itemErrors: Record<string, string> = {};
+    if (!warehouseId) errors.push("Omborni tanlang.");
+    if (!recipient.trim()) errors.push("Mijoz nomini kiriting.");
+    items.forEach(item => {
+      if (!item.productId) {
+        itemErrors[item.id] = "Mahsulot tanlanmagan";
+      } else {
+        let stock = getStockForProduct(item.productId);
+        if (isEditMode) {
+          const orig = originalItems.find(o => o.productId === item.productId);
+          if (orig) stock += orig.inUnit;
+        }
+        if (item.inUnit <= 0) itemErrors[item.id] = "Miqdor noto'g'ri";
+        else if (item.inUnit > stock) itemErrors[item.id] = `Zaxira yetarli emas (Mavjud: ${stock})`;
+      }
+    });
+    return { isValid: errors.length === 0 && Object.keys(itemErrors).length === 0, errors, itemErrors };
+  }, [items, warehouseId, recipient, getStockForProduct, isEditMode, originalItems]);
+ 
+  const totals = useMemo(() => {
+    let gross = 0, discount = 0, vat = 0, noVat = 0, cost = 0;
+    items.forEach(item => {
+      const c = getRowCalc(item);
+      gross += c.gross; discount += c.discountAmt;
+      vat += c.vatAmt; noVat += c.amountNoVat; cost += c.costTotal;
+    });
+    return { gross, discount, vat, noVat, net: gross - discount, cost };
+  }, [items, getRowCalc]);
+ 
+  const handlePreDispatch = () => {
+    if (!validation.isValid) {
+      toast({ variant: "destructive", title: "Xatolik", description: validation.errors[0] || "Jadvaldagi xatoliklarni to'g'rilang." });
+      return;
+    }
+    setIsConfirmOpen(true);
+  };
+ 
+  const handleFinalProcess = async () => {
+    setIsConfirmOpen(false);
+    setLoading(true);
+    if (isEditMode && editDocId) {
+      await handleUpdateInvoice();
+    } else {
+      await handleCreateInvoice();
+    }
+  };
+ 
+  const handleUpdateInvoice = async () => {
+    try {
+      const currentUserName = user?.displayName || user?.email || "Noma'lum";
+      const movRef = collection(db, "stockMovements");
+ 
+      const oldQ = query(movRef, where("orderNumber", "==", editDocId), where("movementType", "==", "StockOut"));
+      const oldSnap = await getDocs(oldQ);
+ 
+      for (const oldDoc of oldSnap.docs) {
+        const oldData = oldDoc.data();
+        const oldQty = Math.abs(oldData.quantityChange || 0);
+        const oldProductId = oldData.productId;
+ 
+        const invId = `${warehouseId}_${oldProductId}`;
+        const invRef = doc(db, "inventory", invId);
+        const invSnap = await getDoc(invRef);
+        if (invSnap.exists()) {
+          updateDocumentNonBlocking(invRef, { stock: (invSnap.data().stock || 0) + oldQty, updatedAt: new Date().toISOString() });
+        }
+        const oldProduct = products.find(p => p.id === oldProductId);
+        if (oldProduct) {
+          updateDocumentNonBlocking(doc(db, "products", oldProductId), { stock: (oldProduct.stock || 0) + oldQty, updatedAt: new Date().toISOString() });
+        }
+        updateDocumentNonBlocking(oldDoc.ref, { _deleted: true, deletedAt: new Date().toISOString() });
+      }
+ 
+      const invoiceItems: any[] = [];
+      for (const item of items) {
+        const product = products.find(p => p.id === item.productId);
+        const { inUnit } = item;
+        const invId = `${warehouseId}_${item.productId}`;
+        const invRef = doc(db, "inventory", invId);
+        const calc = getRowCalc(item);
+ 
+        invoiceItems.push({
+          name: product?.name || "Noma'lum", sku: product?.sku || "",
+          quantity: inUnit, price: item.price, discount: item.discount,
+          vatRate: item.vatRate, vatAmount: calc.vatAmt,
+          total: calc.afterDiscount, unit: product?.unit || "шт",
+          costPerUnit: calc.costPerUnit, costTotal: calc.costTotal,
+        });
+ 
+        addDocumentNonBlocking(movRef, {
+          productId: item.productId, productName: product?.name || "Noma'lum",
+          warehouseId, warehouseName: warehouses.find(w => w.id === warehouseId)?.name || "Noma'lum",
+          quantityChange: -inUnit, movementType: "StockOut",
+          movementDate: orderDate || new Date().toISOString(),
+          responsibleUserId: user?.uid, responsibleUserName: currentUserName,
+          orderNumber: editDocId, recipient, buyerType, concept,
+          revenueAccount, expenseAccount, outgoingType,
+          outgoingTypeLabel: outgoingType === "sale" ? "Sotuv" : "Xarajat",
+          saleId: editDocId, unitPrice: item.price, discount: item.discount,
+          vatRate: item.vatRate, totalPrice: calc.afterDiscount,
+          unit: product?.unit || "шт",
+          editedAt: new Date().toISOString(), editedBy: currentUserName,
+        });
+ 
+        if (product) {
+          updateDocumentNonBlocking(doc(db, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
+        }
+        const invSnap = await getDoc(invRef);
+        if (invSnap.exists()) {
+          updateDocumentNonBlocking(invRef, { stock: (invSnap.data().stock || 0) - inUnit, updatedAt: new Date().toISOString() });
+        } else {
+          await setDoc(invRef, { id: invId, warehouseId, productId: item.productId, stock: -inUnit, updatedAt: new Date().toISOString() });
+        }
+      }
+ 
+      setProcessedInvoice({
+        orderNumber: editDocId, recipient, buyerType, concept,
+        warehouse: warehouses.find(w => w.id === warehouseId)?.name,
+        date: orderDate, items: invoiceItems,
+        responsible: currentUserName, totals, outgoingType, isEdited: true,
+      });
+ 
+      toast({ title: "Yangilandi ✓", description: `${editDocId} — muvaffaqiyatli yangilandi.` });
+      setIsSuccessOpen(true);
+      handleExitEditMode();
+    } catch (err: any) {
+      toast({
+        variant: "destructive", title: "Xatolik",
+        description: err?.code === "permission-denied" ? "Ruxsat yo'q." : "Yangilashda xatolik yuz berdi.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+ 
+  const handleCreateInvoice = async () => {
+    const saleId = orderNumber;
+    try {
+      const invoiceItems: any[] = [];
+      const currentUserName = user?.displayName || user?.email || "Noma'lum";
+ 
+      for (const item of items) {
+        const product = products.find(p => p.id === item.productId);
+        const { inUnit } = item;
+        const invId = `${warehouseId}_${item.productId}`;
+        const invRef = doc(db, "inventory", invId);
+        const calc = getRowCalc(item);
+ 
+        invoiceItems.push({
+          name: product?.name || "Noma'lum", sku: product?.sku || "",
+          quantity: inUnit, price: item.price, discount: item.discount,
+          vatRate: item.vatRate, vatAmount: calc.vatAmt,
+          total: calc.afterDiscount, unit: product?.unit || "шт",
+          costPerUnit: calc.costPerUnit, costTotal: calc.costTotal,
+        });
+ 
+        addDocumentNonBlocking(collection(db, "stockMovements"), {
+          productId: item.productId, productName: product?.name || "Noma'lum",
+          warehouseId, warehouseName: warehouses.find(w => w.id === warehouseId)?.name || "Noma'lum",
+          quantityChange: -inUnit, movementType: "StockOut",
+          movementDate: orderDate || new Date().toISOString(),
+          responsibleUserId: user?.uid, responsibleUserName: currentUserName,
+          orderNumber: saleId, recipient, buyerType, concept,
+          revenueAccount, expenseAccount, outgoingType,
+          outgoingTypeLabel: outgoingType === "sale" ? "Sotuv" : "Xarajat",
+          saleId, unitPrice: item.price, discount: item.discount,
+          vatRate: item.vatRate, totalPrice: calc.afterDiscount,
+          unit: product?.unit || "шт",
+        });
+ 
+        if (product) {
+          updateDocumentNonBlocking(doc(db, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
+        }
+        const invSnap = await getDoc(invRef);
+        if (invSnap.exists()) {
+          updateDocumentNonBlocking(invRef, { stock: (invSnap.data().stock || 0) - inUnit, updatedAt: new Date().toISOString() });
+        } else {
+          await setDoc(invRef, { id: invId, warehouseId, productId: item.productId, stock: -inUnit, updatedAt: new Date().toISOString() });
+        }
+      }
+ 
+      setProcessedInvoice({
+        orderNumber: saleId, recipient, buyerType, concept,
+        warehouse: warehouses.find(w => w.id === warehouseId)?.name,
+        date: orderDate, items: invoiceItems,
+        responsible: currentUserName, totals, outgoingType,
+      });
+ 
+      toast({ title: "Chiqim nakladnoyi", description: `${saleId} — muvaffaqiyatli bajarildi.` });
+      setIsSuccessOpen(true);
+      setItems([{
+        id: generateId(), productId: "", searchQuery: "",
+        size: "шт", inPackage: 1, inUnit: 1,
+        pricePerPackage: 0, price: 0, discount: 0, vatRate: "Без НДС",
+        writeoffCoeff: 1, itemComment: "",
+      }]);
+      setRecipient("");
+      if (isAdmin) setWarehouseId("");
+      const next = await getNextOrderNumber(db);
+      setOrderNumber(next);
+    } catch (err: any) {
+      toast({
+        variant: "destructive", title: "Xatolik",
+        description: err?.code === "permission-denied" ? "Ruxsat yo'q." : "Chiqimni saqlashda xatolik.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+ 
+  const handleDownloadPDF = async () => {
+    if (!processedInvoice) return;
+    const currencyStr = t.settings?.currency?.split(" ")[0] || "сум";
+    await generateInvoicePDF({
+      title: "Расходная накладная", type: "out",
+      docNumber: processedInvoice.orderNumber, date: processedInvoice.date,
+      partyName: `${processedInvoice.recipient} (${processedInvoice.buyerType})`,
+      partyTypeLabel: "Покупатель",
+      warehouseName: processedInvoice.warehouse,
+      responsibleName: processedInvoice.responsible,
+      items: processedInvoice.items, currency: currencyStr,
+      labels: {
+        number: "Номер документа", date: "Дата", warehouse: "Склад",
+        product: "Наименование", qty: "Кол-во", unit: "Ед.",
+        price: "Цена", total: "Сумма", grandTotal: "Итого",
+        shippedBy: "Отпустил", receivedBy: "Получил",
+      },
+    });
+  };
+ 
+  return (
+    <div className="flex min-h-screen bg-background font-body">
+      <OmniSidebar />
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-5 pb-0 border-b border-border/20 bg-card/30">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
+              <FileOutput className="w-5 h-5 text-rose-600" />
+              {isEditMode ? (
+                <>
+                  <span className="text-amber-600">Tahrirlash:</span>
+                  Расходная накладная №{orderNumber}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                    <Pencil className="w-2.5 h-2.5" /> Edit rejimi
+                  </span>
+                </>
+              ) : (
+                <>
+                  Расходная накладная №{orderLoading ? "..." : orderNumber}
+                  <span className="text-muted-foreground font-normal text-sm ml-1">
+                    от {new Date(orderDate).toLocaleDateString("ru-RU")}
+                  </span>
+                </>
+              )}
+            </h1>
+            <div className="flex items-center gap-2">
+              {isEditMode ? (
+                <Button variant="outline" size="sm" onClick={handleExitEditMode}
+                  className="h-8 px-3 text-xs font-bold rounded-lg border-amber-500/30 text-amber-600 hover:bg-amber-500/5 gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5" /> Yangi hujjat
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setIsEditSearchOpen(true)} disabled={editLoading}
+                  className="h-8 px-3 text-xs font-bold rounded-lg border-border/40 gap-1.5 hover:border-amber-500/40 hover:text-amber-600">
+                  {editLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pencil className="w-3.5 h-3.5" />}
+                  Eski hujjatni tahrirlash
+                </Button>
+              )}
+            </div>
+          </div>
+ 
+          <AnimatePresence>
+            {isEditMode && (
+              <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                className="mb-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2.5">
+                <Pencil className="w-4 h-4 text-amber-600 shrink-0" />
+                <p className="text-xs font-bold text-amber-700 flex-1">
+                  <span className="font-black">{orderNumber}</span> — hujjat tahrirlash rejimida.
+                  Saqlash tugmasini bosganingizda eski ma'lumotlar o'chirilib, yangilari yoziladi.
+                </p>
+                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-lg text-amber-600 hover:bg-amber-500/10" onClick={handleExitEditMode}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+ 
+          <div className="flex gap-0">
+            {[{ key: "properties", label: "Основные свойства" }, { key: "delivery", label: "Доставка и оплата" }].map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+                className={cn("px-5 py-2.5 text-sm font-bold border-t border-x border-border/30 rounded-t-lg transition-all",
+                  activeTab === tab.key ? "bg-background text-foreground border-b-transparent -mb-px z-10" : "bg-muted/20 text-muted-foreground hover:text-foreground")}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+ 
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === "properties" && (
+            <div className="p-6 space-y-4">
+              <Card className={cn("border rounded-xl bg-card/50 transition-colors", isEditMode ? "border-amber-500/30" : "border-border/30")}>
+                <CardContent className="p-5">
+                  <div className="grid grid-cols-2 gap-x-10 gap-y-4">
+                    {/* LEFT */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Номер документа:</Label>
+                        <div className="relative flex-1">
+                          {orderLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-rose-500" />}
+                          <Input className={cn("h-8 text-sm font-mono font-bold bg-background/80 border-border/40 rounded-lg", isEditMode && "border-amber-500/40 bg-amber-500/5")}
+                            value={orderNumber} onChange={e => !isEditMode && setOrderNumber(e.target.value)} readOnly={isEditMode} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Дата и время выдачи:</Label>
+                        <Input type="datetime-local" className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"
+                          value={orderDate} onChange={e => setOrderDate(e.target.value)} />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Концепция:</Label>
+                        <Select value={concept} onValueChange={setConcept}>
+                          <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue placeholder="Выберите концепцию" /></SelectTrigger>
+                          <SelectContent className="rounded-xl">{CONCEPTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0 mt-2">Комментарий:</Label>
+                        <Input className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"
+                          placeholder="—" value={docComment} onChange={e => setDocComment(e.target.value)} />
+                      </div>
+                    </div>
+ 
+                    {/* RIGHT */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Тип покупателя:</Label>
+                        <Select value={buyerType} onValueChange={setBuyerType}>
+                          <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {["Поставщик", "Сотрудник", "Гость", "Юридическое лицо", "Другое"].map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Покупатель:</Label>
+                        <div className="flex flex-1 gap-1">
+                          <Input className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg font-bold"
+                            placeholder="Введите покупателя" value={recipient} onChange={e => setRecipient(e.target.value)} />
+                          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-border/40 shrink-0"><Search className="w-3.5 h-3.5" /></Button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Отгрузить со склада:</Label>
+                        <div className="flex flex-1 items-center gap-2">
+                          <Checkbox checked={shipFromWarehouse} onCheckedChange={v => setShipFromWarehouse(!!v)} className="border-border/60" />
+                          <Select value={warehouseId} onValueChange={setWarehouseId} disabled={!shipFromWarehouse || (!isAdmin && !!assignedWarehouseId)}>
+                            <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue placeholder="Выберите склад" /></SelectTrigger>
+                            <SelectContent className="rounded-xl">{warehouses.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Счет выручки:</Label>
+                        <Select value={revenueAccount} onValueChange={setRevenueAccount}>
+                          <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">{REVENUE_ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Расходный счет:</Label>
+                        <Select value={expenseAccount} onValueChange={setExpenseAccount}>
+                          <SelectTrigger className="h-8 text-sm flex-1 bg-background/80 border-border/40 rounded-lg"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">{EXPENSE_ACCOUNTS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="w-44 text-xs text-right text-muted-foreground shrink-0">Chiqim turi:</Label>
+                        <div className="flex flex-1 gap-2">
+                          {OUTGOING_TYPES.map(type => (
+                            <button key={type.value} onClick={() => setOutgoingType(type.value)}
+                              className={cn("flex-1 h-8 rounded-lg text-xs font-black transition-all border",
+                                outgoingType === type.value
+                                  ? type.value === "sale" ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20" : "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20"
+                                  : "bg-background/80 text-muted-foreground border-border/40 hover:border-border hover:text-foreground")}>
+                              {type.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+ 
+              {/* Items table */}
+              <Card className={cn("border rounded-xl bg-card/50 overflow-hidden", isEditMode ? "border-amber-500/30" : "border-border/30")}>
+                <div className="flex border-b border-border/20 bg-muted/10 px-4 pt-3 gap-1 flex-wrap">
+                  {PRODUCT_TABS.map(tab => (
+                    <button key={tab.key} onClick={() => setProductTab(tab.key)}
+                      className={cn("px-4 py-2 text-xs font-bold rounded-t-lg transition-all border-t border-x border-border/20",
+                        productTab === tab.key ? "bg-background text-foreground border-b-transparent -mb-px z-10" : "bg-transparent text-muted-foreground hover:text-foreground border-transparent")}>
+                      {tab.label}
+                    </button>
+                  ))}
+                  <div className="ml-auto pb-2">
+                    <Button onClick={addItem} size="sm" variant="outline"
+                      className="h-8 px-3 text-[11px] font-black uppercase tracking-widest rounded-lg border-rose-600/20 text-rose-600 hover:bg-rose-600/5">
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
+                    </Button>
+                  </div>
+                </div>
+ 
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/30 border-b border-border/20">
+                      <tr>
+                        <th className="px-3 py-2.5 text-center font-black uppercase text-muted-foreground w-8">№</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-16">Код</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24">Штрихкод</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground min-w-[200px]">Наименование</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20">Размер</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-center bg-blue-500/5">В таре</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-center bg-blue-500/5">В ед.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-emerald-500/5">Цена за ед.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-emerald-500/5">Сумма</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-right bg-emerald-500/5">Скидка, р.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-16 text-center bg-amber-500/5">НДС %</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-20 text-right bg-amber-500/5">НДС р.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-emerald-500/5">Без НДС</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-16 text-center bg-purple-500/5">Коэф.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-right bg-purple-500/5">Себест.</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-center bg-rose-500/5">До</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-24 text-center bg-rose-500/5">После</th>
+                        <th className="px-2 py-2.5 font-black uppercase text-muted-foreground w-28">Коммент.</th>
+                        <th className="px-2 py-2.5 w-8" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/10">
+                      <AnimatePresence mode="popLayout">
+                        {items.map((item, index) => {
+                          const product = products.find(p => p.id === item.productId);
+                          const calc = getRowCalc(item);
+                          const hasError = validation.itemErrors[item.id];
+                          return (
+                            <motion.tr key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}
+                              className={cn("hover:bg-muted/5 group transition-colors", hasError && "bg-rose-500/[0.03]")}>
+                              <td className="px-3 py-1.5 text-center font-bold text-muted-foreground">{index + 1}</td>
+                              <td className="px-2 py-1.5 font-mono text-muted-foreground text-[11px]">{product?.sku || "—"}</td>
+                              <td className="px-2 py-1.5 font-mono text-muted-foreground text-[11px]">{product?.barcode || "—"}</td>
+                              <td className="px-2 py-1.5">
+                                <div className="space-y-0.5">
+                                  <Select onValueChange={(val) => updateItem(item.id, "productId", val)} value={item.productId}>
+                                    <SelectTrigger className={cn("h-8 text-xs rounded-lg bg-background/50 border-border/40 font-bold", !item.productId && "border-dashed")}>
+                                      <SelectValue placeholder="Выберите товар" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl max-h-[300px]">
+                                      <div className="p-2 sticky top-0 bg-popover z-10 border-b border-border/10">
+                                        <div className="relative">
+                                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                                          <Input placeholder="Поиск..." className="h-8 pl-8 text-xs rounded-lg"
+                                            value={item.searchQuery} onChange={e => updateItem(item.id, "searchQuery", e.target.value)} onClick={e => e.stopPropagation()} />
+                                        </div>
+                                      </div>
+                                      {filteredProducts.filter(p =>
+                                        p.name.toLowerCase().includes(item.searchQuery.toLowerCase()) ||
+                                        (p.sku && p.sku.toLowerCase().includes(item.searchQuery.toLowerCase()))
+                                      ).map(p => (
+                                        <SelectItem key={p.id} value={p.id} className="text-xs font-bold">
+                                          {p.name} {p.sku ? `(${p.sku})` : ""}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {hasError && (
+                                    <p className="text-[9px] font-black text-rose-600 flex items-center gap-0.5">
+                                      <AlertTriangle className="w-2.5 h-2.5" /> {hasError}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <Input className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-bold w-16"
+                                  value={item.size} onChange={e => updateItem(item.id, "size", e.target.value)} />
+                              </td>
+                              <td className="px-2 py-1.5 bg-blue-500/[0.02]">
+                                <Input type="number" min={0} className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-center w-16"
+                                  value={item.inPackage} onChange={e => updateItem(item.id, "inPackage", parseFloat(e.target.value) || 0)} />
+                              </td>
+                              <td className="px-2 py-1.5 bg-blue-500/[0.02]">
+                                <Input type="number" min={0}
+                                  className={cn("h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-center w-16", item.inUnit > calc.stockBefore && "border-rose-500 text-rose-600")}
+                                  value={item.inUnit} onChange={e => updateItem(item.id, "inUnit", parseFloat(e.target.value) || 0)} />
+                              </td>
+                              <td className="px-2 py-1.5 bg-emerald-500/[0.02]">
+                                <Input type="number" min={0} className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-right w-20"
+                                  value={item.price} onChange={e => updateItem(item.id, "price", parseFloat(e.target.value) || 0)} />
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-black bg-emerald-500/[0.02]">{formatMoney(calc.gross)}</td>
+                              <td className="px-2 py-1.5 bg-emerald-500/[0.02]">
+                                <Input type="number" min={0} max={100} className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-right w-16"
+                                  value={item.discount} onChange={e => updateItem(item.id, "discount", parseFloat(e.target.value) || 0)} />
+                              </td>
+                              <td className="px-2 py-1.5 bg-amber-500/[0.02]">
+                                <Select value={item.vatRate} onValueChange={v => updateItem(item.id, "vatRate", v)}>
+                                  <SelectTrigger className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-bold w-20"><SelectValue /></SelectTrigger>
+                                  <SelectContent className="rounded-xl">{VAT_RATES.map(r => <SelectItem key={r} value={r} className="text-xs">{r}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-black text-amber-600 bg-amber-500/[0.02]">{formatMoney(calc.vatAmt)}</td>
+                              <td className="px-2 py-1.5 text-right font-black bg-emerald-500/[0.02]">{formatMoney(calc.amountNoVat)}</td>
+                              <td className="px-2 py-1.5 bg-purple-500/[0.02]">
+                                <Input type="number" min={0} step={0.001} className="h-8 text-xs rounded-lg bg-background/50 border-border/40 font-black text-center w-16"
+                                  value={item.writeoffCoeff} onChange={e => updateItem(item.id, "writeoffCoeff", parseFloat(e.target.value) || 1)} />
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-black text-purple-600 bg-purple-500/[0.02]">{formatMoney(calc.costTotal)}</td>
+                              <td className="px-2 py-1.5 text-center bg-rose-500/[0.02]">
+                                <span className={cn("inline-block px-2 py-0.5 rounded-lg text-[11px] font-black",
+                                  calc.stockBefore <= 0 ? "bg-rose-500/10 text-rose-600" : calc.stockBefore < 10 ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600")}>
+                                  {calc.stockBefore.toFixed(3)}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1.5 text-center bg-rose-500/[0.02]">
+                                <span className={cn("inline-block px-2 py-0.5 rounded-lg text-[11px] font-black",
+                                  calc.stockAfter < 0 ? "bg-rose-500/10 text-rose-600" : "bg-muted/30 text-muted-foreground")}>
+                                  {calc.stockAfter.toFixed(3)}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <Input className="h-8 text-xs rounded-lg bg-background/50 border-border/40 w-24" placeholder="—"
+                                  value={item.itemComment} onChange={e => updateItem(item.id, "itemComment", e.target.value)} />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <Button variant="ghost" size="icon"
+                                  className="h-7 w-7 rounded-lg hover:bg-rose-500/10 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => removeItem(item.id)}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </td>
+                            </motion.tr>
+                          );
+                        })}
+                      </AnimatePresence>
+ 
+                      <tr className="bg-muted/20 font-black text-xs border-t-2 border-border/30">
+                        <td colSpan={8} className="px-3 py-2 text-right text-muted-foreground">Итого:</td>
+                        <td className="px-2 py-2 text-right">{formatMoney(totals.gross)}</td>
+                        <td className="px-2 py-2 text-right text-rose-600">{formatMoney(totals.discount)}</td>
+                        <td className="px-2 py-2" />
+                        <td className="px-2 py-2 text-right text-amber-600">{formatMoney(totals.vat)}</td>
+                        <td className="px-2 py-2 text-right">{formatMoney(totals.noVat)}</td>
+                        <td className="px-2 py-2" />
+                        <td className="px-2 py-2 text-right text-purple-600">{formatMoney(totals.cost)}</td>
+                        <td colSpan={4} />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+ 
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs text-rose-600 font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  * Не было приходов товаров/ингредиентов на склад
+                </p>
+                <p className="text-sm font-black">
+                  Общая сумма: <span className="text-rose-600">{formatMoney(totals.net)} р.</span>
+                  <span className="text-muted-foreground font-normal ml-3 text-xs">в том числе НДС: {formatMoney(totals.vat)} р.</span>
+                </p>
+              </div>
+ 
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/20">
+                <Button variant="outline" className="h-9 px-4 text-xs font-bold rounded-lg gap-1.5" onClick={() => window.location.reload()}>
+                  <RefreshCw className="w-3.5 h-3.5" /> Обновить
+                </Button>
+                <Button variant="outline"
+                  className={cn("h-9 px-4 text-xs font-bold rounded-lg gap-1.5", isEditMode && "border-amber-500/30 text-amber-600 hover:bg-amber-500/5")}
+                  onClick={handlePreDispatch} disabled={loading || !validation.isValid}>
+                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isEditMode ? <Pencil className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+                  {isEditMode ? "Yangilash" : "Сохранить"}
+                </Button>
+                <Button variant="outline" className="h-9 px-4 text-xs font-bold rounded-lg gap-1.5"
+                  onClick={isEditMode ? handleExitEditMode : () => window.history.back()}>
+                  <LogOut className="w-3.5 h-3.5" />
+                  {isEditMode ? "Tahrirlashni bekor qilish" : "Выйти без сохранения"}
+                </Button>
+                <Button
+                  className={cn("h-9 px-5 text-xs font-black rounded-lg gap-1.5 border-none shadow-lg",
+                    isEditMode ? "bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20" : "bg-rose-600 text-white hover:bg-rose-700 shadow-rose-600/20")}
+                  onClick={handlePreDispatch} disabled={loading || !validation.isValid}>
+                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isEditMode ? <><Pencil className="w-3.5 h-3.5" /> Saqlash va yopish</> : <><FileOutput className="w-3.5 h-3.5" /> Сохранить и закрыть</>}
+                </Button>
+              </div>
+            </div>
+          )}
+ 
+          {activeTab === "delivery" && (
+            <div className="p-6">
+              <Card className="border border-border/30 rounded-xl bg-card/50">
+                <CardContent className="p-6">
+                  <p className="text-muted-foreground text-sm font-medium">Доставка и оплата sozlamalari bu yerda bo'ladi.</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+ 
+        {/* Edit Search Dialog */}
+        <Dialog open={isEditSearchOpen} onOpenChange={setIsEditSearchOpen}>
+          <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-2xl p-8 shadow-2xl">
+            <DialogHeader>
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-3">
+                <Clock className="w-7 h-7" />
+              </div>
+              <DialogTitle className="text-xl font-black tracking-tight">Eski nakladnoylni tanlang</DialogTitle>
+              <p className="text-muted-foreground font-medium text-sm pt-1">Tahrirlash uchun StockOut hujjatini qidiring.</p>
+            </DialogHeader>
+            <div className="relative mt-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Hujjat №, mijoz nomi..." className="h-10 pl-10 rounded-xl bg-background/80 border-border/40 text-sm"
+                value={editSearchQuery} onChange={e => setEditSearchQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && handleEditSearch()} />
+              <Button size="sm" variant="outline" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3 text-xs font-bold rounded-lg"
+                onClick={handleEditSearch} disabled={editSearchLoading}>
+                {editSearchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Qidirish"}
+              </Button>
+            </div>
+            <div className="mt-3 space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {editSearchLoading ? (
+                <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>
+              ) : editSearchResults.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <p className="text-sm font-bold">Hujjatlar topilmadi</p>
+                  <p className="text-xs mt-1">Qidiruvni o'zgartiring yoki boshqa so'z kiriting</p>
+                </div>
+              ) : (
+                editSearchResults.map(result => (
+                  <motion.button key={result.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    onClick={() => handleLoadInvoiceForEdit(result.orderNumber)}
+                    className="w-full text-left p-3.5 rounded-xl border border-border/20 hover:border-amber-500/30 hover:bg-amber-500/5 transition-all group">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                          <FileOutput className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="font-mono font-black text-sm text-rose-600">{result.orderNumber}</p>
+                          <p className="text-xs text-muted-foreground font-bold">{result.recipient}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-black">{formatMoney(result.total)} р.</p>
+                        <p className="text-[10px] text-muted-foreground">{new Date(result.date).toLocaleDateString("ru-RU")}</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-amber-600 transition-colors ml-2" />
+                    </div>
+                  </motion.button>
+                ))
+              )}
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="ghost" onClick={() => setIsEditSearchOpen(false)} className="rounded-xl h-10 font-bold px-5">Bekor qilish</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+ 
+        {/* Confirm Dialog */}
+        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground max-w-lg p-8 shadow-2xl">
+            <DialogHeader>
+              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-3", "bg-amber-500/10 text-amber-500")}>
+                {isEditMode ? <Pencil className="w-7 h-7" /> : <Info className="w-7 h-7" />}
+              </div>
+              <DialogTitle className="text-xl font-black tracking-tight">
+                {isEditMode ? "Tahrirlashni tasdiqlang" : "Tasdiqlash"}
+              </DialogTitle>
+              <p className="text-muted-foreground font-medium text-sm pt-1">
+                {isEditMode ? "Eski ma'lumotlar o'chirilib, inventar qayta hisoblanadi." : "Operatsiyani yakunlashdan oldin tekshiring."}
+              </p>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              <div className="p-4 rounded-2xl bg-muted/20 space-y-2.5 text-sm">
+                {([
+                  ["Hujjat №", orderNumber],
+                  ["Sana", new Date(orderDate).toLocaleString("ru-RU")],
+                  ["Покупатель", recipient],
+                  ["Склад", warehouses.find(w => w.id === warehouseId)?.name ?? "—"],
+                  ["Концепция", concept || "—"],
+                  ["Mahsulotlar", `${items.filter(i => i.productId).length} та`],
+                  ["Chiqim turi", outgoingType === "sale" ? "Sotuv" : "Xarajat"],
+                ] as [string, string][]).map(([label, val], i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-bold">{label}:</span>
+                    <span className={cn("font-black", label === "Hujjat №" ? "font-mono text-rose-600" : "")}>{val}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center pt-2 border-t border-white/5">
+                  <span className="text-rose-600 font-black uppercase text-[10px] tracking-widest">Общая сумма</span>
+                  <span className="text-xl font-black text-rose-600">{formatMoney(totals.net)} р.</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground font-bold text-xs">в том числе НДС</span>
+                  <span className="font-black text-amber-600">{formatMoney(totals.vat)} р.</span>
+                </div>
+              </div>
+              {isEditMode && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs font-bold text-amber-700">Bu amalni bekor qilib bo'lmaydi. Eski stockMovements yozuvlari o'chirilib, inventar qayta hisoblanadi.</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setIsConfirmOpen(false)} className="rounded-xl h-11 font-bold px-5">Bekor qilish</Button>
+              <Button onClick={handleFinalProcess} disabled={loading}
+                className={cn("rounded-xl h-11 flex-1 font-black uppercase tracking-widest text-[10px] gap-2",
+                  isEditMode ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-rose-600 text-white hover:bg-rose-700")}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditMode ? <><Pencil className="w-4 h-4" /> Yangilash</> : <>Tasdiqlash <ArrowRight className="w-4 h-4" /></>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+ 
+        {/* Success Dialog */}
+        <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
+          <DialogContent className="rounded-[2rem] border-white/5 bg-card/40 backdrop-blur-3xl text-foreground p-8 shadow-2xl text-center">
+            <div className={cn("mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4",
+              processedInvoice?.isEdited ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500")}>
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black tracking-tight mb-1">
+                {processedInvoice?.isEdited ? "Hujjat yangilandi!" : "Расходная накладная сохранена!"}
+              </DialogTitle>
+              <p className="text-muted-foreground font-medium text-sm">
+                {processedInvoice?.isEdited ? "Nakladnoy muvaffaqiyatli yangilandi." : "Chiqim nakladnoyi muvaffaqiyatli rasmiylashtirildi."}
+              </p>
+              <p className="text-rose-600 font-black text-2xl mt-2 font-mono">{processedInvoice?.orderNumber}</p>
+              {processedInvoice && (
+                <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                  <p>Общая сумма: <span className="font-black text-foreground">{formatMoney(processedInvoice.totals?.net || 0)} р.</span></p>
+                  <p>НДС: <span className="font-black text-amber-600">{formatMoney(processedInvoice.totals?.vat || 0)} р.</span></p>
+                  <p>Chiqim turi: <span className={cn("font-black", processedInvoice.outgoingType === "sale" ? "text-emerald-600" : "text-amber-600")}>
+                    {processedInvoice.outgoingType === "sale" ? "Sotuv" : "Xarajat"}
+                  </span></p>
+                </div>
+              )}
+            </DialogHeader>
+            <DialogFooter className="mt-6 flex-col gap-2">
+              <Button onClick={handleDownloadPDF}
+                className="w-full h-12 rounded-xl bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] gap-2">
+                <Download className="w-4 h-4" /> Скачать PDF накладную
+              </Button>
+              <Button variant="ghost" onClick={() => setIsSuccessOpen(false)} className="w-full h-10 rounded-xl font-bold">
+                <X className="w-4 h-4 mr-1" /> Закрыть
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </main>
+    </div>
+  );
+}

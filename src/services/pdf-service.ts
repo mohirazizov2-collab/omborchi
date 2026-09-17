@@ -1,0 +1,137 @@
+'use client';
+
+export interface InvoiceItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  price: number;
+}
+
+export interface InvoiceData {
+  title: string;
+  type: 'in' | 'out';
+  docNumber: string;
+  date: string;
+  partyName: string;
+  partyTypeLabel: string;
+  warehouseName: string;
+  responsibleName: string;
+  items: InvoiceItem[];
+  currency: string;
+  labels: {
+    number: string;
+    date: string;
+    warehouse: string;
+    product: string;
+    qty: string;
+    unit: string;
+    price: string;
+    total: string;
+    grandTotal: string;
+    shippedBy: string;
+    receivedBy: string;
+  };
+}
+
+export async function generateInvoicePDF(data: InvoiceData) {
+  const themeColor = data.type === 'in' ? '#3B82F6' : '#E11D48';
+  
+  const totalValue = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  
+  const rows = data.items.map((it, i) => `
+    <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#ffffff'}">
+      <td style="text-align:center;padding:8px 4px;border:1px solid #e5e7eb">${i + 1}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb">${it.name}</td>
+      <td style="text-align:center;padding:8px 4px;border:1px solid #e5e7eb">${it.quantity}</td>
+      <td style="text-align:center;padding:8px 4px;border:1px solid #e5e7eb">${it.unit}</td>
+      <td style="text-align:right;padding:8px;border:1px solid #e5e7eb">${it.price.toLocaleString().replace(/,/g, ' ')}</td>
+      <td style="text-align:right;padding:8px;border:1px solid #e5e7eb">${(it.quantity * it.price).toLocaleString().replace(/,/g, ' ')}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; color: #1f2937; font-size: 13px; }
+        .header { background: ${themeColor}; color: white; padding: 20px 25px; }
+        .header h1 { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
+        .header p { font-size: 11px; opacity: 0.85; }
+        .meta { padding: 20px 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; border-bottom: 2px solid #e5e7eb; }
+        .meta-item label { font-size: 10px; color: #6b7280; text-transform: uppercase; font-weight: bold; }
+        .meta-item p { font-size: 13px; font-weight: 600; margin-top: 3px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 25px; width: calc(100% - 50px); }
+        thead tr { background: ${themeColor}; color: white; }
+        thead th { padding: 10px 8px; text-align: center; font-size: 11px; border: 1px solid ${themeColor}; }
+        .total { text-align: right; padding: 15px 25px; font-size: 16px; font-weight: bold; color: ${themeColor}; }
+        .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; padding: 30px 25px 15px; }
+        .sig-line { border-top: 1px solid #9ca3af; padding-top: 5px; font-size: 11px; color: #6b7280; margin-top: 30px; }
+        .footer { text-align: center; font-size: 9px; color: #9ca3af; padding: 10px; border-top: 1px solid #e5e7eb; }
+        @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>${data.title.toUpperCase()}</h1>
+        <p>omborchi.uz | Professional Warehouse Management System</p>
+      </div>
+      <div class="meta">
+        <div class="meta-item">
+          <label>${data.partyTypeLabel}</label>
+          <p>${data.partyName || 'N/A'}</p>
+        </div>
+        <div class="meta-item">
+          <label>${data.labels.number}</label>
+          <p>${data.docNumber || '---'}</p>
+        </div>
+        <div class="meta-item">
+          <label>${data.labels.warehouse}</label>
+          <p>${data.warehouseName || 'N/A'}</p>
+        </div>
+        <div class="meta-item">
+          <label>${data.labels.date}</label>
+          <p>${data.date || '---'}</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th style="text-align:left">${data.labels.product}</th>
+            <th style="width:60px">${data.labels.qty}</th>
+            <th style="width:70px">${data.labels.unit}</th>
+            <th style="width:90px">${data.labels.price}</th>
+            <th style="width:90px">${data.labels.total}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="total">${data.labels.grandTotal}: ${totalValue.toLocaleString().replace(/,/g, ' ')} ${data.currency}</div>
+      <div class="signatures">
+        <div>
+          <div class="sig-line">${data.labels.shippedBy}: ________________</div>
+        </div>
+        <div>
+          <div class="sig-line">${data.labels.receivedBy}: ________________</div>
+        </div>
+      </div>
+      <div class="footer">Doc ID: ${data.docNumber} | Generated by omborchi.uz System</div>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+  
+  printWindow.document.write(html);
+  printWindow.document.close();
+  
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+}

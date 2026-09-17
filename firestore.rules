@@ -1,0 +1,86 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Yordamchi funksiyalar ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+        (exists(/databases/$(database)/documents/rolesAdmin/$(request.auth.uid)) || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin']);
+    }
+
+    // --- Foydalanuvchilar ---
+    match /users/{userId} {
+      // Login credentiallari password_hash maydoniga ega bo'ladi. Ular faqat
+      // serverdagi Firebase Admin SDK orqali o'qiladi; browser hech qachon
+      // hashni olmasligi kerak.
+      allow read: if isSignedIn() && !('password_hash' in resource.data);
+      allow create: if isAdmin() && !('password_hash' in request.resource.data);
+      allow update: if !('password_hash' in resource.data) &&
+                    !('password_hash' in request.resource.data) &&
+                    (isAdmin() || request.auth.uid == userId);
+      allow delete: if !('password_hash' in resource.data) &&
+                    (isAdmin() || request.auth.uid == userId);
+    }
+
+    match /rolesAdmin/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Omborxonalar ---
+    match /warehouses/{warehouseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- Kategoriyalar ---
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // --- Mahsulotlar ---
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // --- Ishchilar ---
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Xarajatlar ---
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // --- Zaxira harakatlari (Audit Trail) ---
+    match /stockMovements/{movementId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin(); 
+    }
+
+    // --- Inventar (Ombordagi qoldiqlar) ---
+    match /inventory/{inventoryId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // --- Qolgan barcha hujjatlar ---
+    match /{path=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

@@ -1,0 +1,221 @@
+
+{
+  "entities": {
+    "Warehouse": {
+      "title": "Warehouse",
+      "description": "Omborxonalar ma'lumotlari: nomi, manzili va mas'ul shaxs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "responsibleUserId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "responsibleUserId"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Mahsulotlar uchun toifalar (papkalar).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Mahsulotlar katalogi: nomi, narxi va joriy zaxira miqdori.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "salePrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "unit": { "type": "string", "enum": ["pcs", "kg", "g", "m", "cm", "l", "ml", "m2", "m3", "set", "bag", "box", "pack"] },
+        "lowStockThreshold": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "sku", "unit"]
+    },
+    "Recipe": {
+      "title": "Recipe",
+      "description": "Mahsulot tarkibi (Retsept): 1 birlik tayyor mahsulot uchun sarf-xarajatlar.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "outputProductId": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "components"]
+    },
+    "Production": {
+      "title": "Production",
+      "description": "Tayyorlash akti (Akt prigotovleniya) jurnali.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "recipeId": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "responsibleUserId": { "type": "string" }
+      }
+    },
+    "WarehouseInventory": {
+      "title": "WarehouseInventory",
+      "description": "Muayyan ombordagi muayyan mahsulot qoldig'i.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "warehouseId_productId formatida" },
+        "warehouseId": { "type": "string" },
+        "productId": { "type": "string" },
+        "stock": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "warehouseId", "productId", "stock"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Audit Trail: Zaxira harakati tarixi.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "quantityChange": { "type": "number" },
+        "movementType": { "type": "string", "enum": ["StockIn", "StockOut", "Transfer", "Adjustment", "Production"] },
+        "movementDate": { "type": "string", "format": "date-time" },
+        "responsibleUserId": { "type": "string" },
+        "responsibleUserName": { "type": "string" }
+      },
+      "required": ["id", "productId", "warehouseId", "quantityChange", "movementType"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Ishchilar ma'lumotlari va moliyaviy sozlamalari.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "position": { "type": "string" },
+        "department": { "type": "string" },
+        "baseSalary": { "type": "number" },
+        "overtimeHourlyRate": { "type": "number" },
+        "taxRate": { "type": "number" },
+        "standardHours": { "type": "number" },
+        "phoneNumber": { "type": "string" },
+        "hiredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "fullName", "position", "baseSalary"]
+    },
+    "Payroll": {
+      "title": "Payroll",
+      "description": "Oylik maosh hisob-kitoblari tarixi.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "month": { "type": "string" },
+        "workingHours": { "type": "number" },
+        "overtimeHours": { "type": "number" },
+        "bonus": { "type": "number" },
+        "deductions": { "type": "number" },
+        "brutto": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "netto": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Biznes xarajatlari (ijara, kommunal, transport va h.k.).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "responsibleUserId": { "type": "string" },
+        "responsibleUserName": { "type": "string" }
+      },
+      "required": ["id", "category", "amount", "date"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Super Admin huquqiga ega foydalanuvchilar UID ro'yxati.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "assignedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["password"],
+    "securityPolicy": "Strict: Email/Password login required."
+  },
+  "firestore": {
+    "/warehouses/{warehouseId}": {
+      "schema": "#/entities/Warehouse",
+      "description": "Omborlar ro'yxati."
+    },
+    "/categories/{categoryId}": {
+      "schema": "#/entities/Category",
+      "description": "Mahsulot toifalari (papkalar)."
+    },
+    "/products/{productId}": {
+      "schema": "#/entities/Product",
+      "description": "Mahsulotlar katalogi."
+    },
+    "/recipes/{recipeId}": {
+      "schema": "#/entities/Recipe",
+      "description": "Mahsulot tarkibi (Retseptlar)."
+    },
+    "/productions/{productionId}": {
+      "schema": "#/entities/Production",
+      "description": "Tayyorlash aktlari."
+    },
+    "/inventory/{inventoryId}": {
+      "schema": "#/entities/WarehouseInventory",
+      "description": "Ombordagi qoldiqlar."
+    },
+    "/stockMovements/{movementId}": {
+      "schema": "#/entities/StockMovement",
+      "description": "Harakatlar jurnali."
+    },
+    "/employees/{employeeId}": {
+      "schema": "#/entities/Employee",
+      "description": "Ishchilar ma'lumotlari."
+    },
+    "/payrolls/{payrollId}": {
+      "schema": "#/entities/Payroll",
+      "description": "Maosh hisoblari."
+    },
+    "/expenses/{expenseId}": {
+      "schema": "#/entities/Expense",
+      "description": "Biznes xarajatlari."
+    },
+    "/users/{userId}": {
+      "schema": { "type": "object" },
+      "description": "Profillar."
+    }
+  }
+}
