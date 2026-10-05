@@ -175,14 +175,7 @@ export default function LoginPage() {
               <path d="M8 18H16" />
             </svg>
           </motion.div>
-          <motion.h1 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="font-headline font-black text-6xl tracking-tighter text-foreground"
-          >
-            omborchi.uz
-          </motion.h1>
-          <p className="text-muted-foreground/50 text-[10px] font-black uppercase tracking-[0.4em] mt-3">Advanced Warehouse Management</p>
+          <img src="/omborchi-logo.png" alt="omborchi.uz" className="mx-auto h-40 w-auto rounded-3xl bg-[#03060f] px-4 py-3 object-contain shadow-xl" />
         </div>
 
         <motion.div

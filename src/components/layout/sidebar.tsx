@@ -170,15 +170,7 @@ export function OmniSidebar() {
     <div className="flex flex-col h-full">
       <div className="flex items-center px-6 h-20 border-b shrink-0">
         <Link href="/sales" className="flex items-center gap-3 group" onClick={() => setMobileOpen(false)}>
-          <div className="w-11 h-11 rounded-[0.9rem] bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 10L12 4L21 10V20H3V10Z" />
-              <path d="M8 12H16" />
-              <path d="M8 15H16" />
-              <path d="M8 18H16" />
-            </svg>
-          </div>
-          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
+          <img src="/omborchi-logo.png" alt="omborchi.uz" className="h-12 w-auto rounded-xl bg-[#03060f] px-2 py-1 object-contain" />
         </Link>
       </div>
  
@@ -243,15 +235,7 @@ export function OmniSidebar() {
     <div className="flex flex-col h-full">
       <div className="flex items-center px-6 h-20 border-b shrink-0">
         <Link href="/" className="flex items-center gap-3 group" onClick={() => setMobileOpen(false)}>
-          <div className="w-11 h-11 rounded-[0.9rem] bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 10L12 4L21 10V20H3V10Z" />
-              <path d="M8 12H16" />
-              <path d="M8 15H16" />
-              <path d="M8 18H16" />
-            </svg>
-          </div>
-          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
+          <img src="/omborchi-logo.png" alt="omborchi.uz" className="h-12 w-auto rounded-xl bg-[#03060f] px-2 py-1 object-contain" />
         </Link>
       </div>
  
@@ -308,14 +292,7 @@ export function OmniSidebar() {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-16 bg-card border-b">
         <Link href={isSotuvchi ? "/sales" : "/"} className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 10L12 4L21 10V20H3V10Z" />
-              <path d="M8 12H16" />
-              <path d="M8 15H16" />
-            </svg>
-          </div>
-          <span className="font-black text-lg tracking-tighter">omborchi.uz</span>
+          <img src="/omborchi-logo.png" alt="omborchi.uz" className="h-9 w-auto rounded-xl bg-[#03060f] px-2 py-1 object-contain" />
         </Link>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
