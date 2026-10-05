@@ -162,19 +162,6 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md p-6 z-20 relative">
         <div className="flex flex-col items-center mb-10">
-          <motion.div 
-            initial={{ scale: 0, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", damping: 12 }}
-            className="w-24 h-24 rounded-[2rem] bg-[#3b82f6] flex items-center justify-center text-white shadow-[0_20px_40px_-10px_rgba(59,130,246,0.5)] mb-8"
-          >
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 10L12 4L21 10V20H3V10Z" />
-              <path d="M8 12H16" />
-              <path d="M8 15H16" />
-              <path d="M8 18H16" />
-            </svg>
-          </motion.div>
           <img src="/omborchi-logo.png" alt="omborchi.uz" className="mx-auto h-40 w-auto rounded-3xl bg-[#03060f] px-4 py-3 object-contain shadow-xl" />
         </div>
 
