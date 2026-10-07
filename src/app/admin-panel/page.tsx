@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CheckCircle2,
@@ -26,7 +26,28 @@ import {
   Users,
   CreditCard,
   RefreshCw,
+  Plus,
+  Loader2,
 } from "lucide-react";
+
+import { initializeApp, deleteApp } from "firebase/app";
+import { createUserWithEmailAndPassword, deleteUser, getAuth, signOut, type UserCredential } from "firebase/auth";
+import { addMonths } from "date-fns";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  writeBatch,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { firebaseConfig } from "@/firebase/config";
+import { useRouter } from "next/navigation";
+import { useUser } from "@/firebase";
+import { companyAuthEmail, isFounder } from "@/lib/tenancy";
 
 /* =========================================================
    TYPES
@@ -58,6 +79,7 @@ type Subscription = {
 
 type Company = {
   id: number;
+  firestore_id: string;
   name: string;
   owner_name: string;
   phone: string;
@@ -77,172 +99,7 @@ type Company = {
    Backend ulanganda shu massiv API dan keladi.
 ========================================================= */
 
-const initialCompanies: Company[] = [
-  {
-    id: 1,
-    name: "Farrux Mebel",
-    owner_name: "Farrux",
-    phone: "+998 90 123 45 67",
-    status: "active",
-    plan: "Pro",
-    plan_price: 1500000,
-    created_at: "2026-01-12",
-    expires_at: "2026-11-12",
-    total_paid: 12000000,
-    users_count: 8,
-    payments: [
-      {
-        id: 1,
-        amount: 1500000,
-        paid_at: "2026-10-01",
-        method: "Click",
-      },
-      {
-        id: 2,
-        amount: 1500000,
-        paid_at: "2026-09-01",
-        method: "Payme",
-      },
-    ],
-    subscriptions: [
-      {
-        id: 1,
-        plan: "Pro",
-        start_date: "2026-10-01",
-        end_date: "2026-11-01",
-        status: "active",
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "Ideal Mebel",
-    owner_name: "Azizbek",
-    phone: "+998 91 555 22 11",
-    status: "active",
-    plan: "Basic",
-    plan_price: 700000,
-    created_at: "2026-02-03",
-    expires_at: "2026-11-03",
-    total_paid: 5600000,
-    users_count: 5,
-    payments: [
-      {
-        id: 3,
-        amount: 700000,
-        paid_at: "2026-10-03",
-        method: "Payme",
-      },
-    ],
-    subscriptions: [
-      {
-        id: 2,
-        plan: "Basic",
-        start_date: "2026-10-03",
-        end_date: "2026-11-03",
-        status: "active",
-      },
-    ],
-  },
-  {
-    id: 3,
-    name: "Royal Furniture",
-    owner_name: "Jasur",
-    phone: "+998 93 777 88 99",
-    status: "trial",
-    plan: "Pro",
-    plan_price: 1500000,
-    created_at: "2026-10-05",
-    expires_at: "2026-10-19",
-    total_paid: 0,
-    users_count: 3,
-    payments: [],
-    subscriptions: [
-      {
-        id: 3,
-        plan: "Pro Trial",
-        start_date: "2026-10-05",
-        end_date: "2026-10-19",
-        status: "trial",
-      },
-    ],
-  },
-  {
-    id: 4,
-    name: "Mega Decor",
-    owner_name: "Bekzod",
-    phone: "+998 95 111 22 33",
-    status: "suspended",
-    plan: "Basic",
-    plan_price: 700000,
-    created_at: "2026-03-15",
-    expires_at: "2026-09-15",
-    total_paid: 4200000,
-    users_count: 4,
-    payments: [
-      {
-        id: 4,
-        amount: 700000,
-        paid_at: "2026-08-15",
-        method: "Click",
-      },
-    ],
-    subscriptions: [
-      {
-        id: 4,
-        plan: "Basic",
-        start_date: "2026-08-15",
-        end_date: "2026-09-15",
-        status: "expired",
-      },
-    ],
-  },
-  {
-    id: 5,
-    name: "Lux House",
-    owner_name: "Muhammad",
-    phone: "+998 97 444 55 66",
-    status: "active",
-    plan: "Enterprise",
-    plan_price: 3000000,
-    created_at: "2026-04-20",
-    expires_at: "2026-12-20",
-    total_paid: 21000000,
-    users_count: 22,
-    payments: [
-      {
-        id: 5,
-        amount: 3000000,
-        paid_at: "2026-10-20",
-        method: "Bank",
-      },
-    ],
-    subscriptions: [
-      {
-        id: 5,
-        plan: "Enterprise",
-        start_date: "2026-10-20",
-        end_date: "2026-11-20",
-        status: "active",
-      },
-    ],
-  },
-  {
-    id: 6,
-    name: "Modern Home",
-    owner_name: "Sardor",
-    phone: "+998 99 222 33 44",
-    status: "active",
-    plan: "Pro",
-    plan_price: 1500000,
-    created_at: "2026-05-11",
-    expires_at: "2026-11-11",
-    total_paid: 9000000,
-    users_count: 11,
-    payments: [],
-    subscriptions: [],
-  },
-];
+const initialCompanies: Company[] = [];
 
 /* =========================================================
    HELPERS
@@ -275,12 +132,267 @@ function statusClass(status: CompanyStatus) {
 }
 
 /* =========================================================
+   FIRESTORE
+========================================================= */
+
+function normalizeFirestoreDate(
+  value: unknown,
+  fallback = new Date().toISOString()
+): string {
+  if (!value) return fallback;
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+  }
+
+  if (typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+  }
+
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    const parsed = (value as { toDate: () => Date }).toDate();
+    return parsed instanceof Date && !Number.isNaN(parsed.getTime())
+      ? parsed.toISOString()
+      : fallback;
+  }
+
+  return fallback;
+}
+
+async function loadCompaniesFromFirestore(): Promise<Company[]> {
+  const snapshot = await getDocs(collection(db, "companies"));
+
+  const companies = await Promise.all(
+    snapshot.docs.map(async (companyDoc, index) => {
+      const data = companyDoc.data();
+
+      const usersSnapshot = await getDocs(
+        collection(db, "companies", companyDoc.id, "users")
+      );
+
+      // These collections are optional. A company does not need to have
+      // payment/subscription subcollections for the admin panel to work.
+      const paymentsSnapshot = await getDocs(
+        collection(db, "companies", companyDoc.id, "payments")
+      );
+
+      const subscriptionsSnapshot = await getDocs(
+        collection(db, "companies", companyDoc.id, "subscriptions")
+      );
+
+      const createdAt = normalizeFirestoreDate(
+        data.createdAt ?? data.created_at
+      );
+
+      const expiresAt = normalizeFirestoreDate(
+        data.subscriptionEndsAt ??
+          data.subscriptionEnd ??
+          data.subscription_end ??
+          data.expiresAt ??
+          data.expires_at,
+        createdAt
+      );
+
+      const ownerUid = String(data.ownerUid ?? "");
+
+      const ownerUser = ownerUid
+        ? usersSnapshot.docs.find((userDoc) => userDoc.id === ownerUid)?.data()
+        : undefined;
+
+      const payments: Payment[] = paymentsSnapshot.docs.map(
+        (paymentDoc, paymentIndex) => {
+          const payment = paymentDoc.data();
+
+          return {
+            id: paymentIndex + 1,
+            amount: Number(
+              payment.amount ??
+                payment.price ??
+                payment.total ??
+                0
+            ),
+            paid_at: normalizeFirestoreDate(
+              payment.paid_at ??
+                payment.paidAt ??
+                payment.created_at ??
+                payment.createdAt,
+              createdAt
+            ),
+            method:
+              String(
+                payment.method ??
+                  payment.payment_method ??
+                  payment.paymentMethod ??
+                  "Noma'lum"
+              ),
+          };
+        }
+      );
+
+      const subscriptions: Subscription[] =
+        subscriptionsSnapshot.docs.map(
+          (subscriptionDoc, subscriptionIndex) => {
+            const subscription = subscriptionDoc.data();
+
+            return {
+              id: subscriptionIndex + 1,
+              plan:
+                String(
+                  subscription.plan ??
+                    subscription.plan_name ??
+                    data.plan ??
+                    data.subscriptionPlan ??
+                    (data.subscriptionType === "trial"
+                      ? "Trial"
+                      : "Paid")
+                ),
+              start_date: normalizeFirestoreDate(
+                subscription.start_date ??
+                  subscription.startDate ??
+                  subscription.createdAt ??
+                  data.createdAt,
+                createdAt
+              ),
+              end_date: normalizeFirestoreDate(
+                subscription.end_date ??
+                  subscription.endDate ??
+                  subscription.expiresAt ??
+                  data.subscriptionEndsAt,
+                expiresAt
+              ),
+              status: String(
+                subscription.status ??
+                  data.subscriptionStatus ??
+                  "active"
+              ),
+            };
+          }
+        );
+
+      const rawSubscriptionStatus = String(
+        data.subscriptionStatus ??
+          data.subscription_status ??
+          data.status ??
+          "active"
+      ).toLowerCase();
+
+      const rawSubscriptionType = String(
+        data.subscriptionType ??
+          data.subscription_type ??
+          ""
+      ).toLowerCase();
+
+      let status: CompanyStatus = "active";
+
+      if (
+        rawSubscriptionStatus === "suspended" ||
+        rawSubscriptionStatus === "blocked" ||
+        rawSubscriptionStatus === "inactive"
+      ) {
+        status = "suspended";
+      } else if (
+        rawSubscriptionType === "trial" ||
+        rawSubscriptionStatus === "trial" ||
+        rawSubscriptionStatus === "trialing"
+      ) {
+        status = "trial";
+      }
+
+      const totalPaid = payments.reduce(
+        (sum, payment) => sum + payment.amount,
+        0
+      );
+
+      const ownerName = String(
+        ownerUser?.fullName ??
+          [ownerUser?.firstName, ownerUser?.lastName]
+            .filter(Boolean)
+            .join(" ") ??
+          data.owner_name ??
+          data.ownerName ??
+          data.owner ??
+          "—"
+      ).trim() || "—";
+
+      const plan =
+        String(
+          data.plan ??
+            data.plan_name ??
+            data.subscription_plan ??
+            data.subscriptionPlan ??
+            (rawSubscriptionType === "trial" ? "Trial" : "Paid")
+        );
+
+      const planPrice = Number(
+        data.plan_price ??
+          data.planPrice ??
+          data.subscription_price ??
+          data.subscriptionPrice ??
+          0
+      );
+
+      return {
+        id: index + 1,
+        firestore_id: companyDoc.id,
+        name: String(
+          data.name ??
+            data.companyName ??
+            data.company_name ??
+            companyDoc.id
+        ),
+        owner_name: ownerName,
+        phone: String(
+          data.phone ??
+            data.phoneNumber ??
+            data.telephone ??
+            ownerUser?.phone ??
+            "—"
+        ),
+        status,
+        plan,
+        plan_price: planPrice,
+        created_at: createdAt,
+        expires_at: expiresAt,
+        total_paid: Number(
+          data.total_paid ??
+            data.totalPaid ??
+            totalPaid
+        ),
+        users_count: usersSnapshot.size,
+        payments,
+        subscriptions,
+      };
+    })
+  );
+
+  return companies;
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function AdminDashboard() {
+  const router = useRouter();
+  const { user, isUserLoading } = useUser();
+  const founderAccess = isFounder(user?.email);
+
   const [companies, setCompanies] =
     useState<Company[]>(initialCompanies);
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const [dark, setDark] = useState(false);
 
@@ -303,8 +415,72 @@ export default function AdminDashboard() {
   const [showFilters, setShowFilters] = useState(false);
 
   const [actionLoading, setActionLoading] = useState(false);
+  const [companyForm, setCompanyForm] = useState({
+    name: "",
+    companyId: "",
+    username: "",
+    password: "",
+  });
+  const [companyFormLoading, setCompanyFormLoading] = useState(false);
+  const [companyFormMessage, setCompanyFormMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const pageSize = 5;
+
+  useEffect(() => {
+    if (isUserLoading) return;
+
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
+    if (!founderAccess) {
+      router.replace("/");
+    }
+  }, [founderAccess, isUserLoading, router, user]);
+
+  useEffect(() => {
+    if (isUserLoading || !user || !founderAccess) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setLoadError("");
+
+        const data = await loadCompaniesFromFirestore();
+
+        if (!cancelled) {
+          setCompanies(data);
+        }
+      } catch (error) {
+        console.error("Admin panel Firestore error:", error);
+
+        if (!cancelled) {
+          setLoadError(
+            "Ma'lumotlarni Firestore'dan yuklashda xatolik yuz berdi."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [founderAccess, isUserLoading, user]);
 
   /* =====================================================
      STATISTICS
@@ -346,7 +522,116 @@ export default function AdminDashboard() {
     0
   );
 
-  const growth = 18.7;
+  const currentMonth = new Date();
+  const currentMonthRevenue = companies.reduce(
+    (sum, company) =>
+      sum +
+      company.payments
+        .filter((payment) => {
+          const date = new Date(payment.paid_at);
+          return (
+            date.getFullYear() === currentMonth.getFullYear() &&
+            date.getMonth() === currentMonth.getMonth()
+          );
+        })
+        .reduce((paymentSum, payment) => paymentSum + payment.amount, 0),
+    0
+  );
+
+  const previousMonth = new Date(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth() - 1,
+    1
+  );
+
+  const previousMonthRevenue = companies.reduce(
+    (sum, company) =>
+      sum +
+      company.payments
+        .filter((payment) => {
+          const date = new Date(payment.paid_at);
+          return (
+            date.getFullYear() === previousMonth.getFullYear() &&
+            date.getMonth() === previousMonth.getMonth()
+          );
+        })
+        .reduce((paymentSum, payment) => paymentSum + payment.amount, 0),
+    0
+  );
+
+  const growth =
+    previousMonthRevenue > 0
+      ? ((currentMonthRevenue - previousMonthRevenue) /
+          previousMonthRevenue) *
+        100
+      : currentMonthRevenue > 0
+        ? 100
+        : 0;
+
+  const revenueChartData = useMemo(() => {
+    const now = new Date();
+
+    return Array.from({ length: 12 }, (_, index) => {
+      const monthDate = new Date(
+        now.getFullYear(),
+        now.getMonth() - (11 - index),
+        1
+      );
+
+      const value = companies.reduce(
+        (sum, company) =>
+          sum +
+          company.payments
+            .filter((payment) => {
+              const date = new Date(payment.paid_at);
+              return (
+                date.getFullYear() === monthDate.getFullYear() &&
+                date.getMonth() === monthDate.getMonth()
+              );
+            })
+            .reduce(
+              (paymentSum, payment) => paymentSum + payment.amount,
+              0
+            ),
+        0
+      );
+
+      return {
+        label: monthDate.toLocaleDateString("uz-UZ", {
+          month: "short",
+        }),
+        value,
+      };
+    });
+  }, [companies]);
+
+  const newCompaniesChartData = useMemo(() => {
+    const now = new Date();
+
+    return Array.from({ length: 12 }, (_, index) => {
+      const monthDate = new Date(
+        now.getFullYear(),
+        now.getMonth() - (11 - index),
+        1
+      );
+
+      const value = companies.filter((company) => {
+        const date = new Date(company.created_at);
+
+        return (
+          date.getFullYear() === monthDate.getFullYear() &&
+          date.getMonth() === monthDate.getMonth()
+        );
+      }).length;
+
+      return {
+        label: monthDate.toLocaleDateString("uz-UZ", {
+          month: "short",
+        }),
+        value,
+      };
+    });
+  }, [companies]);
 
   /* =====================================================
      FILTER
@@ -417,35 +702,216 @@ export default function AdminDashboard() {
      COMPANY ACTIONS
   ===================================================== */
 
-  function changeStatus(
+  async function changeStatus(
     id: number,
     newStatus: CompanyStatus
   ) {
+    const company = companies.find((item) => item.id === id);
+
+    if (!company) return;
+
     setActionLoading(true);
 
-    setTimeout(() => {
+    try {
+      const updateData =
+        newStatus === "trial"
+          ? {
+              subscriptionStatus: "active",
+              subscriptionType: "trial",
+              updatedAt: serverTimestamp(),
+            }
+          : {
+              subscriptionStatus:
+                newStatus === "suspended"
+                  ? "suspended"
+                  : "active",
+              updatedAt: serverTimestamp(),
+            };
+
+      await updateDoc(
+        doc(db, "companies", company.firestore_id),
+        updateData
+      );
+
       setCompanies((old) =>
-        old.map((company) =>
-          company.id === id
+        old.map((item) =>
+          item.id === id
             ? {
-                ...company,
+                ...item,
                 status: newStatus,
               }
-            : company
+            : item
         )
       );
 
       setSelectedCompany((old) =>
-        old
+        old && old.id === id
           ? {
               ...old,
               status: newStatus,
             }
-          : null
+          : old
+      );
+    } catch (error) {
+      console.error("Company status update error:", error);
+
+      alert(
+        "Korxona holatini o'zgartirishda xatolik yuz berdi."
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function createCompanyAccount(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!user || !founderAccess) return;
+
+    const normalizedId = companyForm.companyId.trim().toLowerCase();
+    const normalizedUsername = companyForm.username.trim().toLowerCase();
+    const normalizedName = companyForm.name.trim();
+
+    if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(normalizedId)) {
+      setCompanyFormMessage({
+        type: "error",
+        text: "Korxona ID 3–40 ta kichik lotin harfi, raqam yoki tire bo‘lishi kerak.",
+      });
+      return;
+    }
+
+    if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(normalizedUsername)) {
+      setCompanyFormMessage({
+        type: "error",
+        text: "Login 3–40 ta kichik lotin harfi, raqam yoki . _ - belgilaridan iborat bo‘lishi kerak.",
+      });
+      return;
+    }
+
+    if (normalizedId.length + normalizedUsername.length > 59) {
+      setCompanyFormMessage({
+        type: "error",
+        text: "Korxona ID va login uzunligi birgalikda 59 belgidan oshmasligi kerak.",
+      });
+      return;
+    }
+
+    if (!normalizedName) {
+      setCompanyFormMessage({
+        type: "error",
+        text: "Korxona nomini kiriting.",
+      });
+      return;
+    }
+
+    if (companyForm.password.length < 6) {
+      setCompanyFormMessage({
+        type: "error",
+        text: "Parol kamida 6 ta belgidan iborat bo‘lishi kerak.",
+      });
+      return;
+    }
+
+    setCompanyFormLoading(true);
+    setCompanyFormMessage(null);
+
+    let secondaryApp: ReturnType<typeof initializeApp> | undefined;
+    let createdUser: UserCredential | undefined;
+
+    try {
+      const companyRef = doc(db, "companies", normalizedId);
+      const existingCompany = await getDoc(companyRef);
+
+      if (existingCompany.exists()) {
+        setCompanyFormMessage({
+          type: "error",
+          text: "Bu korxona ID allaqachon ishlatilgan.",
+        });
+        return;
+      }
+
+      const authEmail = companyAuthEmail(normalizedId, normalizedUsername);
+      secondaryApp = initializeApp(firebaseConfig, `company-${Date.now()}`);
+      const secondaryAuth = getAuth(secondaryApp);
+      createdUser = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        authEmail,
+        companyForm.password
       );
 
-      setActionLoading(false);
-    }, 400);
+      const endsAt = addMonths(new Date(), 1);
+      const userRef = doc(
+        db,
+        "companies",
+        normalizedId,
+        "users",
+        createdUser.user.uid
+      );
+
+      const batch = writeBatch(db);
+      batch.set(companyRef, {
+        name: normalizedName,
+        username: normalizedUsername,
+        ownerUid: createdUser.user.uid,
+        subscriptionStatus: "active",
+        subscriptionType: "trial",
+        subscriptionEndsAt: Timestamp.fromDate(endsAt),
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+      });
+      batch.set(userRef, {
+        firstName: normalizedName,
+        lastName: "",
+        fullName: normalizedName,
+        username: normalizedUsername,
+        email: authEmail,
+        role: "Admin",
+        companyId: normalizedId,
+        createdAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      const refreshedCompanies = await loadCompaniesFromFirestore();
+      setCompanies(refreshedCompanies);
+      setCompanyForm({ name: "", companyId: "", username: "", password: "" });
+      setCompanyFormMessage({
+        type: "success",
+        text: `Korxona yaratildi. Login: ${authEmail}`,
+      });
+    } catch (error) {
+      console.error("Company creation failed:", error);
+      if (createdUser?.user) {
+        try {
+          await deleteUser(createdUser.user);
+        } catch (cleanupError) {
+          console.error("Failed to remove orphaned auth account:", cleanupError);
+        }
+      }
+      setCompanyFormMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Korxonani yaratishda xatolik yuz berdi.",
+      });
+    } finally {
+      if (secondaryApp) {
+        try {
+          await signOut(getAuth(secondaryApp));
+        } catch (cleanupError) {
+          console.error("Failed to sign out temp company account:", cleanupError);
+        }
+        try {
+          await deleteApp(secondaryApp);
+        } catch (cleanupError) {
+          console.error("Failed to delete temp Firebase app:", cleanupError);
+        }
+      }
+      setCompanyFormLoading(false);
+    }
   }
 
   /* =====================================================
@@ -498,6 +964,14 @@ export default function AdminDashboard() {
     link.click();
 
     URL.revokeObjectURL(url);
+  }
+
+  if (isUserLoading || !user || !founderAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-[3px] border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
   }
 
   /* =====================================================
@@ -573,6 +1047,18 @@ export default function AdminDashboard() {
         =============================================== */}
 
         <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-8">
+          {loading && (
+            <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+              Firestore ma'lumotlari yuklanmoqda...
+            </div>
+          )}
+
+          {loadError && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+              {loadError}
+            </div>
+          )}
+
           {/* TITLE */}
 
           <div className="mb-6">
@@ -583,6 +1069,93 @@ export default function AdminDashboard() {
             <p className="mt-1 text-sm text-slate-500">
               SaaS tizimingizdagi asosiy ko'rsatkichlar
             </p>
+          </div>
+
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h3 className="text-lg font-bold">Yangi korxona qo&apos;shish</h3>
+                <p className="text-sm text-slate-500">
+                  Bu yerda korxona uchun avtomatik login va parol yaratiladi.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Plus size={15} />
+                <span>Admin login yaratish</span>
+              </div>
+            </div>
+
+            <form onSubmit={createCompanyAccount} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-2 xl:col-span-2">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Korxona nomi</label>
+                <input
+                  value={companyForm.name}
+                  onChange={(e) => setCompanyForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Masalan: Oqila Tech"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Korxona ID</label>
+                <input
+                  value={companyForm.companyId}
+                  onChange={(e) => setCompanyForm((prev) => ({ ...prev, companyId: e.target.value }))}
+                  placeholder="oqila-tech"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Login</label>
+                <input
+                  value={companyForm.username}
+                  onChange={(e) => setCompanyForm((prev) => ({ ...prev, username: e.target.value }))}
+                  placeholder="admin"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Parol</label>
+                <input
+                  type="password"
+                  value={companyForm.password}
+                  onChange={(e) => setCompanyForm((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="••••••••"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={companyFormLoading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {companyFormLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {companyFormLoading ? "Yaratilmoqda..." : "Yaratish"}
+                </button>
+              </div>
+            </form>
+
+            {companyFormMessage && (
+              <div
+                className={`mt-4 rounded-xl border px-3 py-2 text-sm ${
+                  companyFormMessage.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300"
+                    : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300"
+                }`}
+              >
+                {companyFormMessage.text}
+              </div>
+            )}
           </div>
 
           {/* =============================================
@@ -677,7 +1250,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <RevenueChart />
+              <RevenueChart data={revenueChartData} />
             </div>
 
             {/* Donut */}
@@ -734,7 +1307,7 @@ export default function AdminDashboard() {
               Oylar bo'yicha
             </p>
 
-            <NewCompaniesChart />
+            <NewCompaniesChart data={newCompaniesChartData} />
           </div>
 
           {/* =============================================
@@ -831,11 +1404,8 @@ export default function AdminDashboard() {
                     <option value="all">
                       Barcha tariflar
                     </option>
-                    <option value="Basic">Basic</option>
-                    <option value="Pro">Pro</option>
-                    <option value="Enterprise">
-                      Enterprise
-                    </option>
+                    <option value="Trial">Trial</option>
+                    <option value="Paid">Paid</option>
                   </select>
 
                   <select
@@ -1576,28 +2146,15 @@ function Legend({
    REVENUE CHART
 ========================================================= */
 
-function RevenueChart() {
-  const values = [
-    4.2, 5.1, 6.4, 5.7, 8.2, 9.5, 8.9, 11.2, 12.4, 13.8,
-    15.2, 18.4,
-  ];
+function RevenueChart({
+  data,
+}: {
+  data: { label: string; value: number }[];
+}) {
+  const values = data.map((item) => item.value);
+  const labels = data.map((item) => item.label);
 
-  const labels = [
-    "Noy",
-    "Dek",
-    "Yan",
-    "Fev",
-    "Mar",
-    "Apr",
-    "May",
-    "Iyun",
-    "Iyl",
-    "Avg",
-    "Sen",
-    "Okt",
-  ];
-
-  const max = Math.max(...values);
+  const max = Math.max(...values, 1);
 
   const points = values
     .map((value, index) => {
@@ -1754,27 +2311,15 @@ function DonutChart({
    NEW COMPANIES BAR CHART
 ========================================================= */
 
-function NewCompaniesChart() {
-  const values = [
-    4, 7, 5, 9, 11, 8, 14, 12, 17, 19, 22, 28,
-  ];
+function NewCompaniesChart({
+  data,
+}: {
+  data: { label: string; value: number }[];
+}) {
+  const values = data.map((item) => item.value);
+  const labels = data.map((item) => item.label);
 
-  const labels = [
-    "Noy",
-    "Dek",
-    "Yan",
-    "Fev",
-    "Mar",
-    "Apr",
-    "May",
-    "Iyun",
-    "Iyl",
-    "Avg",
-    "Sen",
-    "Okt",
-  ];
-
-  const max = Math.max(...values);
+  const max = Math.max(...values, 1);
 
   return (
     <div className="mt-6 flex h-56 items-end gap-2 overflow-x-auto pb-6">
