@@ -35,6 +35,12 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   useEffect(() => {
     if (!isInitialized || !mounted) return;
 
+    // Super Admin panel uses its own authentication.
+    // Do not redirect /admin-panel to the regular login page.
+    if (pathname === '/admin-panel') {
+      return;
+    }
+
     if (!user && pathname !== '/login') {
       router.push('/login');
     } else if (user && pathname === '/login') {
