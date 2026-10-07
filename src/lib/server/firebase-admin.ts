@@ -24,6 +24,8 @@ export type CompanyRecord = {
   name: string;
   slug: string;
   status: "active" | "inactive";
+  plan?: string;
+  expires_at?: number | null;
 };
 
 export type UserRecord = {
@@ -57,5 +59,11 @@ export async function findCompanyBySlug(slug: string): Promise<CompanyRecord | n
     name: data.name,
     slug: data.slug,
     status: data.status === "active" ? "active" : "inactive",
+    plan: data.plan,
+    expires_at: data.expires_at?.toMillis?.() ?? null,
   };
+}
+
+export function isCompanyExpired(company: { expires_at?: number | null }) {
+  return typeof company.expires_at === "number" && company.expires_at < Date.now();
 }

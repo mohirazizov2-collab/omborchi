@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { clearFailedLogins, isLoginRateLimited, registerFailedLogin } from "@/lib/server/login-rate-limit";
 import { findLoginCompany, findLoginUser, isValidCompanySlug } from "@/lib/server/company-login-store";
 import { createSession, sessionCookie } from "@/lib/server/session";
+import { isCompanyExpired } from "@/lib/server/firebase-admin";
+import { recordLogin } from "@/lib/server/usage";
 
 export const runtime = "nodejs";
 
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Bu korxona akkaunti faol emas." }, { status: 403 });
     }
 
+    if (isCompanyExpired(company)) return NextResponse.json({ message: "Obuna muddati tugagan. Administrator bilan aloqaga chiqing." }, { status: 403 });
     const user = await findLoginUser(company.id, username);
     if (!user) {
       registerFailedLogin(limiterKey);
@@ -50,6 +53,7 @@ export async function POST(request: Request) {
     }
 
     clearFailedLogins(limiterKey);
+    await recordLogin(company.id, user.id);
     const response = NextResponse.json({
       authenticated: true,
       user: { id: user.id, role: user.role },

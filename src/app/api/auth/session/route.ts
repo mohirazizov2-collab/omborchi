@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { findLoginCompany } from "@/lib/server/company-login-store";
 import { readSession, sessionCookie } from "@/lib/server/session";
+import { isCompanyExpired } from "@/lib/server/firebase-admin";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
     const slug = new URL(request.url).searchParams.get("slug");
     if (slug) {
       const company = await findLoginCompany(slug);
-      if (!company || company.id !== session.company_id) {
+      if (!company || company.id !== session.company_id || isCompanyExpired(company)) {
         return NextResponse.json({ authenticated: false }, { status: 401 });
       }
     }
