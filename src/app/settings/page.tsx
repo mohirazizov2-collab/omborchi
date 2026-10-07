@@ -43,6 +43,7 @@ import {
   EmailAuthProvider,
 } from "firebase/auth";
 import * as XLSX from "xlsx";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 
 // ─── O'LCHOV BIRLIKLARI ───────────────────────────────────────────────────────
 const UNIT_OPTIONS = [
@@ -79,7 +80,7 @@ function matchColumns(headers: string[]) {
 export default function SettingsPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { role } = useUser();
+  const { role, companyId } = useUser();
   const db = useFirestore();
   const auth = getAuth();
 
@@ -163,7 +164,7 @@ export default function SettingsPage() {
         const productId = skuVal
           ? String(skuVal)
           : Math.random().toString(36).substr(2, 9);
-        const docRef = doc(db, "products", productId);
+        const docRef = tenantDoc(db, companyId, "products", productId);
 
         // Birlik: excel'dan ol, yo'q bo'lsa tanlangan birlikni ishlataki
         const unitFromExcel = findVal(["birligi", "unit", "ед.изм", "ед.изм.", "birlik"]);
@@ -250,7 +251,7 @@ export default function SettingsPage() {
     if (!db || !confirm("DIQQAT! Barcha mahsulotlarni o'chirib yubormoqchisiz. Tasdiqlaysizmi?")) return;
     setClearing(true);
     try {
-      const snap = await getDocs(collection(db, "products"));
+      const snap = await getDocs(tenantCollection(db, companyId, "products"));
       const batch = writeBatch(db);
       snap.docs.forEach((d) => batch.delete(d.ref));
       await batch.commit();

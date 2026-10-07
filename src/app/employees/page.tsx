@@ -23,8 +23,10 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, setDoc,
 } from "firebase/firestore";
  
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { initializeApp, deleteApp } from "firebase/app";
+import { createUserWithEmailAndPassword, getAuth, deleteUser, signOut } from "firebase/auth";
+import { firebaseConfig } from "@/firebase/config";
+import { companyAuthEmail, tenantCollection, tenantDoc } from "@/lib/tenancy";
  
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -129,6 +131,7 @@ interface StaffMember {
   lastName:   string;
   fullName?:  string;
   email:      string;
+  username?:  string;
   role:       Role;
   permissions: Permissions;
   createdAt?: unknown;
@@ -189,7 +192,7 @@ function RoleBadge({ role }: { role: Role }) {
 export default function StaffManagementPage() {
   const { toast } = useToast();
   const db = useFirestore();
-  const { role: currentUserRole } = useUser();
+  const { role: currentUserRole, companyId } = useUser();
  
   const isSuperAdmin = currentUserRole === "Super Admin";
  
@@ -208,7 +211,10 @@ export default function StaffManagementPage() {
  
   // ── Firebase: "users" collection dan o'qish ──
   // ⚠️ ASOSIY TUZATISH: "staff" → "users"
-  const usersQuery = useMemoFirebase(() => db ? collection(db, "users") : null, [db]);
+  const usersQuery = useMemoFirebase(
+    () => db ? tenantCollection(db, companyId, "users") : null,
+    [db, companyId]
+  );
   const { data: usersList, isLoading } = useCollection(usersQuery);
  
   // ── Filtrlangan ro'yxat ──
@@ -257,7 +263,7 @@ export default function StaffManagementPage() {
     setFormData({
       firstName:   member.firstName  ?? "",
       lastName:    member.lastName   ?? "",
-      email:       member.email      ?? "",
+      email:       member.username  ?? member.email ?? "",
       phone:       member.phone      ?? "",
       position:    member.position   ?? "",
       role,
@@ -315,7 +321,15 @@ export default function StaffManagementPage() {
       return;
     }
     if (!editingId && (!formData.email || !password)) {
-      toast({ title: "Xatolik", description: "Email va parol majburiy!", variant: "destructive" });
+      toast({ title: "Xatolik", description: "Login va parol majburiy!", variant: "destructive" });
+      return;
+    }
+    if (!editingId && companyId && !/^[a-z0-9][a-z0-9._-]{2,39}$/i.test(formData.email.trim())) {
+      toast({ title: "Xatolik", description: "Login 3–40 belgidan iborat bo‘lsin; harf, raqam, . _ - belgilaridan foydalaning.", variant: "destructive" });
+      return;
+    }
+    if (!editingId && companyId && companyId.length + formData.email.trim().length > 59) {
+      toast({ title: "Xatolik", description: "Korxona ID va login uzunligi birgalikda 59 belgidan oshmasin.", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -333,30 +347,55 @@ export default function StaffManagementPage() {
           permissions: formData.permissions,
           updatedAt:   serverTimestamp(),
         };
-        await updateDoc(doc(db!, "users", editingId), payload);
+        await updateDoc(tenantDoc(db!, companyId, "users", editingId), payload);
         toast({ title: "Yangilandi ✓", description: `${formData.firstName} ma'lumotlari saqlandi` });
       } else {
         // ── CREATE: Firebase Auth + Firestore users ──
-        const cred = await createUserWithEmailAndPassword(auth, formData.email, password);
-        const uid = cred.user.uid;
- 
-        // users collection'ga UID bilan yozish (Firestore'dagi mavjud struktura bilan mos)
-        await setDoc(doc(db!, "users", uid), {
-          id:          uid,
-          firstName:   formData.firstName,
-          lastName:    formData.lastName,
-          fullName:    `${formData.firstName} ${formData.lastName}`,
-          email:       formData.email,
-          phone:       formData.phone,
-          position:    formData.position,
-          role:        formData.role,
-          status:      formData.status,
-          permissions: formData.permissions,
-          hasLogin:    true,
-          uid:         uid,
-          createdAt:   serverTimestamp(),
-          updatedAt:   serverTimestamp(),
-        });
+        const login = formData.email.trim().toLowerCase();
+        const authEmail = companyId ? companyAuthEmail(companyId, login) : login;
+        const secondaryApp = initializeApp(firebaseConfig, `employee-${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+        try {
+          const cred = await createUserWithEmailAndPassword(secondaryAuth, authEmail, password);
+          const uid = cred.user.uid;
+          try {
+            await setDoc(tenantDoc(db!, companyId, "users", uid), {
+              id:          uid,
+              firstName:   formData.firstName,
+              lastName:    formData.lastName,
+              fullName:    `${formData.firstName} ${formData.lastName}`,
+              email:       authEmail,
+              ...(companyId ? { companyId, username: login } : {}),
+              phone:       formData.phone,
+              position:    formData.position,
+              role:        formData.role,
+              status:      formData.status,
+              permissions: formData.permissions,
+              hasLogin:    true,
+              uid:         uid,
+              createdAt:   serverTimestamp(),
+              updatedAt:   serverTimestamp(),
+            });
+          } catch (error) {
+            try {
+              await deleteUser(cred.user);
+            } catch (cleanupError) {
+              console.error("Failed to remove orphaned employee auth account:", cleanupError);
+            }
+            throw error;
+          }
+        } finally {
+          try {
+            await signOut(secondaryAuth);
+          } catch (cleanupError) {
+            console.error("Failed to sign out temporary employee account:", cleanupError);
+          }
+          try {
+            await deleteApp(secondaryApp);
+          } catch (cleanupError) {
+            console.error("Failed to delete temporary employee Firebase app:", cleanupError);
+          }
+        }
         toast({ title: "Qo'shildi ✓", description: `${formData.firstName} tizimga qo'shildi` });
       }
       closeModal();
@@ -383,7 +422,7 @@ export default function StaffManagementPage() {
   const handleDelete = async (id: string) => {
     if (!db) return;
     try {
-      await deleteDoc(doc(db, "users", id));
+      await deleteDoc(tenantDoc(db, companyId, "users", id));
       toast({ title: "O'chirildi", description: "Foydalanuvchi ma'lumotlari o'chirildi" });
       setDeleteConfirm(null);
     } catch {
@@ -651,12 +690,12 @@ export default function StaffManagementPage() {
                       <h3 className="text-sm font-semibold text-slate-800">Tizimga kirish ma&apos;lumotlari</h3>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">Email (Login) *</Label>
+                      <Label className="text-xs text-slate-500">{companyId ? "Login *" : "Email (Login) *"}</Label>
                       <Input
-                        type="email"
+                        type={companyId ? "text" : "email"}
                         value={formData.email}
                         onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
-                        placeholder="anvar@ombor.uz"
+                        placeholder={companyId ? "anvar" : "anvar@ombor.uz"}
                         className="h-9 text-sm"
                       />
                     </div>

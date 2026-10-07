@@ -18,6 +18,7 @@ import { collection, doc, getDocs, query, where, orderBy, limit } from "firebase
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 
 // ─── Animation ───────────────────────────────────────────────────────────────
 const SPRING = { type: "spring", stiffness: 380, damping: 34, mass: 0.65 } as const;
@@ -31,7 +32,7 @@ export default function ProductionPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, assignedWarehouseId, role } = useUser();
+  const { user, assignedWarehouseId, role, companyId } = useUser();
   const prefersReduced = useReducedMotion();
 
   const isAdmin = role === "Super Admin" || role === "Admin";
@@ -52,10 +53,10 @@ export default function ProductionPage() {
   }, [isAdmin, assignedWarehouseId]);
 
   // ─── Firebase queries ─────────────────────────────────────────────────────
-  const recipesQ   = useMemoFirebase(() => db ? collection(db, "recipes") : null, [db]);
-  const productsQ  = useMemoFirebase(() => db ? collection(db, "products") : null, [db]);
-  const inventoryQ = useMemoFirebase(() => db ? collection(db, "inventory") : null, [db]);
-  const warehousesQ = useMemoFirebase(() => db ? collection(db, "warehouses") : null, [db]);
+  const recipesQ   = useMemoFirebase(() => db ? tenantCollection(db, companyId, "recipes") : null, [db, companyId]);
+  const productsQ  = useMemoFirebase(() => db ? tenantCollection(db, companyId, "products") : null, [db, companyId]);
+  const inventoryQ = useMemoFirebase(() => db ? tenantCollection(db, companyId, "inventory") : null, [db, companyId]);
+  const warehousesQ = useMemoFirebase(() => db ? tenantCollection(db, companyId, "warehouses") : null, [db, companyId]);
 
   const { data: recipes }    = useCollection(recipesQ);
   const { data: products }   = useCollection(productsQ);
@@ -113,7 +114,7 @@ export default function ProductionPage() {
     setLoadingHistory(true);
     try {
       const q = query(
-        collection(db, "stockMovements"),
+        tenantCollection(db, companyId, "stockMovements"),
         where("movementType", "==", "Production"),
         orderBy("movementDate", "desc"),
         limit(20)
@@ -125,7 +126,7 @@ export default function ProductionPage() {
     } finally {
       setLoadingHistory(false);
     }
-  }, [db]);
+  }, [db, companyId]);
 
   useEffect(() => {
     if (showHistory) loadHistory();
@@ -145,7 +146,7 @@ export default function ProductionPage() {
       // 1. Deduct stock from each material
       for (const mat of neededMaterials) {
         // Update inventory record
-        const invRef = doc(db, "inventory", mat.inventoryId);
+        const invRef = tenantDoc(db, companyId, "inventory", mat.inventoryId);
         updateDocumentNonBlocking(invRef, {
           stock: mat.currentStock - mat.totalNeeded,
           updatedAt: now,
@@ -154,14 +155,14 @@ export default function ProductionPage() {
         // Update global product stock
         const product = products?.find(p => p.id === mat.productId);
         if (product) {
-          updateDocumentNonBlocking(doc(db, "products", mat.productId), {
+          updateDocumentNonBlocking(tenantDoc(db, companyId, "products", mat.productId), {
             stock: Math.max(0, (product.stock || 0) - mat.totalNeeded),
             updatedAt: now,
           });
         }
 
         // 2. Write stock movement log entry
-        addDocumentNonBlocking(collection(db, "stockMovements"), {
+        addDocumentNonBlocking(tenantCollection(db, companyId, "stockMovements"), {
           batchId,
           productId:           mat.productId,
           productName:         mat.name,
@@ -202,7 +203,7 @@ export default function ProductionPage() {
   }, [
     db, selectedRecipe, warehouseId, canProduce, loading,
     neededMaterials, products, user, warehouses, quantity,
-    productionNote, showHistory, loadHistory,
+    productionNote, showHistory, loadHistory, companyId,
   ]);
 
   // ─── Reset recipe when warehouse changes ──────────────────────────────────

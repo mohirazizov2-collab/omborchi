@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { companyLoginEmail } from "@/lib/tenancy";
 
 const SUPER_ADMIN_EMAIL = "f2472839@gmail.com";
 
@@ -21,13 +22,15 @@ export default function LoginPage() {
   const { t, language, setLanguage } = useLanguage();
   const auth = useAuth();
   const { toast } = useToast();
-  
+
   const [email, setEmail] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
   const [bgItems, setBgItems] = useState<any[]>([]);
+  const needsCompanyId = email.trim().length > 0 && !email.includes("@");
 
   useEffect(() => {
     setMounted(true);
@@ -50,7 +53,16 @@ export default function LoginPage() {
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const authEmail = email.includes("@")
+        ? email.trim()
+        : companyId.trim() && email.trim()
+          ? companyLoginEmail(companyId.trim(), email.trim())
+          : "";
+      if (!authEmail) {
+        setError("Korxona ID va loginni kiriting yoki email orqali kiring.");
+        return;
+      }
+      await signInWithEmailAndPassword(auth, authEmail, password);
       toast({
         title: "Tizimga kirildi",
         description: "Dashboardga yo'naltirilmoqdasiz...",
@@ -76,28 +88,28 @@ export default function LoginPage() {
       {/* Dynamic Warehouse Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
         <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '48px 48px' }} />
-        
+
         {mounted && bgItems.map((item) => (
           <motion.div
             key={item.id}
-            initial={{ 
-              top: item.top, 
-              left: item.left, 
+            initial={{
+              top: item.top,
+              left: item.left,
               opacity: 0,
               scale: 0.6
             }}
-            animate={{ 
+            animate={{
               y: [0, -150, 0, 150, 0],
               x: [0, 100, 0, -100, 0],
               rotate: [0, 180, 360],
-              opacity: [0, 0.4, 0.4, 0], 
+              opacity: [0, 0.4, 0.4, 0],
               scale: [0.6, 1.1, 1.1, 0.6]
             }}
-            transition={{ 
-              duration: item.duration, 
-              repeat: Infinity, 
-              delay: item.delay, 
-              ease: "linear" 
+            transition={{
+              duration: item.duration,
+              repeat: Infinity,
+              delay: item.delay,
+              ease: "linear"
             }}
             className="absolute text-foreground/40 dark:text-foreground/60"
           >
@@ -108,7 +120,7 @@ export default function LoginPage() {
         <div className="absolute top-[-30%] left-[-20%] w-[80%] h-[80%] bg-primary/10 dark:bg-primary/15 rounded-full blur-[160px]" />
         <div className="absolute bottom-[-30%] right-[-20%] w-[80%] h-[80%] bg-blue-500/10 dark:bg-blue-500/15 rounded-full blur-[160px]" />
       </div>
-      
+
       {/* Floating Controls */}
       <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
         <ThemeToggle />
@@ -128,7 +140,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md p-6 z-20 relative">
         <div className="flex flex-col items-center mb-10">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0, rotate: -20 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", damping: 12 }}
@@ -141,7 +153,7 @@ export default function LoginPage() {
               <path d="M8 18H16" />
             </svg>
           </motion.div>
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="font-headline font-black text-6xl tracking-tighter text-foreground"
@@ -163,11 +175,11 @@ export default function LoginPage() {
               </CardTitle>
               <CardDescription className="text-muted-foreground/70 font-medium px-10 text-sm">{t.auth.loginDescription}</CardDescription>
             </CardHeader>
-            
+
             <form onSubmit={handleLogin}>
               <CardContent className="space-y-6 pt-8 px-10">
                 {error && (
-                  <motion.div 
+                  <motion.div
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className="p-4 rounded-[1.5rem] bg-rose-500/10 text-rose-500 text-[11px] font-bold border border-rose-500/20 flex items-center gap-3"
@@ -175,12 +187,25 @@ export default function LoginPage() {
                     <AlertCircle className="w-4 h-4 shrink-0" /> {error}
                   </motion.div>
                 )}
+                {needsCompanyId && (
+                  <div className="space-y-2.5">
+                    <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-2">Korxona ID</Label>
+                    <input
+                      type="text"
+                      className="flex h-12 w-full px-5 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-medium"
+                      value={companyId}
+                      onChange={(e) => setCompanyId(e.target.value)}
+                      autoComplete="organization"
+                    />
+                  </div>
+                )}
                 <div className="space-y-2.5">
-                  <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-2">{t.auth.emailLabel}</Label>
+                  <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-2">Email yoki login</Label>
                   <div className="relative group">
                     <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/30 group-focus-within:text-primary transition-colors" />
-                    <input 
-                      type="email" 
+                    <input
+                      type="text"
+                      autoComplete="username"
                       className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-medium"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -192,8 +217,8 @@ export default function LoginPage() {
                   <Label className="text-muted-foreground/60 text-[10px] font-black uppercase tracking-widest pl-2">{t.auth.passwordLabel}</Label>
                   <div className="relative group">
                     <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/30 group-focus-within:text-primary transition-colors" />
-                    <input 
-                      type="password" 
+                    <input
+                      type="password"
                       className="flex h-14 w-full pl-12 rounded-[1.5rem] bg-background/50 border border-border/40 text-foreground placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all font-medium"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -203,9 +228,9 @@ export default function LoginPage() {
                 </div>
 
                 <div className="pt-2">
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
+                  <Button
+                    type="button"
+                    variant="ghost"
                     className="w-full h-12 rounded-2xl bg-primary/5 hover:bg-primary/10 text-primary border border-primary/10 font-bold text-[10px] uppercase tracking-widest gap-2"
                     onClick={handleQuickAdmin}
                   >
@@ -214,9 +239,9 @@ export default function LoginPage() {
                 </div>
               </CardContent>
               <CardFooter className="pt-6 pb-12 px-10">
-                <Button 
-                  type="submit" 
-                  className="w-full h-14 rounded-[1.5rem] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-2xl shadow-primary/25 bg-primary hover:bg-primary/90 hover:translate-y-[-2px] transition-all active:scale-95 border-none" 
+                <Button
+                  type="submit"
+                  className="w-full h-14 rounded-[1.5rem] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-2xl shadow-primary/25 bg-primary hover:bg-primary/90 hover:translate-y-[-2px] transition-all active:scale-95 border-none"
                   disabled={loading}
                 >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t.auth.loginButton} <ArrowRight className="w-4 h-4 ml-2" /></>}
@@ -227,7 +252,7 @@ export default function LoginPage() {
         </motion.div>
 
         <p className="text-center mt-12 text-muted-foreground/40 text-[11px] font-black uppercase tracking-[0.5em] select-none">
-          omborchi.uz by X e M team © 2026
+          omborchi.uz by xem team © 2026
         </p>
       </div>
     </div>

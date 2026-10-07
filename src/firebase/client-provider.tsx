@@ -2,10 +2,11 @@
 'use client';
 
 import React, { useMemo, useEffect, useState, type ReactNode } from 'react';
-import { FirebaseProvider } from '@/firebase/provider';
+import { FirebaseProvider, SubscriptionGate } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { isFounder } from '@/lib/tenancy';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -37,7 +38,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     if (!user && pathname !== '/login') {
       router.push('/login');
     } else if (user && pathname === '/login') {
-      router.push('/');
+      router.push(isFounder(user.email) ? '/admin' : '/');
     }
   }, [user, isInitialized, mounted, pathname, router]);
 
@@ -65,7 +66,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       auth={firebaseServices.auth}
       firestore={firebaseServices.firestore}
     >
-      {children}
+      <SubscriptionGate>{children}</SubscriptionGate>
     </FirebaseProvider>
   );
 }

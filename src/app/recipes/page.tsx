@@ -25,6 +25,7 @@ import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebas
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
  
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PRODUCT_UNITS = ["kg", "litr", "dona", "metr", "m2", "m3", "gramm", "pachka", "quti"];
@@ -50,7 +51,7 @@ export default function RecipesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { role } = useUser();
+  const { role, companyId } = useUser();
   const prefersReduced = useReducedMotion();
  
   const canEdit = role === "Super Admin" || role === "Admin";
@@ -64,10 +65,10 @@ export default function RecipesPage() {
   const [formData, setFormData] = useState(defaultForm());
  
   // ─── Firebase ─────────────────────────────────────────────────────────────
-  const productsQ = useMemoFirebase(() => db ? collection(db, "products") : null, [db]);
+  const productsQ = useMemoFirebase(() => db ? tenantCollection(db, companyId, "products") : null, [db, companyId]);
   const { data: products } = useCollection(productsQ);
  
-  const recipesQ = useMemoFirebase(() => db ? collection(db, "recipes") : null, [db]);
+  const recipesQ = useMemoFirebase(() => db ? tenantCollection(db, companyId, "recipes") : null, [db, companyId]);
   const { data: recipes, isLoading } = useCollection(recipesQ);
  
   // ─── Component helpers ────────────────────────────────────────────────────
@@ -123,9 +124,9 @@ export default function RecipesPage() {
   // ─── Duplicate ────────────────────────────────────────────────────────────
   const handleDuplicate = useCallback(async (recipe: any) => {
     if (!db) return;
-    const id = doc(collection(db, "recipes")).id;
+    const id = doc(tenantCollection(db, companyId, "recipes")).id;
     try {
-      await setDoc(doc(db, "recipes", id), {
+      await setDoc(tenantDoc(db, companyId, "recipes", id), {
         ...recipe,
         id,
         name: `${recipe.name} (nusxa)`,
@@ -136,7 +137,7 @@ export default function RecipesPage() {
     } catch {
       toast({ variant: "destructive", title: "Xatolik yuz berdi" });
     }
-  }, [db, toast]);
+  }, [db, companyId, toast]);
  
   // ─── Save ─────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
@@ -146,8 +147,8 @@ export default function RecipesPage() {
     }
     setIsSaving(true);
     try {
-      const id = formMode === "edit" && editingId ? editingId : doc(collection(db, "recipes")).id;
-      await setDoc(doc(db, "recipes", id), {
+      const id = formMode === "edit" && editingId ? editingId : doc(tenantCollection(db, companyId, "recipes")).id;
+      await setDoc(tenantDoc(db, companyId, "recipes", id), {
         id,
         name: formData.name.trim(),
         mainUnit: formData.mainUnit,
@@ -168,18 +169,18 @@ export default function RecipesPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [db, formData, formMode, editingId, formValid, toast]);
+  }, [db, companyId, formData, formMode, editingId, formValid, toast]);
  
   // ─── Delete ───────────────────────────────────────────────────────────────
   const handleDelete = useCallback(async (id: string, name: string) => {
     if (!db || !confirm(`"${name}" retseptini o'chirishni tasdiqlaysizmi?`)) return;
     try {
-      await deleteDoc(doc(db, "recipes", id));
+      await deleteDoc(tenantDoc(db, companyId, "recipes", id));
       toast({ title: "Retsept o'chirildi" });
     } catch {
       toast({ variant: "destructive", title: "Xatolik yuz berdi" });
     }
-  }, [db, toast]);
+  }, [db, companyId, toast]);
  
   // ─── Filter ───────────────────────────────────────────────────────────────
   const filteredRecipes = useMemo(() => {

@@ -3,9 +3,11 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { Firestore, doc, onSnapshot, updateDoc, Timestamp } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { usePathname, useRouter } from 'next/navigation';
+import { companyIdFromAuthEmail } from '@/lib/tenancy';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -18,6 +20,8 @@ interface UserAuthState {
   user: User | null;
   role: string | null;
   assignedWarehouseId: string | null;
+  companyId: string | null;
+  subscriptionExpired: boolean;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -30,6 +34,8 @@ export interface FirebaseContextState {
   user: User | null;
   role: string | null;
   assignedWarehouseId: string | null;
+  companyId: string | null;
+  subscriptionExpired: boolean;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -41,6 +47,8 @@ export interface FirebaseServicesAndUser {
   user: User | null;
   role: string | null;
   assignedWarehouseId: string | null;
+  companyId: string | null;
+  subscriptionExpired: boolean;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -49,6 +57,8 @@ export interface UserHookResult {
   user: User | null;
   role: string | null;
   assignedWarehouseId: string | null;
+  companyId: string | null;
+  subscriptionExpired: boolean;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -67,6 +77,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     user: null,
     role: null,
     assignedWarehouseId: null,
+    companyId: null,
+    subscriptionExpired: false,
     isUserLoading: true,
     userError: null,
   });
@@ -77,54 +89,108 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       return;
     }
 
+    let unsubscribeUser: (() => void) | undefined;
+    let unsubscribeAdmin: (() => void) | undefined;
+    let unsubscribeCompany: (() => void) | undefined;
+    let companyExpiryTimeout: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) => {
+        unsubscribeUser?.();
+        unsubscribeAdmin?.();
+        unsubscribeCompany?.();
+        if (companyExpiryTimeout) clearTimeout(companyExpiryTimeout);
+        unsubscribeUser = undefined;
+        unsubscribeAdmin = undefined;
+        unsubscribeCompany = undefined;
         if (firebaseUser) {
           const isPermanentAdmin = firebaseUser.email === PERMANENT_SUPER_ADMIN;
+          const authenticatedCompanyId = isPermanentAdmin ? null : companyIdFromAuthEmail(firebaseUser.email);
           
           setUserAuthState({ 
             user: firebaseUser, 
             role: isPermanentAdmin ? "Super Admin" : "Omborchi", 
             assignedWarehouseId: null,
+            companyId: authenticatedCompanyId,
+            subscriptionExpired: !!authenticatedCompanyId,
             isUserLoading: false, 
             userError: null 
           });
 
           // Real-time role and warehouse syncing
-          const userRef = doc(firestore, "users", firebaseUser.uid);
+          const userRef = authenticatedCompanyId
+            ? doc(firestore, "companies", authenticatedCompanyId, "users", firebaseUser.uid)
+            : doc(firestore, "users", firebaseUser.uid);
           const adminRef = doc(firestore, "rolesAdmin", firebaseUser.uid);
 
-          const unsubUser = onSnapshot(userRef, (uDoc) => {
-            if (uDoc.exists()) {
-              const uData = uDoc.data();
-              setUserAuthState(prev => ({ 
-                ...prev, 
-                role: isPermanentAdmin ? "Super Admin" : (uData.role || "Omborchi"),
-                assignedWarehouseId: uData.assignedWarehouseId || null
-              }));
+          unsubscribeUser = onSnapshot(userRef, (uDoc) => {
+            if (!uDoc.exists()) return;
+            const uData = uDoc.data();
+            setUserAuthState(prev => ({
+              ...prev,
+              role: isPermanentAdmin ? "Super Admin" : (uData.role || "Omborchi"),
+              assignedWarehouseId: uData.assignedWarehouseId || null,
+              companyId: authenticatedCompanyId,
+            }));
+            const lastSeen = uData.lastSeenAt?.toDate?.();
+            if (!lastSeen || Date.now() - lastSeen.getTime() > 24 * 60 * 60 * 1000) {
+              updateDoc(userRef, { lastSeenAt: Timestamp.now() }).catch((error) => {
+                console.error("Failed to update user activity timestamp:", error);
+              });
             }
-          });
 
-          const unsubAdmin = onSnapshot(adminRef, (aDoc) => {
-            if (aDoc.exists()) {
-              setUserAuthState(prev => ({ ...prev, role: "Super Admin" }));
+            if (authenticatedCompanyId) {
+              setUserAuthState(prev => ({ ...prev, subscriptionExpired: true }));
+              unsubscribeCompany?.();
+              unsubscribeCompany = onSnapshot(
+                doc(firestore, "companies", authenticatedCompanyId),
+                (companySnapshot) => {
+                  const companyData = companySnapshot.data();
+                  const end = companyData?.subscriptionEndsAt?.toDate?.();
+                  const expired = !companySnapshot.exists()
+                    || companyData?.subscriptionStatus !== "active"
+                    || !end
+                    || end.getTime() <= Date.now();
+                  if (companyExpiryTimeout) clearTimeout(companyExpiryTimeout);
+                  if (!expired && end) {
+                    companyExpiryTimeout = setTimeout(
+                      () => setUserAuthState(prev => ({ ...prev, subscriptionExpired: true })),
+                      end.getTime() - Date.now()
+                    );
+                  }
+                  setUserAuthState(prev => ({ ...prev, subscriptionExpired: expired }));
+                },
+                (error) => {
+                  setUserAuthState(prev => ({ ...prev, userError: error }));
+                }
+              );
+            } else if (!authenticatedCompanyId && !unsubscribeAdmin) {
+              unsubscribeAdmin = onSnapshot(adminRef, (aDoc) => {
+                if (aDoc.exists()) setUserAuthState(prev => ({ ...prev, role: "Super Admin" }));
+              });
             }
+          }, (error) => {
+            setUserAuthState(prev => ({
+              ...prev,
+              userError: error,
+              subscriptionExpired: !!authenticatedCompanyId,
+            }));
           });
-
-          return () => {
-            unsubUser();
-            unsubAdmin();
-          };
         } else {
-          setUserAuthState({ user: null, role: null, assignedWarehouseId: null, isUserLoading: false, userError: null });
+          setUserAuthState({ user: null, role: null, assignedWarehouseId: null, companyId: null, subscriptionExpired: false, isUserLoading: false, userError: null });
         }
       },
       (error) => {
-        setUserAuthState({ user: null, role: null, assignedWarehouseId: null, isUserLoading: false, userError: error });
+        setUserAuthState({ user: null, role: null, assignedWarehouseId: null, companyId: null, subscriptionExpired: false, isUserLoading: false, userError: error });
       }
     );
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      unsubscribeUser?.();
+      unsubscribeAdmin?.();
+      unsubscribeCompany?.();
+      if (companyExpiryTimeout) clearTimeout(companyExpiryTimeout);
+    };
   }, [auth, firestore]);
 
   const contextValue = useMemo((): FirebaseContextState => {
@@ -137,6 +203,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       user: userAuthState.user,
       role: userAuthState.role,
       assignedWarehouseId: userAuthState.assignedWarehouseId,
+      companyId: userAuthState.companyId,
+      subscriptionExpired: userAuthState.subscriptionExpired,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
     };
@@ -165,6 +233,8 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     user: context.user,
     role: context.role,
     assignedWarehouseId: context.assignedWarehouseId,
+    companyId: context.companyId,
+    subscriptionExpired: context.subscriptionExpired,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
   };
@@ -182,6 +252,24 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T & 
 }
 
 export const useUser = (): UserHookResult => {
-  const { user, role, assignedWarehouseId, isUserLoading, userError } = useFirebase();
-  return { user, role, assignedWarehouseId, isUserLoading, userError };
+  const { user, role, assignedWarehouseId, companyId, subscriptionExpired, isUserLoading, userError } = useFirebase();
+  return { user, role, assignedWarehouseId, companyId, subscriptionExpired, isUserLoading, userError };
 };
+
+export function SubscriptionGate({ children }: { children: ReactNode }) {
+  const { user, companyId, subscriptionExpired, isUserLoading } = useFirebase();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && user && companyId && subscriptionExpired && pathname !== "/subscription-required") {
+      router.replace("/subscription-required");
+    }
+    if (!isUserLoading && user && companyId && !subscriptionExpired && pathname === "/subscription-required") {
+      router.replace("/");
+    }
+  }, [companyId, isUserLoading, pathname, router, subscriptionExpired, user]);
+
+  if (companyId && subscriptionExpired && pathname !== "/subscription-required") return null;
+  return <>{children}</>;
+}

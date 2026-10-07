@@ -15,6 +15,7 @@ import {
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useUser } from "@/firebase";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 import {
   getFirestore,
   collection, doc, getDoc, setDoc, runTransaction,
@@ -259,8 +260,8 @@ async function generateInvoicePDF(params: {
  
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
  
-async function getNextOrderNumber(db: ReturnType<typeof getFirestore>): Promise<string> {
-  const counterRef = doc(db, "counters", "stockOut");
+async function getNextOrderNumber(db: ReturnType<typeof getFirestore>, companyId: string | null): Promise<string> {
+  const counterRef = tenantDoc(db, companyId, "counters", "stockOut");
   try {
     const next = await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(counterRef);
@@ -315,7 +316,7 @@ interface EditSearchResult {
 export default function StockOutPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { user, role, assignedWarehouseId } = useUser();
+  const { user, role, assignedWarehouseId, companyId } = useUser();
  
   // Stable db reference
   const db = useMemo(() => getFirestore(), []);
@@ -376,7 +377,7 @@ export default function StockOutPage() {
       setter: React.Dispatch<React.SetStateAction<T[]>>
     ) => {
       const unsub = onSnapshot(
-        collection(db, col),
+        tenantCollection(db, companyId, col),
         (snapshot: QuerySnapshot) => {
           setter(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
         },
@@ -394,14 +395,14 @@ export default function StockOutPage() {
     snap("inventory", setInventory);
  
     return () => { unsubs.forEach((u) => u()); };
-  }, [db]);
+  }, [db, companyId]);
  
   // ── init order number ────────────────────────────────────────────────────
   useEffect(() => {
     if (!db || isEditMode) return;
     setOrderLoading(true);
-    getNextOrderNumber(db).then(setOrderNumber).finally(() => setOrderLoading(false));
-  }, [db, isEditMode]);
+    getNextOrderNumber(db, companyId).then(setOrderNumber).finally(() => setOrderLoading(false));
+  }, [db, isEditMode, companyId]);
  
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
@@ -424,7 +425,7 @@ export default function StockOutPage() {
     if (!db) return;
     setEditSearchLoading(true);
     try {
-      const movRef = collection(db, "stockMovements");
+      const movRef = tenantCollection(db, companyId, "stockMovements");
       const q = query(movRef, where("movementType", "==", "StockOut"), orderBy("movementDate", "desc"), limit(50));
       const snap = await getDocs(q);
  
@@ -462,7 +463,7 @@ export default function StockOutPage() {
     setEditLoading(true);
     setIsEditSearchOpen(false);
     try {
-      const movRef = collection(db, "stockMovements");
+      const movRef = tenantCollection(db, companyId, "stockMovements");
       const q = query(movRef, where("orderNumber", "==", orderNum), where("movementType", "==", "StockOut"));
       const snap = await getDocs(q);
  
@@ -527,7 +528,7 @@ export default function StockOutPage() {
     setOrderDate(new Date().toISOString().slice(0, 16));
     if (isAdmin) setWarehouseId("");
     setOrderLoading(true);
-    getNextOrderNumber(db).then(setOrderNumber).finally(() => setOrderLoading(false));
+    getNextOrderNumber(db, companyId).then(setOrderNumber).finally(() => setOrderLoading(false));
   };
  
   const filteredProducts = useMemo(() => {
@@ -639,7 +640,7 @@ export default function StockOutPage() {
   const handleUpdateInvoice = async () => {
     try {
       const currentUserName = user?.displayName || user?.email || "Noma'lum";
-      const movRef = collection(db, "stockMovements");
+      const movRef = tenantCollection(db, companyId, "stockMovements");
  
       const oldQ = query(movRef, where("orderNumber", "==", editDocId), where("movementType", "==", "StockOut"));
       const oldSnap = await getDocs(oldQ);
@@ -650,14 +651,14 @@ export default function StockOutPage() {
         const oldProductId = oldData.productId;
  
         const invId = `${warehouseId}_${oldProductId}`;
-        const invRef = doc(db, "inventory", invId);
+        const invRef = tenantDoc(db, companyId, "inventory", invId);
         const invSnap = await getDoc(invRef);
         if (invSnap.exists()) {
           updateDocumentNonBlocking(invRef, { stock: (invSnap.data().stock || 0) + oldQty, updatedAt: new Date().toISOString() });
         }
         const oldProduct = products.find(p => p.id === oldProductId);
         if (oldProduct) {
-          updateDocumentNonBlocking(doc(db, "products", oldProductId), { stock: (oldProduct.stock || 0) + oldQty, updatedAt: new Date().toISOString() });
+          updateDocumentNonBlocking(tenantDoc(db, companyId, "products", oldProductId), { stock: (oldProduct.stock || 0) + oldQty, updatedAt: new Date().toISOString() });
         }
         updateDocumentNonBlocking(oldDoc.ref, { _deleted: true, deletedAt: new Date().toISOString() });
       }
@@ -667,7 +668,7 @@ export default function StockOutPage() {
         const product = products.find(p => p.id === item.productId);
         const { inUnit } = item;
         const invId = `${warehouseId}_${item.productId}`;
-        const invRef = doc(db, "inventory", invId);
+        const invRef = tenantDoc(db, companyId, "inventory", invId);
         const calc = getRowCalc(item);
  
         invoiceItems.push({
@@ -694,7 +695,7 @@ export default function StockOutPage() {
         });
  
         if (product) {
-          updateDocumentNonBlocking(doc(db, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
+          updateDocumentNonBlocking(tenantDoc(db, companyId, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
         }
         const invSnap = await getDoc(invRef);
         if (invSnap.exists()) {
@@ -734,7 +735,7 @@ export default function StockOutPage() {
         const product = products.find(p => p.id === item.productId);
         const { inUnit } = item;
         const invId = `${warehouseId}_${item.productId}`;
-        const invRef = doc(db, "inventory", invId);
+        const invRef = tenantDoc(db, companyId, "inventory", invId);
         const calc = getRowCalc(item);
  
         invoiceItems.push({
@@ -745,7 +746,7 @@ export default function StockOutPage() {
           costPerUnit: calc.costPerUnit, costTotal: calc.costTotal,
         });
  
-        addDocumentNonBlocking(collection(db, "stockMovements"), {
+        addDocumentNonBlocking(tenantCollection(db, companyId, "stockMovements"), {
           productId: item.productId, productName: product?.name || "Noma'lum",
           warehouseId, warehouseName: warehouses.find(w => w.id === warehouseId)?.name || "Noma'lum",
           quantityChange: -inUnit, movementType: "StockOut",
@@ -760,7 +761,7 @@ export default function StockOutPage() {
         });
  
         if (product) {
-          updateDocumentNonBlocking(doc(db, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
+          updateDocumentNonBlocking(tenantDoc(db, companyId, "products", item.productId), { stock: (product.stock || 0) - inUnit, updatedAt: new Date().toISOString() });
         }
         const invSnap = await getDoc(invRef);
         if (invSnap.exists()) {
@@ -787,7 +788,7 @@ export default function StockOutPage() {
       }]);
       setRecipient("");
       if (isAdmin) setWarehouseId("");
-      const next = await getNextOrderNumber(db);
+      const next = await getNextOrderNumber(db, companyId);
       setOrderNumber(next);
     } catch (err: any) {
       toast({

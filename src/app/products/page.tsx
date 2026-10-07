@@ -25,9 +25,9 @@ import {
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
-import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
  
 type SortField = "name" | "sku" | "stock" | "salePrice";
 type SortDir = "asc" | "desc";
@@ -36,7 +36,7 @@ export default function ProductsPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role, isUserLoading: authLoading } = useUser();
+  const { user, role, companyId, isUserLoading: authLoading } = useUser();
  
   const canEdit = role === "Super Admin" || role === "Admin";
   const canAdd = canEdit || role === "Sotuvchi";
@@ -67,14 +67,14 @@ export default function ProductsPage() {
  
   // Firebase
   const productsQuery = useMemoFirebase(
-    () => (db && user ? collection(db, "products") : null),
-    [db, user]
+    () => (db && user ? tenantCollection(db, companyId, "products") : null),
+    [db, user, companyId]
   );
   const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
  
   const categoriesQuery = useMemoFirebase(
-    () => (db && user ? collection(db, "categories") : null),
-    [db, user]
+    () => (db && user ? tenantCollection(db, companyId, "categories") : null),
+    [db, user, companyId]
   );
   const { data: categories, isLoading: categoriesLoading } = useCollection(categoriesQuery);
  
@@ -155,8 +155,8 @@ export default function ProductsPage() {
  
     const productId = editingProduct
       ? editingProduct.id
-      : doc(collection(db, "products")).id;
-    const productRef = doc(db, "products", productId);
+      : doc(tenantCollection(db, companyId, "products")).id;
+    const productRef = tenantDoc(db, companyId, "products", productId);
  
     const data: any = {
       id: productId,
@@ -238,7 +238,7 @@ export default function ProductsPage() {
   const handleDelete = async (id: string) => {
     if (!db) return;
     try {
-      await deleteDocumentNonBlocking(doc(db, "products", id));
+      await deleteDoc(tenantDoc(db, companyId, "products", id));
       setDeleteConfirmId(null);
       toast({ title: "O'chirildi" });
     } catch (error: any) {
@@ -257,7 +257,7 @@ export default function ProductsPage() {
     if (!db || selectedIds.length === 0) return;
     setIsBulkDeleting(true);
     try {
-      await Promise.all(selectedIds.map((id) => deleteDoc(doc(db, "products", id))));
+      await Promise.all(selectedIds.map((id) => deleteDoc(tenantDoc(db, companyId, "products", id))));
       setSelectedIds([]);
       toast({ title: "Muvaffaqiyatli o'chirildi" });
     } catch (error: any) {
@@ -290,9 +290,9 @@ export default function ProductsPage() {
     setIsSaving(true);
     const id = editingCategory
       ? editingCategory.id
-      : doc(collection(db, "categories")).id;
+      : doc(tenantCollection(db, companyId, "categories")).id;
     try {
-      await setDoc(doc(db, "categories", id), {
+      await setDoc(tenantDoc(db, companyId, "categories", id), {
         id,
         name: newCategoryName.trim(),
         createdAt: editingCategory?.createdAt || new Date().toISOString(),
@@ -318,7 +318,7 @@ export default function ProductsPage() {
   const handleDeleteCategory = async (id: string, name: string) => {
     if (!db || !confirm(`"${name}" guruhini o'chirmoqchimisiz?`)) return;
     try {
-      await deleteDoc(doc(db, "categories", id));
+      await deleteDoc(tenantDoc(db, companyId, "categories", id));
       if (selectedCategoryId === id) setSelectedCategoryId("all");
       toast({ title: "Guruh o'chirildi" });
     } catch (error: any) {

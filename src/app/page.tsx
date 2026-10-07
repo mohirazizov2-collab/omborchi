@@ -13,6 +13,7 @@ import { collection } from "firebase/firestore";
 import { AlertTriangle, Loader2, Layers, PlusCircle, TrendingUp, DollarSign, Receipt } from "lucide-react";
 import Link from "next/link";
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { tenantCollection } from "@/lib/tenancy";
 
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const BarChart       = dynamic(() => import("recharts").then(m => m.BarChart),       { ssr: false });
@@ -34,15 +35,15 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
   const db = useFirestore();
-  const { user, isUserLoading } = useUser();
+  const { user, companyId, isUserLoading } = useUser();
 
   useEffect(() => { setMounted(true); }, []);
 
-  const warehousesQuery = useMemoFirebase(() => (mounted && db && user) ? collection(db, "warehouses") : null, [mounted, db, user]);
-  const productsQuery   = useMemoFirebase(() => (mounted && db && user) ? collection(db, "products")   : null, [mounted, db, user]);
-  const employeesQuery  = useMemoFirebase(() => (mounted && db && user) ? collection(db, "employees")  : null, [mounted, db, user]);
-  const movementsQuery  = useMemoFirebase(() => (mounted && db && user) ? collection(db, "stockMovements") : null, [mounted, db, user]);
-  const expensesQuery   = useMemoFirebase(() => (mounted && db && user) ? collection(db, "expenses")   : null, [mounted, db, user]);
+  const warehousesQuery = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "warehouses") : null, [mounted, db, user, companyId]);
+  const productsQuery   = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "products") : null, [mounted, db, user, companyId]);
+  const employeesQuery  = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "employees") : null, [mounted, db, user, companyId]);
+  const movementsQuery  = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "stockMovements") : null, [mounted, db, user, companyId]);
+  const expensesQuery   = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "expenses") : null, [mounted, db, user, companyId]);
 
   const { data: products }  = useCollection(productsQuery);
   const { data: employees } = useCollection(employeesQuery);

@@ -20,6 +20,7 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { analyzeReports, type AnalyzeReportsOutput } from "@/ai/flows/analyze-reports-flow";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { tenantCollection } from "@/lib/tenancy";
 import {
   startOfWeek, startOfMonth, startOfQuarter, startOfYear,
   isWithinInterval, subMonths, format, differenceInDays,
@@ -161,7 +162,7 @@ export default function ReportsPage() {
   const { t }                           = useLanguage();
   const { toast }                       = useToast();
   const db                              = useFirestore();
-  const { user, role, isUserLoading: authLoading } = useUser();
+  const { user, role, companyId, isUserLoading: authLoading } = useUser();
   const router                          = useRouter();
 
   const [isAiLoading, setIsAiLoading]   = useState(false);
@@ -176,13 +177,13 @@ export default function ReportsPage() {
   }, [role, authLoading, router]);
 
   // ── Firebase queries ──
-  const productsQuery  = useMemoFirebase(() => (db && user) ? collection(db, "products")  : null, [db, user]);
-  const warehousesQuery= useMemoFirebase(() => (db && user) ? collection(db, "warehouses"): null, [db, user]);
-  const employeesQuery = useMemoFirebase(() => (db && user) ? collection(db, "employees") : null, [db, user]);
-  const expensesQuery  = useMemoFirebase(() => (db && user) ? collection(db, "expenses")  : null, [db, user]);
+  const productsQuery  = useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "products")  : null, [db, user, companyId]);
+  const warehousesQuery= useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "warehouses"): null, [db, user, companyId]);
+  const employeesQuery = useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "employees") : null, [db, user, companyId]);
+  const expensesQuery  = useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "expenses")  : null, [db, user, companyId]);
   const movementsQuery = useMemoFirebase(() =>
-    (db && user) ? query(collection(db, "stockMovements"), orderBy("movementDate", "desc")) : null,
-  [db, user]);
+    (db && user) ? query(tenantCollection(db, companyId, "stockMovements"), orderBy("movementDate", "desc")) : null,
+  [db, user, companyId]);
 
   const { data: products,  isLoading: productsLoading  } = useCollection(productsQuery);
   const { data: warehouses,isLoading: warehousesLoading } = useCollection(warehousesQuery);

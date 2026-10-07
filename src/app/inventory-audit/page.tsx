@@ -47,6 +47,7 @@ import {
   updateDocumentNonBlocking,
 } from "@/firebase/non-blocking-updates";
 import { useToast } from "@/hooks/use-toast";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 import { useScanner } from "@/hooks/use-scanner";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,7 @@ export default function InventoryAuditPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role, isUserLoading, assignedWarehouseId } = useUser();
+  const { user, role, companyId, isUserLoading, assignedWarehouseId } = useUser();
 
   const [view, setView] = useState<"list" | "form">("list");
   const [formMode, setFormMode] = useState<FormMode>("new");
@@ -138,27 +139,27 @@ export default function InventoryAuditPage() {
 
   // ── Firebase ma'lumotlari ──
   const productsQuery = useMemoFirebase(
-    () => (db ? collection(db, "products") : null),
-    [db]
+    () => (db ? tenantCollection(db, companyId, "products") : null),
+    [db, companyId]
   );
   const { data: products, isLoading: productsLoading } =
     useCollection(productsQuery);
 
   const warehousesQuery = useMemoFirebase(
-    () => (db ? collection(db, "warehouses") : null),
-    [db]
+    () => (db ? tenantCollection(db, companyId, "warehouses") : null),
+    [db, companyId]
   );
   const { data: warehouses } = useCollection(warehousesQuery);
 
   const inventoryQuery = useMemoFirebase(
-    () => (db ? collection(db, "inventory") : null),
-    [db]
+    () => (db ? tenantCollection(db, companyId, "inventory") : null),
+    [db, companyId]
   );
   const { data: inventory } = useCollection(inventoryQuery);
 
   const auditLogsQuery = useMemoFirebase(
-    () => (db ? collection(db, "auditLogs") : null),
-    [db]
+    () => (db ? tenantCollection(db, companyId, "auditLogs") : null),
+    [db, companyId]
   );
   const { data: auditLogsRaw, isLoading: logsLoading } =
     useCollection(auditLogsQuery);
@@ -177,7 +178,7 @@ export default function InventoryAuditPage() {
       }
       try {
         const q = query(
-          collection(db, "products"),
+          tenantCollection(db, companyId, "products"),
           where("barcode", "==", barcode)
         );
         const snap = await getDocs(q);
@@ -206,7 +207,7 @@ export default function InventoryAuditPage() {
         });
       }
     },
-    [db, selectedWarehouseId, view, toast]
+    [db, companyId, selectedWarehouseId, view, toast]
   );
 
   useScanner(handleScan);
@@ -369,12 +370,12 @@ export default function InventoryAuditPage() {
 
       // ── Audit logni saqlash ──
       if (formMode === "edit" && editingLogId) {
-        await updateDocumentNonBlocking(doc(db, "auditLogs", editingLogId), {
+        await updateDocumentNonBlocking(tenantDoc(db, companyId, "auditLogs", editingLogId), {
           ...auditPayload,
           updatedAt: new Date().toISOString(),
         });
       } else {
-        await addDocumentNonBlocking(collection(db, "auditLogs"), {
+        await addDocumentNonBlocking(tenantCollection(db, companyId, "auditLogs"), {
           ...auditPayload,
           createdAt: new Date().toISOString(),
         });
@@ -392,11 +393,11 @@ export default function InventoryAuditPage() {
 
           if (existingInv) {
             await updateDocumentNonBlocking(
-              doc(db, "inventory", existingInv.id),
+              tenantDoc(db, companyId, "inventory", existingInv.id),
               { stock: actualCount }
             );
           } else {
-            await addDocumentNonBlocking(collection(db, "inventory"), {
+            await addDocumentNonBlocking(tenantCollection(db, companyId, "inventory"), {
               warehouseId: selectedWarehouseId,
               productId,
               stock: actualCount,
@@ -432,7 +433,7 @@ export default function InventoryAuditPage() {
     async (logId: string) => {
       if (!db) return;
       try {
-        await updateDocumentNonBlocking(doc(db, "auditLogs", logId), {
+        await updateDocumentNonBlocking(tenantDoc(db, companyId, "auditLogs", logId), {
           status: "deleted",
           deletedAt: new Date().toISOString(),
         });
@@ -449,7 +450,7 @@ export default function InventoryAuditPage() {
         });
       }
     },
-    [db, toast]
+    [db, companyId, toast]
   );
 
   // ── Nusxa ko'chirish ──

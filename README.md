@@ -27,6 +27,15 @@ git push origin main
 *   **AI**: Google Gemini (Genkit)
 *   **PDF/Excel**: Professional Multilingual Support
 **Eslatma**: GitHub Pages faqat statik fayllarni qo'llab-quvvatlaydi. Genkit AI funksiyalari (Server Actions) ishlashi uchun Firebase App Hosting-dan foydalanish tavsiya etiladi. Preview rejimida muammo bo'lmasligi uchun `next.config.ts` faylida `basePath` shartli ravishda sozlangan.
+
+## Super Admin, korxonalar va obunalar
+- Super Admin paneli `/admin` sahifasida: korxonani ID, login va boshlang'ich parol bilan yaratish, 1 oylik sinov/obuna berish, obunani to'xtatish yoki yana bir oyga uzaytirish mumkin.
+- Korxona foydalanuvchilari tizimga **korxona ID + login + parol** bilan kiradi. Avvalgi email orqali kirish ham saqlangan.
+- Har bir yangi korxonaning ombor ma'lumotlari Firestore'da `companies/{companyId}` ostida alohida saqlanadi. Mavjud korxonaning eski ma'lumotlari ko'chirilmaydi va avvalgi hisoblar uchun ildiz kolleksiyalarida qoladi.
+- Admin paneldagi “Faol (30 kun)” — oxirgi 30 kunda kirgan foydalanuvchi hisoblari. Faollik va obuna muddatini Firestore qoidalari ham tekshiradi.
+- Xavfsiz kirish uchun Firestore qoidalarini Firebase loyihasiga chiqarish shart: `firebase deploy --only firestore:rules`.
+- Admin panel va yangi korxona oqimini ishga tushirishdan oldin Firebase Console'da Email/Password sign-in yoqilganini tekshiring.
+
 Created by **X e M team** © 2026
 
 Last updated: 2026-03-24 v2

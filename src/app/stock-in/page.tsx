@@ -17,6 +17,7 @@ import {
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useUser } from "@/firebase";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 import {
   getFirestore,
   collection, doc, getDoc, setDoc, runTransaction,
@@ -296,8 +297,8 @@ async function generateStockInPDF(params: {
 const generateId = () =>
   Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
  
-async function getNextDnNumber(db: ReturnType<typeof getFirestore>): Promise<string> {
-  const counterRef = doc(db, "counters", "stockIn");
+async function getNextDnNumber(db: ReturnType<typeof getFirestore>, companyId: string | null): Promise<string> {
+  const counterRef = tenantDoc(db, companyId, "counters", "stockIn");
   try {
     const next = await runTransaction(db, async (tx) => {
       const snap = await tx.get(counterRef);
@@ -338,7 +339,7 @@ interface LineItem {
 export default function StockInPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { user, role, assignedWarehouseId } = useUser();
+  const { user, role, assignedWarehouseId, companyId } = useUser();
  
   // Get db once, stably
   const db = useMemo(() => getFirestore(), []);
@@ -388,7 +389,7 @@ export default function StockInPage() {
       col: string,
       setter: React.Dispatch<React.SetStateAction<T[]>>
     ) => {
-      const q = collection(db, col);
+      const q = tenantCollection(db, companyId, col);
       const unsub = onSnapshot(
         q,
         (snapshot: QuerySnapshot) => {
@@ -413,16 +414,16 @@ export default function StockInPage() {
     return () => {
       unsubs.forEach((u) => u());
     };
-  }, [db]);
+  }, [db, companyId]);
  
   // ── init DN number ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!db) return;
     setDnLoading(true);
-    getNextDnNumber(db)
+    getNextDnNumber(db, companyId)
       .then(setDnNumber)
       .finally(() => setDnLoading(false));
-  }, [db]);
+  }, [db, companyId]);
  
   useEffect(() => {
     if (!isAdmin && assignedWarehouseId) setWarehouseId(assignedWarehouseId);
@@ -530,7 +531,7 @@ export default function StockInPage() {
     setInvoiceDate(""); setComment(""); setConcept("");
     setMovementDateStr(new Date().toISOString().split("T")[0]);
     if (isAdmin) setWarehouseId("");
-    const next = await getNextDnNumber(db);
+    const next = await getNextDnNumber(db, companyId);
     setDnNumber(next);
   };
  
@@ -578,7 +579,7 @@ export default function StockInPage() {
           unit: unitLabel,
         });
  
-        addDocumentNonBlocking(collection(db, "stockMovements"), {
+        addDocumentNonBlocking(tenantCollection(db, companyId, "stockMovements"), {
           productId: item.productId,
           productName: product?.name || "Noma'lum",
           warehouseId,
@@ -599,14 +600,14 @@ export default function StockInPage() {
         });
  
         if (product) {
-          updateDocumentNonBlocking(doc(db, "products", item.productId), {
+          updateDocumentNonBlocking(tenantDoc(db, companyId, "products", item.productId), {
             stock: (product.stock || 0) + qty,
             updatedAt: new Date().toISOString(),
           });
         }
  
         const invId = `${warehouseId}_${item.productId}`;
-        const invRef = doc(db, "inventory", invId);
+        const invRef = tenantDoc(db, companyId, "inventory", invId);
         const invSnap = await getDoc(invRef);
         if (invSnap.exists()) {
           updateDocumentNonBlocking(invRef, {

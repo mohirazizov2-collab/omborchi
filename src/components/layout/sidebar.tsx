@@ -25,6 +25,7 @@ import {
   X,
   ShoppingCart,
   ClipboardList,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -37,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/firebase";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { isFounder } from "@/lib/tenancy";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Accordion,
@@ -51,7 +53,7 @@ export function OmniSidebar() {
   const { user, role } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
  
-  const isSuperAdmin = role === "Super Admin";
+  const isSuperAdmin = isFounder(user?.email);
   const isAdmin = role === "Admin" || isSuperAdmin;
   const isOmborchi = role === "Omborchi";
   const isSotuvchi = role === "Sotuvchi";
@@ -103,6 +105,7 @@ export function OmniSidebar() {
  
   const adminNavigation = useMemo(() => [
     { name: t.nav.userManagement, href: "/users", icon: Users, hide: !isSuperAdmin },
+    { name: "Korxonalar va obunalar", href: "/admin", icon: Building2, hide: !isSuperAdmin },
     { name: t.nav.settings, href: "/settings", icon: Settings, hide: !isAdmin },
   ], [t, isAdmin, isSuperAdmin]);
  
@@ -180,6 +183,7 @@ export function OmniSidebar() {
           </div>
           <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
         </Link>
+        <p className="mt-3 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/50">omborchi.uz by xem team</p>
       </div>
  
       <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-hide">
@@ -235,6 +239,7 @@ export function OmniSidebar() {
             </div>
           </div>
         </Link>
+        <p className="mt-3 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/50">omborchi.uz by xem team</p>
       </div>
     </div>
   );

@@ -8,7 +8,48 @@ service cloud.firestore {
     // ============================================================
 
     function isSignedIn() {
+      return request.auth != null
+        && !request.auth.token.email.matches('^co-[a-z0-9-]+__.+@accounts[.]omborchi[.]uz$')
+        && (
+          !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          || !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAny(['companyId'])
+        );
+    }
+
+    function hasAuth() {
       return request.auth != null;
+    }
+
+    function isCompanyMember(companyId) {
+      return hasAuth()
+        && exists(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid));
+    }
+
+    function isActiveCompanyMember(companyId) {
+      return isCompanyMember(companyId)
+        && exists(/databases/$(database)/documents/companies/$(companyId))
+        && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionStatus == 'active'
+        && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionEndsAt > request.time;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return isActiveCompanyMember(companyId)
+        && get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    function isCompanySeller(companyId) {
+      return isActiveCompanyMember(companyId)
+        && get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data.role == 'Sotuvchi';
+    }
+
+    function isCompanyWarehouseWorker(companyId) {
+      return isActiveCompanyMember(companyId)
+        && get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data.role in ['Omborchi', "Ombor boshlig'i"];
+    }
+
+    function isCompanyCashier(companyId) {
+      return isActiveCompanyMember(companyId)
+        && get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data.role == 'Kassir';
     }
 
     // ============================================================
@@ -16,7 +57,7 @@ service cloud.firestore {
     // ============================================================
 
     function isSuperAdmin() {
-      return isSignedIn()
+      return hasAuth()
         && request.auth.token.email == 'f2472839@gmail.com';
     }
 
@@ -26,11 +67,9 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSuperAdmin()
-        ||
-        (
+        || (
           isSignedIn()
-          &&
-          exists(
+          && exists(
             /databases/$(database)/documents/users/$(request.auth.uid)
           )
           &&
@@ -82,10 +121,89 @@ service cloud.firestore {
     // ============================================================
 
     match /users/{userId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() || isSuperAdmin();
       allow create: if isAdmin();
-      allow update: if isAdmin() || request.auth.uid == userId;
+      allow update: if isAdmin()
+        || (
+          hasAuth()
+          && request.auth.uid == userId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'permissions', 'status'])
+        );
       allow delete: if isSuperAdmin();
+    }
+
+    match /companies/{companyId} {
+      allow read: if isSuperAdmin() || isCompanyMember(companyId);
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /companies/{companyId}/{collectionName}/{documentId} {
+      allow read: if isActiveCompanyMember(companyId)
+        && (
+          !(collectionName in ['expenses', 'employees', 'staff', 'reports', 'history', 'auditLogs', 'cash'])
+          || isCompanyAdmin(companyId)
+        );
+
+      allow create: if isActiveCompanyMember(companyId)
+        && (
+          (collectionName == 'users'
+            && isCompanyAdmin(companyId)
+            && request.resource.data.companyId == companyId
+            && request.resource.data.role in ['Admin', 'Sotuvchi', 'Omborchi', 'Kassir', 'Menejer', 'Ishchi', "Ombor boshlig'i", 'Hisobchi'])
+          ||
+          (collectionName == 'products' && (isCompanyAdmin(companyId) || isCompanySeller(companyId)))
+          || (collectionName in ['sales', 'cash'] && (isCompanyAdmin(companyId) || isCompanyCashier(companyId) || isCompanySeller(companyId)))
+          ||           (collectionName in ['stock-out', 'stock-in', 'transfers', 'production', 'inventory']
+            && (isCompanyAdmin(companyId) || isCompanyWarehouseWorker(companyId)))
+          || (collectionName == 'stockMovements' && isActiveCompanyMember(companyId))
+          || (collectionName in ['warehouses', 'categories', 'recipes', 'employees', 'staff', 'reports', 'settings', 'counters', 'profile']
+            && isCompanyAdmin(companyId))
+          || (collectionName == 'expenses' && (isCompanyAdmin(companyId) || isCompanySeller(companyId)))
+          || (collectionName in ['auditLogs', 'inventory-audit']
+            && (isCompanyAdmin(companyId) || isCompanyWarehouseWorker(companyId)))
+          || (collectionName == 'history' && isActiveCompanyMember(companyId))
+          || (collectionName in ['chats', 'messages'] && isActiveCompanyMember(companyId))
+        );
+
+      allow update: if isActiveCompanyMember(companyId)
+        && (
+          (collectionName == 'users'
+            && request.resource.data.companyId == companyId
+            && request.resource.data.role != 'Super Admin'
+            && (isCompanyAdmin(companyId)
+              || (request.auth.uid == documentId
+                && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'permissions', 'status']))))
+          ||
+          (collectionName in ['warehouses', 'categories', 'recipes', 'employees', 'staff', 'reports', 'settings', 'cash', 'counters', 'profile']
+            && isCompanyAdmin(companyId))
+          || (collectionName == 'products'
+            && (isCompanyAdmin(companyId) || isCompanySeller(companyId) || isCompanyCashier(companyId)))
+          || (collectionName == 'sales'
+            && (isCompanyAdmin(companyId) || isCompanySeller(companyId) || isCompanyCashier(companyId)))
+          || (collectionName in ['stock-out', 'stock-in', 'transfers', 'production', 'inventory']
+            && (isCompanyAdmin(companyId) || isCompanyWarehouseWorker(companyId)))
+          || (collectionName == 'stockMovements' && isActiveCompanyMember(companyId))
+          || (collectionName == 'expenses' && isCompanyAdmin(companyId))
+          || (collectionName in ['auditLogs', 'inventory-audit']
+            && (isCompanyAdmin(companyId) || isCompanyWarehouseWorker(companyId)))
+          || (collectionName == 'history' && isCompanyAdmin(companyId))
+          || (collectionName in ['chats', 'messages'] && isActiveCompanyMember(companyId))
+        );
+
+      allow delete: if isActiveCompanyMember(companyId)
+        && (
+          (collectionName == 'users' && isCompanyAdmin(companyId))
+          ||
+          (collectionName in ['products', 'sales', 'expenses', 'warehouses', 'categories', 'recipes', 'employees', 'staff', 'reports', 'settings', 'cash']
+            && isCompanyAdmin(companyId))
+          || (collectionName in ['inventory', 'stockMovements', 'inventory-audit', 'auditLogs', 'counters', 'profile', 'history']
+            && isCompanyAdmin(companyId))
+          || (collectionName in ['chats', 'messages'] && isActiveCompanyMember(companyId))
+        );
+    }
+
+    match /companies/{companyId}/{document=**} {
+      allow read, write: if false;
     }
 
 

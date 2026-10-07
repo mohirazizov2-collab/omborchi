@@ -40,8 +40,8 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc } from "firebase/firestore";
-import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
+import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +65,7 @@ export default function WarehousesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role, isUserLoading: authLoading } = useUser();
+  const { user, role, companyId, isUserLoading: authLoading } = useUser();
  
   const isAdmin = role === "Super Admin" || role === "Admin";
  
@@ -94,13 +94,13 @@ export default function WarehousesPage() {
   });
  
   // Firebase queries
-  const warehousesQuery = useMemoFirebase(() => (db && user ? collection(db, "warehouses") : null), [db, user]);
+  const warehousesQuery = useMemoFirebase(() => (db && user ? tenantCollection(db, companyId, "warehouses") : null), [db, user, companyId]);
   const { data: warehouses, isLoading } = useCollection(warehousesQuery);
  
-  const inventoryQuery = useMemoFirebase(() => (db && user ? collection(db, "inventory") : null), [db, user]);
+  const inventoryQuery = useMemoFirebase(() => (db && user ? tenantCollection(db, companyId, "inventory") : null), [db, user, companyId]);
   const { data: inventory } = useCollection(inventoryQuery);
  
-  const productsQuery = useMemoFirebase(() => (db && user ? collection(db, "products") : null), [db, user]);
+  const productsQuery = useMemoFirebase(() => (db && user ? tenantCollection(db, companyId, "products") : null), [db, user, companyId]);
   const { data: products } = useCollection(productsQuery);
  
   // Stats per warehouse
@@ -400,8 +400,8 @@ export default function WarehousesPage() {
   const handleSave = () => {
     if (!db || !user || !formData.name) return;
     setIsSaving(true);
-    const warehouseId = editingWarehouse ? editingWarehouse.id : doc(collection(db, "warehouses")).id;
-    const warehouseRef = doc(db, "warehouses", warehouseId);
+    const warehouseId = editingWarehouse ? editingWarehouse.id : doc(tenantCollection(db, companyId, "warehouses")).id;
+    const warehouseRef = tenantDoc(db, companyId, "warehouses", warehouseId);
     const warehouseData: any = {
       id: warehouseId,
       name: formData.name,
@@ -439,11 +439,16 @@ export default function WarehousesPage() {
     setFormData({ name: "", type: "Производственный", address: "", phoneNumber: "", managerName: "", comment: "" });
   };
  
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!db) return;
-    deleteDocumentNonBlocking(doc(db, "warehouses", id));
-    setDeleteConfirmId(null);
-    toast({ title: "O'chirildi", description: "Ombor o'chirildi." });
+    try {
+      await deleteDoc(tenantDoc(db, companyId, "warehouses", id));
+      setDeleteConfirmId(null);
+      toast({ title: "O'chirildi", description: "Ombor o'chirildi." });
+    } catch (error) {
+      console.error("Failed to delete warehouse:", error);
+      toast({ variant: "destructive", title: "Xatolik", description: "Omborni o‘chirib bo‘lmadi." });
+    }
   };
  
   const toggleSelect = (id: string) => {

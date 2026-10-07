@@ -51,10 +51,10 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, setDoc } from "firebase/firestore";
-import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
  
 const ITEMS_PER_PAGE = 8;
  
@@ -93,7 +93,7 @@ export default function ExpensesPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user, role, isUserLoading } = useUser();
+  const { user, role, companyId, isUserLoading } = useUser();
   const router = useRouter();
  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -119,8 +119,8 @@ export default function ExpensesPage() {
  
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
-    return collection(db, "expenses");
-  }, [db, user]);
+    return tenantCollection(db, companyId, "expenses");
+  }, [db, user, companyId]);
  
   const { data: expenses, isLoading } = useCollection(expensesQuery);
  
@@ -188,8 +188,8 @@ export default function ExpensesPage() {
   const handleSave = () => {
     if (!db || !user || !formData.amount) return;
     setIsSaving(true);
-    const expenseId = doc(collection(db, "expenses")).id;
-    const expenseRef = doc(db, "expenses", expenseId);
+    const expenseId = doc(tenantCollection(db, companyId, "expenses")).id;
+    const expenseRef = tenantDoc(db, companyId, "expenses", expenseId);
     setDoc(expenseRef, {
       id: expenseId,
       category: formData.category,
@@ -213,10 +213,16 @@ export default function ExpensesPage() {
       .finally(() => setIsSaving(false));
   };
  
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!isAdmin || !db) return;
     if (!confirm("Xarajatni o'chirishni tasdiqlaysizmi?")) return;
-    deleteDocumentNonBlocking(doc(db, "expenses", id));
+    try {
+      await deleteDoc(tenantDoc(db, companyId, "expenses", id));
+      toast({ title: "Xarajat o‘chirildi" });
+    } catch (error) {
+      console.error("Failed to delete expense:", error);
+      toast({ variant: "destructive", title: "Xatolik", description: "Xarajatni o‘chirib bo‘lmadi." });
+    }
   };
  
   // ── Guards ──────────────────────────────────────────────────────────────────

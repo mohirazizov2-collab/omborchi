@@ -24,6 +24,7 @@ import { useLanguage } from "@/lib/i18n/context";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, deleteDoc, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { isWithinInterval, startOfDay, subDays, startOfWeek, startOfMonth } from "date-fns";
@@ -65,7 +66,7 @@ export default function HistoryPage() {
   const { t }      = useLanguage();
   const { toast }  = useToast();
   const db         = useFirestore();
-  const { role, user } = useUser();
+  const { role, user, companyId } = useUser();
  
   // ── Ruxsat: FAQAT Super Admin o'chira oladi ──
   const isSuperAdmin = role === "Super Admin";
@@ -84,7 +85,7 @@ export default function HistoryPage() {
   const deleteIdRef = useRef<string | null>(null);
  
   // ── Firebase ──
-  const movementsQuery = useMemoFirebase(() => db ? collection(db, "stockMovements") : null, [db]);
+  const movementsQuery = useMemoFirebase(() => db ? tenantCollection(db, companyId, "stockMovements") : null, [db, companyId]);
   const { data: movements, isLoading: loading } = useCollection(movementsQuery);
  
   // ── Vaqt filtri ──
@@ -191,7 +192,7 @@ export default function HistoryPage() {
     if (!idToDelete || !db) return;
     setDeleting(true);
     try {
-      await deleteDoc(doc(db, "stockMovements", idToDelete));
+      await deleteDoc(tenantDoc(db, companyId, "stockMovements", idToDelete));
       toast({ title: "O'chirildi ✓", description: `"${deleteName}" tarixi o'chirildi.` });
       deleteIdRef.current = null;
       setDeleteId(null);

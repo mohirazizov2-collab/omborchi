@@ -13,10 +13,11 @@ import {
   Pencil, Save, X, Loader2, AlertTriangle, Check,
 } from "lucide-react";
 import { useState, useMemo } from "react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, updateDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
  
 // $ formatida pul
 const formatMoney = (val: number) =>
@@ -26,6 +27,7 @@ const VAT_RATES = ["0%", "12%", "20%", "Без НДС"];
  
 export default function SalesPage() {
   const db = useFirestore();
+  const { companyId } = useUser();
   const { toast } = useToast();
  
   const [search, setSearch] = useState("");
@@ -48,10 +50,10 @@ export default function SalesPage() {
     movementDate: "",
   });
  
-  const movementsQuery = useMemoFirebase(() => db ? collection(db, "stockMovements") : null, [db]);
+  const movementsQuery = useMemoFirebase(() => db ? tenantCollection(db, companyId, "stockMovements") : null, [db, companyId]);
   const { data: movements, loading: movementsLoading } = useCollection(movementsQuery);
  
-  const warehousesQuery = useMemoFirebase(() => db ? collection(db, "warehouses") : null, [db]);
+  const warehousesQuery = useMemoFirebase(() => db ? tenantCollection(db, companyId, "warehouses") : null, [db, companyId]);
   const { data: warehouses } = useCollection(warehousesQuery);
  
   const salesMovements = useMemo(() => {
@@ -117,7 +119,7 @@ export default function SalesPage() {
     if (!editingRow || !db) return;
     setEditSaving(true);
     try {
-      const docRef = doc(db, "stockMovements", editingRow.id);
+      const docRef = tenantDoc(db, companyId, "stockMovements", editingRow.id);
       const qty = Math.abs(editFields.quantityChange);
       const vatPct = editFields.vatRate === "Без НДС" || editFields.vatRate === "0%"
         ? 0 : parseFloat(editFields.vatRate) || 0;

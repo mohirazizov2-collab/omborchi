@@ -7,6 +7,8 @@ import {
   increment, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useUser } from "@/firebase";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 import { useAuth } from "@/hooks/useAuth";
  
 // ============ TYPES ============
@@ -147,6 +149,7 @@ const downloadPDF = (sale: any) => {
 // ============ MAIN ============
 export default function CashPage() {
   const { user } = useAuth();
+  const { companyId } = useUser();
  
   const [warehouses, setWarehouses]   = useState<Warehouse[]>([]);
   const [activeWh, setActiveWh]       = useState<Warehouse | null>(null);
@@ -189,11 +192,11 @@ export default function CashPage() {
   const fetchWarehouses = useCallback(async () => {
     setWhLoading(true);
     try {
-      const names = ["warehouses","skladlar","omborlar","warehouse","sklad","ombor","Warehouses"];
+      const names = companyId ? ["warehouses"] : ["warehouses","skladlar","omborlar","warehouse","sklad","ombor","Warehouses"];
       let data: Warehouse[] = [];
       for (const name of names) {
         try {
-          const snap = await getDocs(collection(db, name));
+          const snap = await getDocs(tenantCollection(db, companyId, name));
           if (!snap.empty) {
             data = snap.docs.map(d => {
               const r = d.data() as any;
@@ -207,16 +210,16 @@ export default function CashPage() {
       if (data.length > 0) setActiveWh(data[0]);
     } catch (e) { console.error(e); }
     finally { setWhLoading(false); }
-  }, []);
+  }, [companyId]);
  
   // ── Inventory ──
   const fetchInventory = useCallback(async (wh: Warehouse | null) => {
     if (!wh) { setInventoryMap({}); return; }
     try {
-      const cols = ["inventory","inventories","stock","stocks","Inventory"];
+      const cols = companyId ? ["inventory"] : ["inventory","inventories","stock","stocks","Inventory"];
       for (const c of cols) {
         try {
-          const snap = await getDocs(query(collection(db, c), where("warehouseId","==",wh.id)));
+          const snap = await getDocs(query(tenantCollection(db, companyId, c), where("warehouseId","==",wh.id)));
           if (!snap.empty) {
             const map: Record<string,number> = {};
             snap.docs.forEach(d => {
@@ -231,17 +234,17 @@ export default function CashPage() {
       }
       setInventoryMap({});
     } catch { setInventoryMap({}); }
-  }, []);
+  }, [companyId]);
  
   // ── Products ──
   const fetchProducts = useCallback(async (wh: Warehouse | null) => {
     setProductsLoading(true);
     try {
-      const cols = ["products","mahsulotlar","tovarlar","items","product","Products","Mahsulotlar","goods"];
+      const cols = companyId ? ["products"] : ["products","mahsulotlar","tovarlar","items","product","Products","Mahsulotlar","goods"];
       let rawData: Product[] = [];
       for (const colName of cols) {
         try {
-          const snap = await getDocs(collection(db, colName));
+          const snap = await getDocs(tenantCollection(db, companyId, colName));
           if (!snap.empty) {
             rawData = snap.docs.map(d => {
               const r = d.data() as any;
@@ -268,7 +271,7 @@ export default function CashPage() {
       setAllProducts(rawData);
     } catch (e) { console.error(e); showToast("Mahsulotlarni yuklashda xato!", "err"); }
     finally { setProductsLoading(false); }
-  }, [showToast]);
+  }, [companyId, showToast]);
  
   const getEffectiveStock = useCallback((p: Product): number => {
     if (inventoryMap[p.id] !== undefined) return inventoryMap[p.id];
@@ -277,16 +280,16 @@ export default function CashPage() {
  
   const fetchSales = useCallback(async () => {
     try {
-      const q = query(collection(db,"sales"), orderBy("createdAt","desc"), limit(100));
+      const q = query(tenantCollection(db, companyId, "sales"), orderBy("createdAt","desc"), limit(100));
       const snap = await getDocs(q);
       setSales(snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale)));
     } catch (e) { console.error(e); }
-  }, []);
+  }, [companyId]);
  
   const fetchReport = useCallback(async () => {
     try {
       const { start, end } = todayRange();
-      const q = query(collection(db,"sales"), where("createdAt",">=",start), where("createdAt","<=",end));
+      const q = query(tenantCollection(db, companyId, "sales"), where("createdAt",">=",start), where("createdAt","<=",end));
       const snap = await getDocs(q);
       const daySales = snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
       let total=0,cash=0,card=0,transfer=0,items=0;
@@ -305,14 +308,14 @@ export default function CashPage() {
       }
       setReport({ totalRevenue:total, cashRevenue:cash, cardRevenue:card, transferRevenue:transfer, salesCount:daySales.length, itemsSold:items, topProducts:Object.values(pmap).sort((a,b)=>b.revenue-a.revenue).slice(0,5) });
     } catch (e) { console.error(e); }
-  }, []);
+  }, [companyId]);
  
-  useEffect(() => { fetchWarehouses(); fetchSales(); fetchReport(); }, []);
+  useEffect(() => { fetchWarehouses(); fetchSales(); fetchReport(); }, [fetchWarehouses, fetchSales, fetchReport]);
   useEffect(() => {
     if (whLoading) return;
     fetchInventory(activeWh).catch(() => setInventoryMap({}));
     fetchProducts(activeWh);
-  }, [activeWh, whLoading]);
+  }, [activeWh, whLoading, fetchInventory, fetchProducts]);
  
   const selectWarehouse = (wh: Warehouse) => {
     if (activeWh?.id !== wh.id) { setCart([]); setCashGiven(0); }
@@ -372,10 +375,10 @@ export default function CashPage() {
         warehouseName: activeWh?.name || "",
         createdAt: serverTimestamp(),
       };
-      const ref = await addDoc(collection(db, "sales"), saleData);
+      const ref = await addDoc(tenantCollection(db, companyId, "sales"), saleData);
       await Promise.all(cart.map(async (i) => {
         const stock = getEffectiveStock(i);
-        if (stock < 9999) { try { await updateDoc(doc(db, "products", i.id), { stock: increment(-i.quantity) }); } catch {} }
+        if (stock < 9999) await updateDoc(tenantDoc(db, companyId, "products", i.id), { stock: increment(-i.quantity) });
       }));
       const completedSale = { id: ref.id, ...saleData };
       setLastSale(completedSale as any);

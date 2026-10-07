@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { tenantCollection } from "@/lib/tenancy";
 
 // Unique ID helper
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -24,7 +25,7 @@ export default function TransfersPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const db = useFirestore();
-  const { user } = useUser();
+  const { user, companyId } = useUser();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([{ id: generateId(), productId: "", quantity: 1 }]);
   const [fromWarehouse, setFromWarehouse] = useState("");
@@ -32,14 +33,14 @@ export default function TransfersPage() {
 
   const productsQuery = useMemoFirebase(() => {
     if (!db) return null;
-    return collection(db, "products");
-  }, [db]);
+    return tenantCollection(db, companyId, "products");
+  }, [db, companyId]);
   const { data: products } = useCollection(productsQuery);
 
   const warehousesQuery = useMemoFirebase(() => {
     if (!db) return null;
-    return collection(db, "warehouses");
-  }, [db]);
+    return tenantCollection(db, companyId, "warehouses");
+  }, [db, companyId]);
   const { data: warehouses } = useCollection(warehousesQuery);
 
   const addItem = () => {
@@ -91,7 +92,7 @@ export default function TransfersPage() {
           responsibleUserId: user?.uid,
           description: `Internal Transfer from ${warehouses?.find(w => w.id === fromWarehouse)?.name} to ${warehouses?.find(w => w.id === toWarehouse)?.name}`
         };
-        addDocumentNonBlocking(collection(db, "stockMovements"), movementData);
+        addDocumentNonBlocking(tenantCollection(db, companyId, "stockMovements"), movementData);
       });
 
       toast({

@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, CheckCircle2, UserRound, Phone, Briefcase } from "lucide-react";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useUser } from "@/firebase";
 import { collection, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { tenantCollection, tenantDoc } from "@/lib/tenancy";
 
 // ─── Tip ──────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ interface Props {
 
 export function StaffWorkerForm({ open, onClose, editingId, initialData }: Props) {
   const db = useFirestore();
+  const { companyId } = useUser();
   const { toast } = useToast();
 
   const [form, setForm] = useState<WorkerFormData>({
@@ -102,12 +104,12 @@ export function StaffWorkerForm({ open, onClose, editingId, initialData }: Props
     setLoading(true);
     try {
       if (editingId) {
-        await updateDoc(doc(db, "staff", editingId), {
+        await updateDoc(tenantDoc(db, companyId, "staff", editingId), {
           ...form, updatedAt: serverTimestamp(),
         });
         toast({ title: "Yangilandi ✓" });
       } else {
-        await addDoc(collection(db, "staff"), {
+        await addDoc(tenantCollection(db, companyId, "staff"), {
           ...form, createdAt: serverTimestamp(),
         });
         toast({ title: "Qo'shildi ✓" });
