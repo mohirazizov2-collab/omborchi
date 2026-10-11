@@ -124,7 +124,7 @@ const generateReceiptHTML = (sale: any): string => {
   ${sale.paymentMethod==="cash"?`<div class="pay-row"><span>Berildi:</span><span>${new Intl.NumberFormat("uz-UZ").format(sale.cashGiven||0)} so'm</span></div>
   <div class="pay-row change"><span>Qaytim:</span><span>${new Intl.NumberFormat("uz-UZ").format(Math.max(0,sale.change||0))} so'm</span></div>`:""}
   </div><div class="dashed"></div>
-  <div class="footer"><div>Xarid uchun rahmat! 🙏</div><div>www.omborchi.uz</div></div>
+  <div class="footer"><div>Xarid uchun rahmat! 🙏</div><div>www.omborchi-ai.uz</div></div>
   <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
   </body></html>`;
 };

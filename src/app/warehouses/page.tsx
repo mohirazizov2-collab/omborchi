@@ -205,7 +205,7 @@ export default function WarehousesPage() {
       // ── SHEET 1: Umumiy hisobot ──
       const summaryData: any[][] = [
         ["OMBORXONA HISOBOTI — OYLIK ATCHOT"],
-        [`Sana: ${today}   |   omborchi.uz   |   Barcha omborlar bo'yicha`],
+        [`Sana: ${today}   |   omborchi-ai.uz   |   Barcha omborlar bo'yicha`],
         [],
         ["№", "Ombor nomi", "Turi", "Menejer", "Manzil", "Telefon", "Jami qoldiq", "SKU turlari", "Balans qiymati (so'm)", "Holat"],
       ];

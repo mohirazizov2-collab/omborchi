@@ -17,7 +17,7 @@ export default function SubscriptionRequiredPage() {
         <Clock3 className="mx-auto mb-4 h-12 w-12 text-amber-500" />
         <h1 className="text-2xl font-bold">Obuna faol emas</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Korxona obunasini davom ettirish uchun omborchi.uz administratori bilan bog‘laning.
+          Korxona obunasini davom ettirish uchun omborchi-ai.uz administratori bilan bog‘laning.
         </p>
         {!subscriptionExpired && <Button className="mt-6" onClick={() => router.replace("/")}>Bosh sahifaga qaytish</Button>}
         <Button variant="outline" className="mt-6 w-full" onClick={() => signOut(auth)}>

@@ -641,13 +641,13 @@ export default function AdminDashboard() {
     let result = [...companies];
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const searchTerm = search.toLowerCase();
 
       result = result.filter(
         (company) =>
-          company.name.toLowerCase().includes(q) ||
-          company.owner_name.toLowerCase().includes(q) ||
-          company.phone.toLowerCase().includes(q)
+          company.name.toLowerCase().includes(searchTerm) ||
+          company.owner_name.toLowerCase().includes(searchTerm) ||
+          company.phone.toLowerCase().includes(searchTerm)
       );
     }
 

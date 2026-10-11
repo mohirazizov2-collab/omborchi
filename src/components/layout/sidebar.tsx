@@ -181,9 +181,9 @@ export function OmniSidebar() {
               <path d="M8 18H16" />
             </svg>
           </div>
-          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
+          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi-ai.uz</span>
         </Link>
-        <p className="mt-3 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/50">omborchi.uz by xem team</p>
+        <p className="mt-3 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/50">omborchi-ai.uz by xem team</p>
       </div>
  
       <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-hide">
@@ -239,7 +239,7 @@ export function OmniSidebar() {
             </div>
           </div>
         </Link>
-        <p className="mt-3 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/50">omborchi.uz by xem team</p>
+        <p className="mt-3 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/50">omborchi-ai.uz by xem team</p>
       </div>
     </div>
   );
@@ -256,7 +256,7 @@ export function OmniSidebar() {
               <path d="M8 18H16" />
             </svg>
           </div>
-          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi.uz</span>
+          <span className="font-headline font-black text-2xl tracking-tighter text-foreground">omborchi-ai.uz</span>
         </Link>
       </div>
  
@@ -320,7 +320,7 @@ export function OmniSidebar() {
               <path d="M8 15H16" />
             </svg>
           </div>
-          <span className="font-black text-lg tracking-tighter">omborchi.uz</span>
+          <span className="font-black text-lg tracking-tighter">omborchi-ai.uz</span>
         </Link>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
