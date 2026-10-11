@@ -1,5 +1,5 @@
-# 🚀 omborchi.uz - Professional Ombor Boshqaruvi Tizimi
-Rasmiy havola: [https://mohirazizov2-collab.github.io/omborchi/](https://mohirazizov2-collab.github.io/omborchi/)
+# 🚀 omborchi-ai.uz - Professional Ombor Boshqaruvi Tizimi
+Rasmiy havola: [https://omborchi-ai.uz](https://omborchi-ai.uz)
 ---
 ## 🌐 GitHub Pages Deployment
 Loyihangiz GitHub Pages-da `/omborchi/` sub-path ostida ishlashi uchun sozlangan. Har qanday o'zgarishdan keyin quyidagi amallarni bajaring:

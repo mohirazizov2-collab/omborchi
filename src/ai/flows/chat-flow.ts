@@ -99,7 +99,7 @@ const chatPrompt = ai.definePrompt({
   tools: [checkProductStock, listWarehouses],
   input: { schema: ChatInputSchema },
   output: { schema: ChatOutputSchema },
-  prompt: `Siz "omborchi.uz" tizimining Senior darajadagi professional konsultantisiz. 
+  prompt: `Siz "omborchi-ai.uz" tizimining Senior darajadagi professional konsultantisiz.
 Ismingiz - Omborchi GPT.
 
 ASOSIY VAZIFALAR:
