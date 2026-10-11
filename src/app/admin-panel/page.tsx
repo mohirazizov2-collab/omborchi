@@ -111,7 +111,10 @@ function money(value: number) {
 }
 
 function dateFormat(value: string) {
-  return new Intl.DateTimeFormat("uz-UZ").format(new Date(value));
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : new Intl.DateTimeFormat("uz-UZ").format(date);
 }
 
 function statusText(status: CompanyStatus) {
@@ -143,7 +146,7 @@ function normalizeFirestoreDate(
   if (!value) return fallback;
 
   if (value instanceof Date) {
-    return value.toISOString();
+    return Number.isNaN(value.getTime()) ? fallback : value.toISOString();
   }
 
   if (typeof value === "string") {
@@ -175,7 +178,7 @@ async function loadCompaniesFromFirestore(): Promise<Company[]> {
   const snapshot = await getDocs(collection(db, "companies"));
 
   const companies = await Promise.all(
-    snapshot.docs.map(async (companyDoc, index) => {
+    snapshot.docs.map(async (companyDoc) => {
       const data = companyDoc.data();
 
       const usersSnapshot = await getDocs(
@@ -344,7 +347,7 @@ async function loadCompaniesFromFirestore(): Promise<Company[]> {
       );
 
       return {
-        id: index + 1,
+        id: companyDoc.id,
         firestore_id: companyDoc.id,
         name: String(
           data.name ??
@@ -391,33 +394,6 @@ export default function AdminDashboard() {
 
   const [companies, setCompanies] =
     useState<Company[]>([]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "companies"), (snap) => {
-      const list: Company[] = snap.docs.map((d) => {
-        const data = d.data();
-        const end = data.subscriptionEndsAt?.toDate?.();
-        const created = data.createdAt?.toDate?.();
-        return {
-          id: d.id,
-          name: data.name ?? "",
-          owner_name: data.ownerName ?? "",
-          phone: data.phone ?? "",
-          status: (data.subscriptionStatus ?? "trial") as CompanyStatus,
-          plan: data.plan ?? "Basic",
-          plan_price: data.planPrice ?? 0,
-          created_at: created ? created.toISOString().slice(0, 10) : "",
-          expires_at: end ? end.toISOString().slice(0, 10) : "",
-          total_paid: data.totalPaid ?? 0,
-          users_count: data.usersCount ?? 0,
-          payments: [],
-          subscriptions: [],
-        };
-      });
-      setCompanies(list);
-    }, (err) => console.error("Companies o'qishda xato:", err));
-    return () => unsub();
-  }, []);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -477,36 +453,51 @@ export default function AdminDashboard() {
     }
 
     let cancelled = false;
+    let latestLoad = 0;
 
-    async function load() {
+    const load = async () => {
+      const loadId = ++latestLoad;
       try {
         setLoading(true);
         setLoadError("");
 
         const data = await loadCompaniesFromFirestore();
 
-        if (!cancelled) {
+        if (!cancelled && loadId === latestLoad) {
           setCompanies(data);
         }
       } catch (error) {
         console.error("Admin panel Firestore error:", error);
 
-        if (!cancelled) {
+        if (!cancelled && loadId === latestLoad) {
           setLoadError(
             "Ma'lumotlarni Firestore'dan yuklashda xatolik yuz berdi."
           );
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && loadId === latestLoad) {
           setLoading(false);
         }
       }
-    }
+    };
 
-    load();
+    const unsubscribe = onSnapshot(
+      collection(db, "companies"),
+      () => {
+        void load();
+      },
+      (error) => {
+        console.error("Admin panel company listener failed:", error);
+        setLoadError(
+          "Kompaniyalar Firestore'dan kuzatilmayapti. Ruxsatlarni tekshiring."
+        );
+        setLoading(false);
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [founderAccess, isUserLoading, user]);
 
