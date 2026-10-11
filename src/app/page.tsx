@@ -14,6 +14,7 @@ import { AlertTriangle, Loader2, Layers, PlusCircle, TrendingUp, DollarSign, Rec
 import Link from "next/link";
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { tenantCollection } from "@/lib/tenancy";
+import { isCompanyModuleEnabled } from "@/lib/company-permissions";
 
 const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
 const BarChart       = dynamic(() => import("recharts").then(m => m.BarChart),       { ssr: false });
@@ -23,27 +24,38 @@ const YAxis          = dynamic(() => import("recharts").then(m => m.YAxis),     
 const CartesianGrid  = dynamic(() => import("recharts").then(m => m.CartesianGrid),  { ssr: false });
 const Tooltip        = dynamic(() => import("recharts").then(m => m.Tooltip),        { ssr: false });
 
-// ✅ Firestore Timestamp + ISO string ikkalasini ham parse qiladi
-const parseDate = (val: any): Date => {
-  if (!val) return new Date(0);
-  if (val?.toDate) return val.toDate();
-  if (val?.seconds) return new Date(val.seconds * 1000);
-  return new Date(val);
+// Firestore Timestamp, Date, and ISO strings may all appear in stored records.
+const parseDate = (val: unknown): Date => {
+  let parsed: Date;
+
+  if (val instanceof Date) {
+    parsed = val;
+  } else if (typeof val === "string" || typeof val === "number") {
+    parsed = new Date(val);
+  } else if (typeof val === "object" && val !== null && "toDate" in val && typeof val.toDate === "function") {
+    parsed = val.toDate();
+  } else if (typeof val === "object" && val !== null && "seconds" in val && typeof val.seconds === "number") {
+    parsed = new Date(val.seconds * 1000);
+  } else {
+    return new Date(0);
+  }
+
+  return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
 };
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
   const db = useFirestore();
-  const { user, companyId, isUserLoading } = useUser();
+  const { user, companyId, permissions, isUserLoading } = useUser();
 
   useEffect(() => { setMounted(true); }, []);
 
   const warehousesQuery = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "warehouses") : null, [mounted, db, user, companyId]);
   const productsQuery   = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "products") : null, [mounted, db, user, companyId]);
-  const employeesQuery  = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "employees") : null, [mounted, db, user, companyId]);
+  const employeesQuery  = useMemoFirebase(() => (mounted && db && user && isCompanyModuleEnabled(permissions, "employees")) ? tenantCollection(db, companyId, "employees") : null, [mounted, db, user, companyId, permissions]);
   const movementsQuery  = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "stockMovements") : null, [mounted, db, user, companyId]);
-  const expensesQuery   = useMemoFirebase(() => (mounted && db && user) ? tenantCollection(db, companyId, "expenses") : null, [mounted, db, user, companyId]);
+  const expensesQuery   = useMemoFirebase(() => (mounted && db && user && isCompanyModuleEnabled(permissions, "expenses")) ? tenantCollection(db, companyId, "expenses") : null, [mounted, db, user, companyId, permissions]);
 
   const { data: products }  = useCollection(productsQuery);
   const { data: employees } = useCollection(employeesQuery);

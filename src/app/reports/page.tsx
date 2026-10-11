@@ -162,7 +162,7 @@ export default function ReportsPage() {
   const { t }                           = useLanguage();
   const { toast }                       = useToast();
   const db                              = useFirestore();
-  const { user, role, companyId, isUserLoading: authLoading } = useUser();
+  const { user, role, companyId, permissions, userProfileLoaded, isUserLoading: authLoading } = useUser();
   const router                          = useRouter();
 
   const [isAiLoading, setIsAiLoading]   = useState(false);
@@ -173,8 +173,10 @@ export default function ReportsPage() {
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
-    if (!authLoading && role === "Omborchi") router.push("/");
-  }, [role, authLoading, router]);
+    if (!authLoading && userProfileLoaded && role === "Omborchi" && permissions?.reports !== true) {
+      router.push("/");
+    }
+  }, [permissions, role, authLoading, router, userProfileLoaded]);
 
   // ── Firebase queries ──
   const productsQuery  = useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "products")  : null, [db, user, companyId]);
