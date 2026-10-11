@@ -48,6 +48,7 @@ import { firebaseConfig } from "@/firebase/config";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/firebase";
 import { companyAuthEmail, isFounder } from "@/lib/tenancy";
+import { onSnapshot } from "firebase/firestore";
 
 /* =========================================================
    TYPES
@@ -78,7 +79,7 @@ type Subscription = {
 };
 
 type Company = {
-  id: number;
+  id: string;
   firestore_id: string;
   name: string;
   owner_name: string;
@@ -389,7 +390,34 @@ export default function AdminDashboard() {
   const founderAccess = isFounder(user?.email);
 
   const [companies, setCompanies] =
-    useState<Company[]>(initialCompanies);
+    useState<Company[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "companies"), (snap) => {
+      const list: Company[] = snap.docs.map((d) => {
+        const data = d.data();
+        const end = data.subscriptionEndsAt?.toDate?.();
+        const created = data.createdAt?.toDate?.();
+        return {
+          id: d.id,
+          name: data.name ?? "",
+          owner_name: data.ownerName ?? "",
+          phone: data.phone ?? "",
+          status: (data.subscriptionStatus ?? "trial") as CompanyStatus,
+          plan: data.plan ?? "Basic",
+          plan_price: data.planPrice ?? 0,
+          created_at: created ? created.toISOString().slice(0, 10) : "",
+          expires_at: end ? end.toISOString().slice(0, 10) : "",
+          total_paid: data.totalPaid ?? 0,
+          users_count: data.usersCount ?? 0,
+          payments: [],
+          subscriptions: [],
+        };
+      });
+      setCompanies(list);
+    }, (err) => console.error("Companies o'qishda xato:", err));
+    return () => unsub();
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -702,62 +730,18 @@ export default function AdminDashboard() {
      COMPANY ACTIONS
   ===================================================== */
 
-  async function changeStatus(
-    id: number,
-    newStatus: CompanyStatus
-  ) {
-    const company = companies.find((item) => item.id === id);
-
-    if (!company) return;
-
+  async function changeStatus(id: string, newStatus: CompanyStatus) {
     setActionLoading(true);
-
     try {
-      const updateData =
-        newStatus === "trial"
-          ? {
-              subscriptionStatus: "active",
-              subscriptionType: "trial",
-              updatedAt: serverTimestamp(),
-            }
-          : {
-              subscriptionStatus:
-                newStatus === "suspended"
-                  ? "suspended"
-                  : "active",
-              updatedAt: serverTimestamp(),
-            };
-
-      await updateDoc(
-        doc(db, "companies", company.firestore_id),
-        updateData
-      );
-
-      setCompanies((old) =>
-        old.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status: newStatus,
-              }
-            : item
-        )
-      );
-
+      await updateDoc(doc(db, "companies", id), {
+        subscriptionStatus: newStatus,
+      });
       setSelectedCompany((old) =>
-        old && old.id === id
-          ? {
-              ...old,
-              status: newStatus,
-            }
-          : old
+        old && old.id === id ? { ...old, status: newStatus } : old
       );
-    } catch (error) {
-      console.error("Company status update error:", error);
-
-      alert(
-        "Korxona holatini o'zgartirishda xatolik yuz berdi."
-      );
+    } catch (err) {
+      console.error("Holatni yangilashda xato:", err);
+      alert("Holatni saqlab bo'lmadi. Ruxsatni tekshiring.");
     } finally {
       setActionLoading(false);
     }
