@@ -146,18 +146,29 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 doc(firestore, "companies", authenticatedCompanyId),
                 (companySnapshot) => {
                   const companyData = companySnapshot.data();
-                  const end = companyData?.subscriptionEndsAt?.toDate?.();
-                  const expired = !companySnapshot.exists()
-                    || companyData?.subscriptionStatus !== "active"
-                    || !end
-                    || end.getTime() <= Date.now();
+
+                  const status = companyData?.subscriptionStatus;
+                  const end =
+                    toDateSafe(companyData?.subscriptionEndsAt) ??
+                    toDateSafe(companyData?.expires_at);
+
+                  const statusOk = status === "active" || status === "trial";
+
+                  const expired =
+                    !companySnapshot.exists() ||
+                    !statusOk ||
+                    !end ||
+                    end.getTime() <= Date.now();
+
                   if (companyExpiryTimeout) clearTimeout(companyExpiryTimeout);
+
                   if (!expired && end) {
                     companyExpiryTimeout = setTimeout(
                       () => setUserAuthState(prev => ({ ...prev, subscriptionExpired: true })),
                       end.getTime() - Date.now()
                     );
                   }
+
                   setUserAuthState(prev => ({ ...prev, subscriptionExpired: expired }));
                 },
                 (error) => {
@@ -255,6 +266,13 @@ export const useUser = (): UserHookResult => {
   const { user, role, assignedWarehouseId, companyId, subscriptionExpired, isUserLoading, userError } = useFirebase();
   return { user, role, assignedWarehouseId, companyId, subscriptionExpired, isUserLoading, userError };
 };
+
+function toDateSafe(value: any): Date | null {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 export function SubscriptionGate({ children }: { children: ReactNode }) {
   const { user, companyId, subscriptionExpired, isUserLoading } = useFirebase();
