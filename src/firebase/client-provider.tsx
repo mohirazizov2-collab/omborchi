@@ -36,9 +36,18 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     if (!isInitialized || !mounted) return;
 
     if (!user && pathname !== '/login') {
-      router.push('/login');
+      const returnTo = pathname === '/admin-panel'
+        ? '?returnTo=%2Fadmin-panel'
+        : '';
+      router.push(`/login${returnTo}`);
     } else if (user && pathname === '/login') {
-      router.push(isFounder(user.email) ? '/admin' : '/');
+      const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+      const destination = returnTo === '/admin-panel'
+        ? returnTo
+        : isFounder(user.email)
+          ? '/admin'
+          : '/';
+      router.push(destination);
     }
   }, [user, isInitialized, mounted, pathname, router]);
 
