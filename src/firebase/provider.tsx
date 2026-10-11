@@ -124,7 +124,18 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           const adminRef = doc(firestore, "rolesAdmin", firebaseUser.uid);
 
           unsubscribeUser = onSnapshot(userRef, (uDoc) => {
-            if (!uDoc.exists()) return;
+            if (!uDoc.exists()) {
+              setUserAuthState(prev => ({
+                ...prev,
+                userError: new Error(
+                  "Kompaniya foydalanuvchi profili topilmadi. Super Admin profilni tiklashi kerak."
+                ),
+                subscriptionExpired: !!authenticatedCompanyId,
+              }));
+              return;
+            }
+
+            setUserAuthState(prev => ({ ...prev, userError: null }));
             const uData = uDoc.data();
             setUserAuthState(prev => ({
               ...prev,
@@ -132,6 +143,18 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
               assignedWarehouseId: uData.assignedWarehouseId || null,
               companyId: authenticatedCompanyId,
             }));
+            if (authenticatedCompanyId && uData.status === "inactive") {
+              unsubscribeCompany?.();
+              unsubscribeCompany = undefined;
+              if (companyExpiryTimeout) clearTimeout(companyExpiryTimeout);
+              companyExpiryTimeout = undefined;
+              setUserAuthState(prev => ({
+                ...prev,
+                subscriptionExpired: true,
+                userError: new Error("Hisobingiz o‘chirib qo‘yilgan. Super Admin bilan bog‘laning."),
+              }));
+              return;
+            }
             const lastSeen = uData.lastSeenAt?.toDate?.();
             if (!lastSeen || Date.now() - lastSeen.getTime() > 24 * 60 * 60 * 1000) {
               updateDoc(userRef, { lastSeenAt: Timestamp.now() }).catch((error) => {
@@ -156,6 +179,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
                   const expired =
                     !companySnapshot.exists() ||
+                    companyData?.companyStatus === "inactive" ||
                     !statusOk ||
                     !end ||
                     end.getTime() <= Date.now();
@@ -169,7 +193,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                     );
                   }
 
-                  setUserAuthState(prev => ({ ...prev, subscriptionExpired: expired }));
+                  setUserAuthState(prev => ({
+                    ...prev,
+                    subscriptionExpired: expired,
+                    userError: companyData?.companyStatus === "inactive"
+                      ? new Error("Kompaniya o‘chirib qo‘yilgan. Super Admin bilan bog‘laning.")
+                      : null,
+                  }));
                 },
                 (error) => {
                   setUserAuthState(prev => ({ ...prev, userError: error }));

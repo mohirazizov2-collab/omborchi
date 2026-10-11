@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CheckCircle2,
@@ -26,14 +26,7 @@ import {
   Plus,
   Loader2,
 } from "lucide-react";
-import { initializeApp, deleteApp } from "firebase/app";
-import {
-  createUserWithEmailAndPassword,
-  deleteUser,
-  getAuth,
-  signOut,
-  type UserCredential,
-} from "firebase/auth";
+import type { User as FirebaseUser } from "firebase/auth";
 import { addMonths } from "date-fns";
 import {
   collection,
@@ -50,7 +43,6 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { firebaseConfig } from "@/firebase/config";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/firebase";
 import { companyAuthEmail, isFounder } from "@/lib/tenancy";
@@ -79,13 +71,37 @@ type Subscription = {
 type Company = {
   id: string;
   name: string;
+  ownerUid: string;
+  username: string;
   owner_name: string;
   phone: string;
   status: CompanyStatus;
+  companyStatus: "active" | "inactive";
   plan: string;
   created_at: string;
   expires_at: string;
   total_paid: number;
+};
+
+type ManagedAccount = {
+  uid: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  username: string;
+  email: string;
+  phone: string;
+  position: string;
+  role: string;
+  status: "active" | "inactive";
+  createdAt: string | null;
+  lastSeenAt: string | null;
+};
+
+type CompanyAccountCounts = {
+  employees: number;
+  activeEmployees: number;
+  inactiveEmployees: number;
 };
 
 /* =========================================================
@@ -156,9 +172,12 @@ function mapCompany(id: string, data: DocumentData): Company {
   return {
     id,
     name: String(data.name ?? id),
+    ownerUid: String(data.ownerUid ?? ""),
+    username: String(data.username ?? ""),
     owner_name: String(data.ownerName ?? "—"),
     phone: String(data.phone || "—"),
     status: deriveStatus(rawStatus, expiresAt),
+    companyStatus: data.companyStatus === "inactive" ? "inactive" : "active",
     plan: String(data.plan ?? "Basic"),
     created_at: createdAt,
     expires_at: expiresAt,
@@ -166,7 +185,28 @@ function mapCompany(id: string, data: DocumentData): Company {
   };
 }
 
-async function loadCompanyDetails(companyId: string) {
+async function adminApiRequest<T>(
+  user: FirebaseUser,
+  path: string,
+  method = "GET",
+  body?: Record<string, unknown>
+): Promise<T> {
+  const token = await user.getIdToken();
+  const response = await fetch(path, {
+    method,
+    cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const result = (await response.json()) as T & { error?: string };
+  if (!response.ok) throw new Error(result.error || "So'rovni bajarib bo'lmadi.");
+  return result;
+}
+
+async function loadCompanyDetails(companyId: string, ownerUid: string) {
   const [usersSnap, paymentsSnap, subsSnap] = await Promise.all([
     getDocs(collection(db, "companies", companyId, "users")),
     getDocs(collection(db, "companies", companyId, "payments")),
@@ -194,7 +234,14 @@ async function loadCompanyDetails(companyId: string) {
     };
   });
 
-  return { usersCount: usersSnap.size, payments, subscriptions };
+  return {
+    usersCount: usersSnap.size,
+    ownerProfileExists: ownerUid
+      ? usersSnap.docs.some((userDoc) => userDoc.id === ownerUid)
+      : null,
+    payments,
+    subscriptions,
+  };
 }
 
 /* =========================================================
@@ -209,6 +256,7 @@ export default function AdminDashboard() {
   const founderAccess = isFounder(user?.email);
 
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyAccountCounts, setCompanyAccountCounts] = useState<Record<string, CompanyAccountCounts>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -217,6 +265,7 @@ export default function AdminDashboard() {
   const [dark, setDark] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CompanyStatus>("all");
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [sort, setSort] = useState<"newest" | "oldest" | "income-high" | "income-low">("newest");
   const [page, setPage] = useState(1);
@@ -232,6 +281,7 @@ export default function AdminDashboard() {
   // Modal uchun qo'shimcha ma'lumotlar (faqat modal ochilganda yuklanadi)
   const [details, setDetails] = useState<{
     usersCount: number;
+    ownerProfileExists: boolean | null;
     payments: Payment[];
     subscriptions: Subscription[];
   } | null>(null);
@@ -239,6 +289,23 @@ export default function AdminDashboard() {
   const [detailMessage, setDetailMessage] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [managedAccounts, setManagedAccounts] = useState<ManagedAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountSearch, setAccountSearch] = useState("");
+  const [accountRoleFilter, setAccountRoleFilter] = useState("all");
+  const [accountStatusFilter, setAccountStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [accountForm, setAccountForm] = useState({
+    firstName: "",
+    lastName: "",
+    username: "",
+    password: "",
+    role: "Sotuvchi",
+    phone: "",
+    position: "",
+  });
+  const [editingAccountUid, setEditingAccountUid] = useState<string | null>(null);
+  const [resetPasswordUid, setResetPasswordUid] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
 
   const [companyForm, setCompanyForm] = useState({
     name: "",
@@ -247,12 +314,34 @@ export default function AdminDashboard() {
     companyId: "",
     username: "",
     password: "",
+    initialSubscription: "disabled" as "disabled" | "trial" | "paid",
   });
   const [companyFormLoading, setCompanyFormLoading] = useState(false);
   const [companyFormMessage, setCompanyFormMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  const fetchData = useCallback(async () => {
+    const companySnapshot = await getDocs(collection(db, "companies"));
+    const nextCompanies = companySnapshot.docs.map((snapshot) =>
+      mapCompany(snapshot.id, snapshot.data())
+    );
+    const countEntries = await Promise.all(
+      nextCompanies.map(async (company) => {
+        const users = await getDocs(collection(db, "companies", company.id, "users"));
+        const employees = users.docs.filter((entry) => entry.data().role !== "Admin");
+        const activeEmployees = employees.filter((entry) => entry.data().status !== "inactive").length;
+        return [company.id, {
+          employees: employees.length,
+          activeEmployees,
+          inactiveEmployees: employees.length - activeEmployees,
+        } satisfies CompanyAccountCounts] as const;
+      })
+    );
+    setCompanies(nextCompanies);
+    setCompanyAccountCounts(Object.fromEntries(countEntries));
+  }, []);
 
   /* ---------- Auth himoyasi ---------- */
 
@@ -276,9 +365,27 @@ export default function AdminDashboard() {
     const unsubscribe = onSnapshot(
       collection(db, "companies"),
       (snap) => {
-        setCompanies(snap.docs.map((d) => mapCompany(d.id, d.data())));
+        const nextCompanies = snap.docs.map((d) => mapCompany(d.id, d.data()));
+        setCompanies(nextCompanies);
         setLoadError("");
-        setLoading(false);
+        void Promise.all(
+          nextCompanies.map(async (company) => {
+            const users = await getDocs(collection(db, "companies", company.id, "users"));
+            const employees = users.docs.filter((entry) => entry.data().role !== "Admin");
+            const activeEmployees = employees.filter((entry) => entry.data().status !== "inactive").length;
+            return [company.id, {
+              employees: employees.length,
+              activeEmployees,
+              inactiveEmployees: employees.length - activeEmployees,
+            } satisfies CompanyAccountCounts] as const;
+          })
+        )
+          .then((entries) => setCompanyAccountCounts(Object.fromEntries(entries)))
+          .catch((error) => {
+            console.error("Company account counts failed:", error);
+            setLoadError("Xodimlar sonini yuklab bo‘lmadi. Firestore ruxsatlarini tekshiring.");
+          })
+          .finally(() => setLoading(false));
       },
       (error) => {
         console.error("Companies listener failed:", error);
@@ -290,6 +397,32 @@ export default function AdminDashboard() {
     return () => unsubscribe();
   }, [founderAccess, isUserLoading, user]);
 
+  useEffect(() => {
+    if (!selectedCompany || !user || !founderAccess) {
+      setManagedAccounts([]);
+      return;
+    }
+    let cancelled = false;
+    setAccountsLoading(true);
+    void adminApiRequest<{ users: ManagedAccount[] }>(
+      user,
+      `/api/admin/companies/${encodeURIComponent(selectedCompany.id)}/users`
+    )
+      .then(({ users }) => {
+        if (!cancelled) setManagedAccounts(users);
+      })
+      .catch((error) => {
+        console.error("Company accounts load failed:", error);
+        if (!cancelled) setDetailMessage(error instanceof Error ? error.message : "Akkauntlarni yuklab bo'lmadi.");
+      })
+      .finally(() => {
+        if (!cancelled) setAccountsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [founderAccess, selectedCompany, user]);
+
   /* ---------- Modal ochilganda detallarni yuklash ---------- */
 
   useEffect(() => {
@@ -300,7 +433,8 @@ export default function AdminDashboard() {
     let cancelled = false;
     setDetailsLoading(true);
     setDetails(null);
-    loadCompanyDetails(selectedId)
+    const company = companies.find((item) => item.id === selectedId);
+    loadCompanyDetails(selectedId, company?.ownerUid ?? "")
       .then((d) => {
         if (!cancelled) setDetails(d);
       })
@@ -314,17 +448,25 @@ export default function AdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [companies, selectedId]);
 
   function openCompany(id: string) {
     setDetailMessage("");
     setPaymentAmount("");
     setPaymentMethod("");
+    setAccountSearch("");
+    setAccountRoleFilter("all");
+    setAccountStatusFilter("all");
+    setResetPasswordUid(null);
+    setResetPassword("");
+    resetAccountForm();
     setSelectedId(id);
   }
 
   function closeModal() {
     setSelectedId(null);
+    resetAccountForm();
+    setResetPasswordUid(null);
   }
 
   /* ---------- Statistika ---------- */
@@ -345,12 +487,17 @@ export default function AdminDashboard() {
       result = result.filter(
         (c) =>
           c.name.toLowerCase().includes(term) ||
+          c.id.toLowerCase().includes(term) ||
+          c.username.toLowerCase().includes(term) ||
           c.owner_name.toLowerCase().includes(term) ||
           c.phone.toLowerCase().includes(term)
       );
     }
     if (statusFilter !== "all") {
       result = result.filter((c) => c.status === statusFilter);
+    }
+    if (companyStatusFilter !== "all") {
+      result = result.filter((c) => c.companyStatus === companyStatusFilter);
     }
     if (planFilter !== "all") {
       result = result.filter((c) => c.plan === planFilter);
@@ -364,7 +511,7 @@ export default function AdminDashboard() {
       return a.total_paid - b.total_paid;
     });
     return result;
-  }, [companies, search, statusFilter, planFilter, sort]);
+  }, [companies, search, statusFilter, companyStatusFilter, planFilter, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / PAGE_SIZE));
   const currentCompanies = filteredCompanies.slice(
@@ -383,29 +530,43 @@ export default function AdminDashboard() {
     setActionError("");
     try {
       const companyRef = doc(db, "companies", company.id);
+      const now = new Date();
+      const currentEnd = company.expires_at ? new Date(company.expires_at) : null;
+      const expired = !currentEnd || Number.isNaN(currentEnd.getTime()) || currentEnd.getTime() <= Date.now();
 
       if (newStatus === "suspended") {
         await updateDoc(companyRef, {
           subscriptionStatus: "suspended",
           updatedAt: serverTimestamp(),
         });
+        await fetchData();
         return;
       }
 
-      // active: muddat tugagan bo'lsa yangilaymiz
-      const endMs = company.expires_at ? new Date(company.expires_at).getTime() : NaN;
-      const expired = Number.isNaN(endMs) || endMs <= Date.now();
+      if (newStatus === "trial") {
+        const trialEndsAt = addMonths(now, 1);
+        await updateDoc(companyRef, {
+          subscriptionStatus: "trial",
+          subscriptionType: "trial",
+          subscriptionEndsAt: Timestamp.fromDate(trialEndsAt),
+          updatedAt: serverTimestamp(),
+        });
+        await fetchData();
+        return;
+      }
 
+      // active: muddati tugagan bo'lsa yangilaymiz
       if (!expired) {
         await updateDoc(companyRef, {
           subscriptionStatus: "active",
           subscriptionType: "paid",
           updatedAt: serverTimestamp(),
         });
+        await fetchData();
         return;
       }
 
-      const start = new Date();
+      const start = now;
       const end = addMonths(start, 1);
       const batch = writeBatch(db);
       batch.update(companyRef, {
@@ -423,12 +584,59 @@ export default function AdminDashboard() {
         createdBy: user?.uid ?? null,
       });
       await batch.commit();
+      await fetchData();
     } catch (error) {
       console.error("Status update failed:", error);
       setActionError(
         error instanceof Error
           ? `Holatni saqlab bo'lmadi: ${error.message}`
           : "Holatni Firebase'ga saqlab bo'lmadi."
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function restoreOwnerProfile(company: Company) {
+    if (!founderAccess || !company.ownerUid) return;
+    setActionLoading(true);
+    setDetailMessage("");
+    try {
+      const profileRef = doc(db, "companies", company.id, "users", company.ownerUid);
+      const existingProfile = await getDoc(profileRef);
+      if (existingProfile.exists()) {
+        const fresh = await loadCompanyDetails(company.id, company.ownerUid);
+        setDetails(fresh);
+        setDetailMessage("Foydalanuvchi profili allaqachon mavjud.");
+        return;
+      }
+
+      const email = company.username
+        ? companyAuthEmail(company.id, company.username)
+        : "";
+      await setDoc(profileRef, {
+        firstName: company.owner_name === "—" ? company.name : company.owner_name,
+        lastName: "",
+        fullName: company.owner_name === "—" ? company.name : company.owner_name,
+        phone: company.phone === "—" ? "" : company.phone,
+        ...(company.username ? { username: company.username } : {}),
+        ...(email ? { email } : {}),
+        role: "Admin",
+        companyId: company.id,
+        createdAt: serverTimestamp(),
+        restoredAt: serverTimestamp(),
+        restoredBy: user?.uid ?? null,
+      });
+
+      const fresh = await loadCompanyDetails(company.id, company.ownerUid);
+      setDetails(fresh);
+      setDetailMessage("Foydalanuvchi profili tiklandi. Korxona hisobiga qayta kiring.");
+    } catch (error) {
+      console.error("Owner profile repair failed:", error);
+      setDetailMessage(
+        error instanceof Error
+          ? `Profilni tiklab bo‘lmadi: ${error.message}`
+          : "Foydalanuvchi profilini Firestore’ga yozib bo‘lmadi."
       );
     } finally {
       setActionLoading(false);
@@ -468,7 +676,7 @@ export default function AdminDashboard() {
       setPaymentAmount("");
       setPaymentMethod("");
       // Ro'yxat onSnapshot orqali o'zi yangilanadi; detallarni qayta yuklaymiz
-      const fresh = await loadCompanyDetails(selectedCompany.id);
+      const fresh = await loadCompanyDetails(selectedCompany.id, selectedCompany.ownerUid);
       setDetails(fresh);
       setDetailMessage("To'lov saqlandi.");
     } catch (error) {
@@ -512,7 +720,7 @@ export default function AdminDashboard() {
       });
       await batch.commit();
 
-      const fresh = await loadCompanyDetails(company.id);
+      const fresh = await loadCompanyDetails(company.id, company.ownerUid);
       setDetails(fresh);
       setDetailMessage("Obuna bir oyga uzaytirildi.");
     } catch (error) {
@@ -549,70 +757,22 @@ export default function AdminDashboard() {
       return fail("Korxona ID va login uzunligi birgalikda 59 belgidan oshmasligi kerak.");
     }
     if (!name) return fail("Korxona nomini kiriting.");
-    if (companyForm.password.length < 6) {
-      return fail("Parol kamida 6 ta belgidan iborat bo'lishi kerak.");
+    if (companyForm.password.length < 12) {
+      return fail("Vaqtinchalik parol kamida 12 ta belgidan iborat bo'lishi kerak.");
     }
 
     setCompanyFormLoading(true);
     setCompanyFormMessage(null);
-
-    let secondaryApp: ReturnType<typeof initializeApp> | undefined;
-    let createdUser: UserCredential | undefined;
-    let companySaved = false;
-
     try {
-      const companyRef = doc(db, "companies", id);
-      if ((await getDoc(companyRef)).exists()) {
-        return fail("Bu korxona ID allaqachon ishlatilgan.");
-      }
-
-      const authEmail = companyAuthEmail(id, username);
-      secondaryApp = initializeApp(firebaseConfig, `company-${Date.now()}`);
-      createdUser = await createUserWithEmailAndPassword(
-        getAuth(secondaryApp),
-        authEmail,
-        companyForm.password
-      );
-
-      const endsAt = addMonths(new Date(), 1);
-      const batch = writeBatch(db);
-
-      batch.set(companyRef, {
+      await adminApiRequest(user, "/api/admin/companies", "POST", {
+        companyId: id,
+        username,
         name,
         ownerName: ownerName || name,
         phone,
-        username,
-        ownerUid: createdUser.user.uid,
-        subscriptionStatus: "trial",
-        subscriptionType: "trial",
-        plan: "Basic",
-        totalPaid: 0,
-        subscriptionEndsAt: Timestamp.fromDate(endsAt),
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
+        password: companyForm.password,
+        initialSubscription: companyForm.initialSubscription,
       });
-      batch.set(doc(db, "companies", id, "users", createdUser.user.uid), {
-        firstName: ownerName || name,
-        lastName: "",
-        fullName: ownerName || name,
-        phone,
-        username,
-        email: authEmail,
-        role: "Admin",
-        companyId: id,
-        createdAt: serverTimestamp(),
-      });
-      batch.set(doc(collection(db, "companies", id, "subscriptions")), {
-        plan: "Basic",
-        startDate: Timestamp.fromDate(new Date()),
-        endDate: Timestamp.fromDate(endsAt),
-        status: "trial",
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
-      });
-
-      await batch.commit();
-      companySaved = true;
 
       setCompanyForm({
         name: "",
@@ -621,34 +781,194 @@ export default function AdminDashboard() {
         companyId: "",
         username: "",
         password: "",
+        initialSubscription: "disabled",
       });
       setCompanyFormMessage({
         type: "success",
-        text: `Korxona saqlandi. Login: ${authEmail}`,
+        text: companyForm.initialSubscription === "disabled"
+          ? `Korxona ${id} yaratildi. Obuna siz yoqmaguningizcha o‘chiq turadi. Login: ${companyAuthEmail(id, username)}`
+          : `Korxona ${id} yaratildi. Login: ${companyAuthEmail(id, username)}`,
       });
+      await fetchData();
     } catch (error) {
       console.error("Company creation failed:", error);
-      if (createdUser?.user && !companySaved) {
-        try {
-          await deleteUser(createdUser.user);
-        } catch (cleanupError) {
-          console.error("Orphaned auth account cleanup failed:", cleanupError);
-        }
-      }
       setCompanyFormMessage({
         type: "error",
         text: error instanceof Error ? error.message : "Korxonani yaratishda xatolik.",
       });
     } finally {
-      if (secondaryApp) {
-        try {
-          await signOut(getAuth(secondaryApp));
-          await deleteApp(secondaryApp);
-        } catch (cleanupError) {
-          console.error("Temp app cleanup failed:", cleanupError);
-        }
-      }
       setCompanyFormLoading(false);
+    }
+  }
+
+  const filteredManagedAccounts = useMemo(() => {
+    const term = accountSearch.trim().toLowerCase();
+    return managedAccounts.filter((account) => {
+      const searchable = `${account.fullName} ${account.username} ${account.role} ${selectedCompany?.id ?? ""}`.toLowerCase();
+      return (
+        (!term || searchable.includes(term)) &&
+        (accountRoleFilter === "all" || account.role === accountRoleFilter) &&
+        (accountStatusFilter === "all" || account.status === accountStatusFilter)
+      );
+    });
+  }, [accountRoleFilter, accountSearch, accountStatusFilter, managedAccounts, selectedCompany?.id]);
+
+  function resetAccountForm() {
+    setAccountForm({
+      firstName: "",
+      lastName: "",
+      username: "",
+      password: "",
+      role: "Sotuvchi",
+      phone: "",
+      position: "",
+    });
+    setEditingAccountUid(null);
+  }
+
+  function beginAccountEdit(account: ManagedAccount) {
+    setAccountForm({
+      firstName: account.firstName,
+      lastName: account.lastName,
+      username: account.username,
+      password: "",
+      role: account.role,
+      phone: account.phone,
+      position: account.position,
+    });
+    setEditingAccountUid(account.uid);
+    setDetailMessage("");
+  }
+
+  async function saveManagedAccount(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user || !selectedCompany || !founderAccess) return;
+    const firstName = accountForm.firstName.trim();
+    const lastName = accountForm.lastName.trim();
+    const username = accountForm.username.trim().toLowerCase();
+    if (!firstName || !lastName || !/^[a-z0-9][a-z0-9._-]{2,39}$/.test(username)) {
+      setDetailMessage("Ism, familiya va 3–40 belgili loginni to‘g‘ri kiriting.");
+      return;
+    }
+    if (selectedCompany.id.length + username.length > 59) {
+      setDetailMessage("Korxona ID va login uzunligi birgalikda 59 belgidan oshmasin.");
+      return;
+    }
+    if (!editingAccountUid && accountForm.password.length < 12) {
+      setDetailMessage("Vaqtinchalik parol kamida 12 ta belgidan iborat bo‘lsin.");
+      return;
+    }
+
+    setActionLoading(true);
+    setDetailMessage("");
+    try {
+      const path = `/api/admin/companies/${encodeURIComponent(selectedCompany.id)}/users`;
+      if (editingAccountUid) {
+        await adminApiRequest(user, `${path}/${encodeURIComponent(editingAccountUid)}`, "PATCH", {
+          action: "update",
+          firstName,
+          lastName,
+          username,
+          role: accountForm.role,
+          phone: accountForm.phone,
+          position: accountForm.position,
+        });
+        setDetailMessage("Akkaunt ma’lumotlari saqlandi.");
+      } else {
+        await adminApiRequest(user, path, "POST", {
+          firstName,
+          lastName,
+          username,
+          password: accountForm.password,
+          role: accountForm.role,
+          phone: accountForm.phone,
+          position: accountForm.position,
+        });
+        setDetailMessage("Xodim akkaunti yaratildi. Parol saqlanmadi va qayta ko‘rsatilmaydi.");
+      }
+      resetAccountForm();
+      const { users } = await adminApiRequest<{ users: ManagedAccount[] }>(user, path);
+      setManagedAccounts(users);
+      await fetchData();
+    } catch (error) {
+      console.error("Employee account save failed:", error);
+      setDetailMessage(error instanceof Error ? error.message : "Akkauntni saqlab bo‘lmadi.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function changeAccountStatus(account: ManagedAccount) {
+    if (!user || !selectedCompany) return;
+    const status = account.status === "active" ? "inactive" : "active";
+    setActionLoading(true);
+    setDetailMessage("");
+    try {
+      await adminApiRequest(
+        user,
+        `/api/admin/companies/${encodeURIComponent(selectedCompany.id)}/users/${encodeURIComponent(account.uid)}`,
+        "PATCH",
+        { action: "status", status }
+      );
+      const { users } = await adminApiRequest<{ users: ManagedAccount[] }>(
+        user,
+        `/api/admin/companies/${encodeURIComponent(selectedCompany.id)}/users`
+      );
+      setManagedAccounts(users);
+      await fetchData();
+      setDetailMessage(status === "active" ? "Akkaunt faollashtirildi." : "Akkaunt nofaol qilindi.");
+    } catch (error) {
+      console.error("Employee account status update failed:", error);
+      setDetailMessage(error instanceof Error ? error.message : "Akkaunt holatini o‘zgartirib bo‘lmadi.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function resetManagedAccountPassword(uid: string) {
+    if (!user || !selectedCompany) return;
+    if (resetPassword.length < 12) {
+      setDetailMessage("Yangi vaqtinchalik parol kamida 12 ta belgidan iborat bo‘lsin.");
+      return;
+    }
+    setActionLoading(true);
+    setDetailMessage("");
+    try {
+      await adminApiRequest(
+        user,
+        `/api/admin/companies/${encodeURIComponent(selectedCompany.id)}/users/${encodeURIComponent(uid)}`,
+        "PATCH",
+        { action: "resetPassword", password: resetPassword }
+      );
+      setResetPassword("");
+      setResetPasswordUid(null);
+      setDetailMessage("Parol yangilandi. U Firestore’da saqlanmaydi yoki qayta ko‘rsatilmaydi.");
+    } catch (error) {
+      console.error("Employee password reset failed:", error);
+      setDetailMessage(error instanceof Error ? error.message : "Parolni yangilab bo‘lmadi.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function changeCompanyStatus(company: Company) {
+    if (!user) return;
+    const companyStatus = company.companyStatus === "active" ? "inactive" : "active";
+    setActionLoading(true);
+    setActionError("");
+    try {
+      await adminApiRequest(
+        user,
+        `/api/admin/companies/${encodeURIComponent(company.id)}`,
+        "PATCH",
+        { companyStatus }
+      );
+      await fetchData();
+    } catch (error) {
+      console.error("Company status update failed:", error);
+      setActionError(error instanceof Error ? error.message : "Korxona holatini o‘zgartirib bo‘lmadi.");
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -763,7 +1083,7 @@ export default function AdminDashboard() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h3 className="text-lg font-bold">Yangi korxona qo'shish</h3>
-              <p className="text-sm text-slate-500">Bu yerda korxona uchun avtomatik login va parol yaratiladi.</p>
+              <p className="text-sm text-slate-500">Kompaniya ID va birinchi Admin akkauntini xavfsiz yarating.</p>
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <Plus size={15} />
@@ -822,16 +1142,32 @@ export default function AdminDashboard() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Parol</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Vaqtinchalik parol</label>
               <input
                 type="password"
                 value={companyForm.password}
                 onChange={(e) => setCompanyForm((p) => ({ ...p, password: e.target.value }))}
-                placeholder="••••••••"
+                placeholder="Kamida 12 belgi"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800"
                 required
-                minLength={6}
+                minLength={12}
+                autoComplete="new-password"
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Boshlang‘ich obuna</label>
+              <select
+                value={companyForm.initialSubscription}
+                onChange={(event) => setCompanyForm((p) => ({
+                  ...p,
+                  initialSubscription: event.target.value as "disabled" | "trial" | "paid",
+                }))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <option value="disabled">Hozircha o‘chiq — keyin o‘zim yoqaman</option>
+                <option value="trial">1 oy sinov</option>
+                <option value="paid">1 oy pullik obuna</option>
+              </select>
             </div>
             <div className="flex items-end">
               <button
@@ -907,7 +1243,7 @@ export default function AdminDashboard() {
             </div>
 
             {showFilters && (
-              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 md:grid-cols-3 dark:border-slate-800">
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 md:grid-cols-4 dark:border-slate-800">
                 <select
                   value={statusFilter}
                   onChange={(e) => {
@@ -935,6 +1271,18 @@ export default function AdminDashboard() {
                   <option value="Enterprise">Enterprise</option>
                 </select>
                 <select
+                  value={companyStatusFilter}
+                  onChange={(e) => {
+                    setCompanyStatusFilter(e.target.value as "all" | "active" | "inactive");
+                    setPage(1);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <option value="all">Barcha kompaniyalar</option>
+                  <option value="active">Kompaniya faol</option>
+                  <option value="inactive">Kompaniya o‘chiq</option>
+                </select>
+                <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as typeof sort)}
                   className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800"
@@ -957,6 +1305,8 @@ export default function AdminDashboard() {
                   <th className="px-5 py-4">Egasi / Telefon</th>
                   <th className="px-5 py-4">Tarif</th>
                   <th className="px-5 py-4">Holati</th>
+                  <th className="px-5 py-4">Kompaniya</th>
+                  <th className="px-5 py-4">Akkauntlar</th>
                   <th className="px-5 py-4">Ro'yxatdan o'tgan</th>
                   <th className="px-5 py-4">Obuna tugashi</th>
                   <th className="px-5 py-4">Jami to'lov</th>
@@ -979,6 +1329,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-5 py-4">
                       <p className="text-sm font-medium">{company.owner_name}</p>
+                      <p className="text-xs text-slate-500">@{company.username || "—"}</p>
                       <p className="text-xs text-slate-500">{company.phone}</p>
                     </td>
                     <td className="px-5 py-4">
@@ -990,6 +1341,24 @@ export default function AdminDashboard() {
                       <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusClass(company.status)}`}>
                         {statusText(company.status)}
                       </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                        company.companyStatus === "active"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                          : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                      }`}>
+                        {company.companyStatus === "active" ? "Faol" : "O‘chiq"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-xs">
+                      {companyAccountCounts[company.id] ? (
+                        <>
+                          <p className="font-semibold">{companyAccountCounts[company.id].employees} ta xodim</p>
+                          <p className="text-emerald-600">{companyAccountCounts[company.id].activeEmployees} faol</p>
+                          <p className="text-slate-500">{companyAccountCounts[company.id].inactiveEmployees} nofaol</p>
+                        </>
+                      ) : "—"}
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{dateFormat(company.created_at)}</td>
                     <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{dateFormat(company.expires_at)}</td>
@@ -1042,16 +1411,27 @@ export default function AdminDashboard() {
                     <div>
                       <p className="font-semibold">{company.name}</p>
                       <p className="text-xs text-slate-500">{company.owner_name}</p>
+                      <p className="text-xs text-slate-500">@{company.username || "—"}</p>
                       <p className="text-xs text-slate-500">{company.phone}</p>
                     </div>
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(company.status)}`}>
-                    {statusText(company.status)}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(company.status)}`}>
+                      Obuna: {statusText(company.status)}
+                    </span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      company.companyStatus === "active"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                        : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                    }`}>
+                      {company.companyStatus === "active" ? "Kompaniya faol" : "Kompaniya o‘chiq"}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
                   <div><p className="text-slate-500">Tarif</p><p className="font-semibold">{company.plan}</p></div>
                   <div><p className="text-slate-500">Jami to'lov</p><p className="font-semibold">{money(company.total_paid)}</p></div>
+                  <div><p className="text-slate-500">Xodimlar</p><p className="font-semibold">{companyAccountCounts[company.id]?.employees ?? "—"} jami · {companyAccountCounts[company.id]?.activeEmployees ?? "—"} faol · {companyAccountCounts[company.id]?.inactiveEmployees ?? "—"} nofaol</p></div>
                   <div><p className="text-slate-500">Ro'yxatdan o'tgan</p><p className="font-semibold">{dateFormat(company.created_at)}</p></div>
                   <div><p className="text-slate-500">Obuna</p><p className="font-semibold">{dateFormat(company.expires_at)}</p></div>
                 </div>
@@ -1114,7 +1494,7 @@ export default function AdminDashboard() {
       {/* MODAL */}
       {selectedCompany && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
             <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
               <div>
                 <h2 className="text-xl font-bold">{selectedCompany.name}</h2>
@@ -1141,8 +1521,8 @@ export default function AdminDashboard() {
               <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-semibold">Korxona holati</p>
-                    <p className="text-xs text-slate-500">Korxonaning tizimga kirish holatini boshqaring</p>
+                    <p className="font-semibold">Obuna holati</p>
+                    <p className="text-xs text-slate-500">Obunani yoqish yoki vaqtincha to‘xtatish</p>
                   </div>
                   <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusClass(selectedCompany.status)}`}>
                     {statusText(selectedCompany.status)}
@@ -1170,6 +1550,274 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Kompaniya holati</p>
+                    <p className="text-xs text-slate-500">Kompaniya va uning barcha xodimlariga kirishni boshqaradi</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    selectedCompany.companyStatus === "active"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                      : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                  }`}>
+                    {selectedCompany.companyStatus === "active" ? "Faol" : "O‘chiq"}
+                  </span>
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => void changeCompanyStatus(selectedCompany)}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                      selectedCompany.companyStatus === "active"
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-emerald-600 hover:bg-emerald-700"
+                    }`}
+                  >
+                    {selectedCompany.companyStatus === "active" ? "Faolsizlantirish" : "Kompaniyani faollashtirish"}
+                  </button>
+                </div>
+              </div>
+
+              {!detailsLoading && details?.ownerProfileExists === false && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/20">
+                  <p className="font-semibold text-amber-900 dark:text-amber-200">
+                    Korxona egasining Firestore profili topilmadi
+                  </p>
+                  <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                    Auth UID: <code>{selectedCompany.ownerUid}</code>. Profilni tiklash uchun pastdagi amalni bosing.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => void restoreOwnerProfile(selectedCompany)}
+                    className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {actionLoading ? "Tiklanmoqda..." : "Admin profilini tiklash"}
+                  </button>
+                </div>
+              )}
+
+              {!detailsLoading && details?.ownerProfileExists === null && (
+                <div role="alert" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300">
+                  Kompaniyada ownerUid yo‘q. Auth foydalanuvchisining UID’ini tekshirib,
+                  kompaniya hujjatiga ownerUid sifatida yozing; noto‘g‘ri UID bilan profil tiklanmaydi.
+                </div>
+              )}
+
+              <section className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold">Xodim akkauntlari</h3>
+                    <p className="text-xs text-slate-500">
+                      {selectedCompany.id} · {managedAccounts.filter((account) => account.role !== "Admin").length} xodim,
+                      {" "}{managedAccounts.filter((account) => account.role !== "Admin" && account.status === "active").length} faol ·
+                      {" "}{managedAccounts.filter((account) => account.role !== "Admin" && account.status === "inactive").length} nofaol
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      aria-label="Xodimlarni qidirish"
+                      value={accountSearch}
+                      onChange={(event) => setAccountSearch(event.target.value)}
+                      placeholder="Login yoki ism..."
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    />
+                    <select
+                      aria-label="Rol bo‘yicha filtr"
+                      value={accountRoleFilter}
+                      onChange={(event) => setAccountRoleFilter(event.target.value)}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <option value="all">Barcha rollar</option>
+                      {["Admin", "Menejer", "Sotuvchi", "Ombor boshlig'i", "Omborchi", "Hisobchi", "Ishchi", "Kassir"].map((role) => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Holat bo‘yicha filtr"
+                      value={accountStatusFilter}
+                      onChange={(event) => setAccountStatusFilter(event.target.value as "all" | "active" | "inactive")}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <option value="all">Barcha holatlar</option>
+                      <option value="active">Faol</option>
+                      <option value="inactive">Nofaol</option>
+                    </select>
+                  </div>
+                </div>
+
+                <form onSubmit={saveManagedAccount} className="grid gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 md:grid-cols-4">
+                  <input
+                    value={accountForm.firstName}
+                    onChange={(event) => setAccountForm((form) => ({ ...form, firstName: event.target.value }))}
+                    placeholder="Ism"
+                    aria-label="Ism"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    required
+                  />
+                  <input
+                    value={accountForm.lastName}
+                    onChange={(event) => setAccountForm((form) => ({ ...form, lastName: event.target.value }))}
+                    placeholder="Familiya"
+                    aria-label="Familiya"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    required
+                  />
+                  <input
+                    value={accountForm.username}
+                    onChange={(event) => setAccountForm((form) => ({ ...form, username: event.target.value }))}
+                    placeholder="Login"
+                    aria-label="Login"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    required
+                  />
+                  <select
+                    value={accountForm.role}
+                    onChange={(event) => setAccountForm((form) => ({ ...form, role: event.target.value }))}
+                    aria-label="Akkaunt roli"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    {["Admin", "Menejer", "Sotuvchi", "Ombor boshlig'i", "Omborchi", "Hisobchi", "Ishchi", "Kassir"].map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={accountForm.phone}
+                    onChange={(event) => setAccountForm((form) => ({ ...form, phone: event.target.value }))}
+                    placeholder="Telefon"
+                    aria-label="Telefon"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                  <input
+                    value={accountForm.position}
+                    onChange={(event) => setAccountForm((form) => ({ ...form, position: event.target.value }))}
+                    placeholder="Lavozim"
+                    aria-label="Lavozim"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                  {!editingAccountUid && (
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={12}
+                      value={accountForm.password}
+                      onChange={(event) => setAccountForm((form) => ({ ...form, password: event.target.value }))}
+                      placeholder="Vaqtinchalik parol (12+)"
+                      aria-label="Vaqtinchalik parol"
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                      required
+                    />
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={actionLoading}
+                      className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {actionLoading ? "Saqlanmoqda..." : editingAccountUid ? "Tahrirni saqlash" : "Xodim qo‘shish"}
+                    </button>
+                    {editingAccountUid && (
+                      <button type="button" onClick={resetAccountForm} className="rounded-lg border px-3 text-sm dark:border-slate-700">
+                        Bekor
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                  <table className="min-w-[980px] w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
+                      <tr>
+                        <th className="px-3 py-3">Ism</th>
+                        <th className="px-3 py-3">Login</th>
+                        <th className="px-3 py-3">Rol</th>
+                        <th className="px-3 py-3">Kompaniya ID</th>
+                        <th className="px-3 py-3">Holati</th>
+                        <th className="px-3 py-3">Yaratilgan</th>
+                        <th className="px-3 py-3">Oxirgi kirish</th>
+                        <th className="px-3 py-3">Amallar</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {accountsLoading ? (
+                        <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-500">Akkauntlar yuklanmoqda...</td></tr>
+                      ) : filteredManagedAccounts.length === 0 ? (
+                        <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-500">Akkaunt topilmadi.</td></tr>
+                      ) : filteredManagedAccounts.map((account) => (
+                        <tr key={account.uid}>
+                          <td className="px-3 py-3 font-medium">{account.fullName || "—"}</td>
+                          <td className="px-3 py-3">{account.username || account.email || "—"}</td>
+                          <td className="px-3 py-3">{account.role}</td>
+                          <td className="px-3 py-3">{selectedCompany.id}</td>
+                          <td className="px-3 py-3">{account.status === "active" ? "Faol" : "Nofaol"}</td>
+                          <td className="px-3 py-3">{dateFormat(account.createdAt)}</td>
+                          <td className="px-3 py-3">{dateFormat(account.lastSeenAt)}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              <button
+                                type="button"
+                                onClick={() => beginAccountEdit(account)}
+                                className="rounded-md border px-2 py-1 text-xs dark:border-slate-700"
+                              >
+                                Tahrir
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => void changeAccountStatus(account)}
+                                className="rounded-md border px-2 py-1 text-xs dark:border-slate-700"
+                              >
+                                {account.status === "active" ? "Nofaol qilish" : "Faollashtirish"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setResetPasswordUid(resetPasswordUid === account.uid ? null : account.uid);
+                                  setResetPassword("");
+                                }}
+                                className="rounded-md border px-2 py-1 text-xs dark:border-slate-700"
+                              >
+                                Parol
+                              </button>
+                            </div>
+                            {resetPasswordUid === account.uid && (
+                              <form
+                                className="mt-2 flex gap-1"
+                                onSubmit={(event) => {
+                                  event.preventDefault();
+                                  void resetManagedAccountPassword(account.uid);
+                                }}
+                              >
+                                <input
+                                  type="password"
+                                  autoComplete="new-password"
+                                  minLength={12}
+                                  value={resetPassword}
+                                  onChange={(event) => setResetPassword(event.target.value)}
+                                  placeholder="Yangi parol 12+"
+                                  aria-label="Yangi parol"
+                                  className="min-w-0 rounded-md border px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                                  required
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={actionLoading}
+                                  className="rounded-md bg-blue-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                >
+                                  Saqlash
+                                </button>
+                              </form>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {detailMessage && (
+                  <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{detailMessage}</p>
+                )}
+              </section>
 
               {/* TO'LOVLAR */}
               <div>
@@ -1264,7 +1912,7 @@ export default function AdminDashboard() {
 
               <button
                 onClick={closeModal}
-                className="w-full rounded-xl border border-slate-200 py-3 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+               className="w-full rounded-xl border border-slate-200 py-3 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
               >
                 Yopish
               </button>
