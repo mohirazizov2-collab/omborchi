@@ -28,7 +28,7 @@ service cloud.firestore {
     function isActiveCompanyMember(companyId) {
       return isCompanyMember(companyId)
         && exists(/databases/$(database)/documents/companies/$(companyId))
-        && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionStatus == 'active'
+        && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionStatus in ['active', 'trial']
         && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionEndsAt > request.time;
     }
 
