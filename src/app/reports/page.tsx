@@ -181,7 +181,8 @@ export default function ReportsPage() {
   // ── Firebase queries ──
   const productsQuery  = useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "products")  : null, [db, user, companyId]);
   const warehousesQuery= useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "warehouses"): null, [db, user, companyId]);
-  const employeesQuery = useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "employees") : null, [db, user, companyId]);
+  const isAdminRole = role === "Admin" || role === "Super Admin";
+  const employeesQuery = useMemoFirebase(() => (db && user && isAdminRole) ? tenantCollection(db, companyId, "employees") : null, [db, user, companyId, isAdminRole]);
   const expensesQuery  = useMemoFirebase(() => (db && user) ? tenantCollection(db, companyId, "expenses")  : null, [db, user, companyId]);
   const movementsQuery = useMemoFirebase(() =>
     (db && user) ? query(tenantCollection(db, companyId, "stockMovements"), orderBy("movementDate", "desc")) : null,
@@ -449,7 +450,7 @@ export default function ReportsPage() {
     { key: "overview",   label: "Umumiy ko'rinish", icon: <BarChart2 className="w-4 h-4" /> },
     { key: "products",   label: "Mahsulotlar",       icon: <Package className="w-4 h-4" /> },
     { key: "warehouse",  label: "Omborlar",           icon: <Warehouse className="w-4 h-4" /> },
-    { key: "staff",      label: "Xodimlar",           icon: <Users2 className="w-4 h-4" /> },
+    ...(isAdminRole ? [{ key: "staff", label: "Xodimlar", icon: <Users2 className="w-4 h-4" /> }] : []),
   ];
 
   const alertColors = {
