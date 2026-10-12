@@ -140,11 +140,11 @@ const chatWithAIFlow = ai.defineFlow(
     } catch (err: any) {
       console.error("Genkit Flow Error:", err);
       // Xatolik xabarini foydalanuvchiga tushunarli qilish
-      if (err.message?.includes('expired') || err.message?.includes('400')) {
-        throw new Error("API kalitining muddati tugagan yoki xato. Iltimos, yangilang.");
+      if (err.message?.includes('401') || err.message?.includes('403')) {
+        throw new Error("TokenRouter API kaliti yaroqsiz yoki ruxsati yetarli emas.");
       }
       if (err.message?.includes('404')) {
-        throw new Error("Model topilmadi. Konfiguratsiyani tekshiring.");
+        throw new Error("TokenRouter modeli topilmadi. TOKENROUTER_MODEL sozlamasini tekshiring.");
       }
       throw err;
     }

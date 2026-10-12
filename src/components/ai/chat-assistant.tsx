@@ -23,7 +23,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { chatWithAI } from '@/ai/flows/chat-flow';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -63,22 +62,55 @@ export function ChatAssistant() {
     setIsLoading(true);
 
     try {
-      const response = await chatWithAI({
-        message: text,
-        history: messages.filter(m => !m.isError).map(m => ({ role: m.role, content: m.content }))
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: messages.filter(m => !m.isError).map(m => ({ role: m.role, content: m.content }))
+        })
       });
-      setMessages(prev => [...prev, { role: 'model', content: response.response }]);
-    } catch (error: any) {
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(
+          "AI server endpointi topilmadi. GitHub Pages API'ni ishga tushirmaydi; Firebase App Hosting yoki Vercel serveriga deploy qiling."
+        );
+      }
+
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const errorMessage =
+          typeof result === 'object' && result !== null && 'error' in result &&
+          typeof result.error === 'string'
+            ? result.error
+            : "AI so'rovni bajara olmadi.";
+        throw new Error(errorMessage);
+      }
+
+      if (typeof result !== 'object' || result === null || !('response' in result)) {
+        throw new Error("AI javobi kutilgan formatda emas.");
+      }
+      const responseText = result.response;
+      if (typeof responseText !== 'string') {
+        throw new Error("AI javobi kutilgan formatda emas.");
+      }
+
+      setMessages(prev => [...prev, { role: 'model', content: responseText }]);
+    } catch (error: unknown) {
       console.error('AI Chat Error:', error);
       let errMsg = "AI bilan bog'lanib bo'lmadi. Kalit yoki ulanishni tekshiring.";
-      const errorStr = String(error?.message || "").toLowerCase();
+      const errorStr = error instanceof Error ? error.message.toLowerCase() : "";
+      if (error instanceof Error && error.message) {
+        errMsg = error.message;
+      }
       
       if (errorStr.includes('expired')) {
-        errMsg = "API kalitining muddati tugagan. Iltimos, Google AI Studiodan yangi kalit oling.";
+        errMsg = "TokenRouter API kalitining muddati tugagan yoki yaroqsiz.";
       } else if (errorStr.includes('429')) {
         errMsg = "AI so'rovlar limiti tugadi. Bir ozdan keyin urinib ko'ring.";
       } else if (errorStr.includes('404')) {
-        errMsg = "Model topilmadi yoki API kalit noto'g'ri kiritilgan.";
+        errMsg = "TokenRouter modeli topilmadi. Model sozlamasini tekshiring.";
       }
 
       setMessages(prev => [...prev, { role: 'model', content: errMsg, isError: true }]);

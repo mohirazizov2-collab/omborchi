@@ -1,14 +1,31 @@
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
- 
+import { genkit, z } from 'genkit';
+import openAI from 'genkitx-openai';
+
+const modelName = process.env.TOKENROUTER_MODEL || 'gpt-4o-mini';
+
 export const ai = genkit({
   plugins: [
-    googleAI({
-      apiKey: process.env.GOOGLE_GENAI_API_KEY!,
+    openAI({
+      apiKey: process.env.TOKENROUTER_API_KEY,
+      baseURL: 'https://api.tokenrouter.com/v1',
+      models: [{
+        name: modelName,
+        info: {
+          versions: [modelName],
+          label: `TokenRouter - ${modelName}`,
+          supports: {
+            multiturn: true,
+            tools: true,
+            media: false,
+            systemRole: true,
+            output: ['text', 'json'],
+          },
+        },
+        configSchema: z.object({}),
+      }],
     }),
   ],
-  model: 'googleai/gemini-1.5-flash',
+  model: `openai/${modelName}`,
 });
- 
-// model ni alohida export qilish — flow fayllar import qilishi uchun
-export const model = 'googleai/gemini-1.5-flash';
+
+export const model = `openai/${modelName}`;
