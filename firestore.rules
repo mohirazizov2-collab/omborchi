@@ -22,25 +22,107 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid));
     }
 
-    function isCompanyOwner(companyId) {
-      return hasAuth()
-        && exists(/databases/$(database)/documents/companies/$(companyId))
-        && get(/databases/$(database)/documents/companies/$(companyId)).data.ownerUid == request.auth.uid;
-    }
-
     // Obuna faol (active yoki trial) va muddati tugamagan
     function isActiveCompany(companyId) {
       return exists(/databases/$(database)/documents/companies/$(companyId))
         && (!('companyStatus' in get(/databases/$(database)/documents/companies/$(companyId)).data)
           || get(/databases/$(database)/documents/companies/$(companyId)).data.companyStatus == 'active')
         && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionStatus in ['active', 'trial']
-        && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionEndsAt > request.time;
+        && (
+          ('subscriptionEndsAt' in get(/databases/$(database)/documents/companies/$(companyId)).data
+            && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionEndsAt is timestamp
+            && get(/databases/$(database)/documents/companies/$(companyId)).data.subscriptionEndsAt > request.time)
+          || ('expires_at' in get(/databases/$(database)/documents/companies/$(companyId)).data
+            && get(/databases/$(database)/documents/companies/$(companyId)).data.expires_at is timestamp
+            && get(/databases/$(database)/documents/companies/$(companyId)).data.expires_at > request.time)
+        );
     }
 
     function isActiveCompanyMember(companyId) {
       return isCompanyMember(companyId)
         && get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data.get('status', 'active') != 'inactive'
         && isActiveCompany(companyId);
+    }
+
+    function hasModulePermission(companyId, moduleName) {
+      let member = get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data;
+      return isActiveCompanyMember(companyId)
+        && ('permissions' in member)
+        && member.permissions.get(moduleName, false) == true;
+    }
+
+    function hasExplicitModulePermission(companyId, moduleName) {
+      let member = get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data;
+      return isActiveCompanyMember(companyId)
+        && ('permissions' in member)
+        && member.permissions.get(moduleName, false) == true;
+    }
+
+    function canAccessCompanyCollection(companyId, collectionName) {
+      return collectionName in ['payments', 'subscriptions', 'counters', 'chats', 'messages']
+        || (collectionName == 'users' && (
+          hasModulePermission(companyId, 'users')
+          || hasModulePermission(companyId, 'employees')
+        ))
+        || (collectionName == 'accountAuditLogs' && hasModulePermission(companyId, 'users'))
+        || (collectionName in ['products', 'categories'] && (
+          hasModulePermission(companyId, 'products')
+          || hasModulePermission(companyId, 'dashboard')
+          || hasModulePermission(companyId, 'reports')
+          || hasModulePermission(companyId, 'sales')
+          || hasModulePermission(companyId, 'stockIn')
+          || hasModulePermission(companyId, 'stockOut')
+          || hasModulePermission(companyId, 'transfers')
+          || hasModulePermission(companyId, 'production')
+          || hasModulePermission(companyId, 'inventoryAudit')
+          || hasModulePermission(companyId, 'cash')
+        ))
+        || (collectionName == 'warehouses' && (
+          hasModulePermission(companyId, 'warehouses')
+          || hasModulePermission(companyId, 'reports')
+          || hasModulePermission(companyId, 'stockIn')
+          || hasModulePermission(companyId, 'stockOut')
+          || hasModulePermission(companyId, 'transfers')
+          || hasModulePermission(companyId, 'production')
+          || hasModulePermission(companyId, 'inventoryAudit')
+        ))
+        || (collectionName == 'stock-in' && hasModulePermission(companyId, 'stockIn'))
+        || (collectionName == 'stock-out' && hasModulePermission(companyId, 'stockOut'))
+        || (collectionName == 'transfers' && hasModulePermission(companyId, 'transfers'))
+        || (collectionName == 'production' && hasModulePermission(companyId, 'production'))
+        || (collectionName == 'recipes' && hasModulePermission(companyId, 'recipes'))
+        || (collectionName == 'expenses' && (
+          hasModulePermission(companyId, 'expenses')
+          || hasModulePermission(companyId, 'reports')
+        ))
+        || (collectionName in ['employees', 'staff'] && (
+          isCompanyAdmin(companyId)
+          || hasModulePermission(companyId, 'employees')
+          || hasModulePermission(companyId, 'reports')
+        ))
+        || (collectionName == 'reports' && hasModulePermission(companyId, 'reports'))
+        || (collectionName == 'history' && hasModulePermission(companyId, 'history'))
+        || (collectionName == 'settings' && hasModulePermission(companyId, 'settings'))
+        || (collectionName == 'profile' && hasModulePermission(companyId, 'profile'))
+        || (collectionName == 'inventory' && (
+          hasModulePermission(companyId, 'inventoryAudit')
+          || hasModulePermission(companyId, 'production')
+        ))
+        || (collectionName == 'inventory-audit' && hasModulePermission(companyId, 'inventoryAudit'))
+        || (collectionName == 'auditLogs' && (
+          hasModulePermission(companyId, 'history')
+          || hasModulePermission(companyId, 'inventoryAudit')
+        ))
+        || (collectionName == 'sales' && hasModulePermission(companyId, 'sales'))
+        || (collectionName == 'cash' && hasModulePermission(companyId, 'cash'))
+        || (collectionName == 'stockMovements' && (
+          hasModulePermission(companyId, 'dashboard')
+          || hasModulePermission(companyId, 'reports')
+          || hasModulePermission(companyId, 'stockIn')
+          || hasModulePermission(companyId, 'stockOut')
+          || hasModulePermission(companyId, 'sales')
+          || hasModulePermission(companyId, 'history')
+        ));
     }
 
     function companyRole(companyId) {
@@ -80,11 +162,25 @@ service cloud.firestore {
         || (hasAuth()
           && collectionName == 'users'
           && documentId == request.auth.uid
-          && isCompanyOwner(companyId))
+          && isCompanyMember(companyId))
         || (isActiveCompanyMember(companyId)
+          && canAccessCompanyCollection(companyId, collectionName)
           && (
             !(collectionName in ['expenses', 'employees', 'staff', 'reports', 'history', 'auditLogs', 'accountAuditLogs', 'cash'])
             || isCompanyAdmin(companyId)
+            || (collectionName == 'expenses' && hasExplicitModulePermission(companyId, 'expenses'))
+            || (collectionName == 'expenses' && hasExplicitModulePermission(companyId, 'reports'))
+            || (collectionName in ['employees', 'staff'] && (
+              hasExplicitModulePermission(companyId, 'employees')
+              || hasExplicitModulePermission(companyId, 'reports')
+            ))
+            || (collectionName == 'reports' && hasExplicitModulePermission(companyId, 'reports'))
+            || (collectionName == 'history' && hasExplicitModulePermission(companyId, 'history'))
+            || (collectionName == 'auditLogs' && (
+              hasExplicitModulePermission(companyId, 'history')
+              || hasExplicitModulePermission(companyId, 'inventoryAudit')
+            ))
+            || (collectionName == 'cash' && hasExplicitModulePermission(companyId, 'cash'))
           ));
 
       allow create: if (isSuperAdmin()
@@ -95,6 +191,7 @@ service cloud.firestore {
             || collectionName in ['payments', 'subscriptions']
           ))
         || (isActiveCompanyMember(companyId)
+          && canAccessCompanyCollection(companyId, collectionName)
           && (
             (collectionName == 'users'
               && isCompanyAdmin(companyId)
@@ -115,6 +212,8 @@ service cloud.firestore {
           ));
 
       allow update: if isActiveCompanyMember(companyId)
+        && (canAccessCompanyCollection(companyId, collectionName)
+          || (collectionName == 'users' && request.auth.uid == documentId))
         && (
           (collectionName == 'users'
             && request.resource.data.companyId == companyId
@@ -139,6 +238,7 @@ service cloud.firestore {
         );
 
       allow delete: if isActiveCompanyMember(companyId)
+        && canAccessCompanyCollection(companyId, collectionName)
         && (
           (collectionName == 'users' && isCompanyAdmin(companyId))
           || (collectionName in ['products', 'sales', 'expenses', 'warehouses', 'categories', 'recipes', 'employees', 'staff', 'reports', 'settings', 'cash']
